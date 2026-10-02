@@ -15,6 +15,12 @@ Scope {
   property string status: ""
   property string pending: ""
 
+  Binding {
+    target: Session
+    property: "locked"
+    value: root.locked
+  }
+
   function lock() {
     if (locked) return
     status = ""

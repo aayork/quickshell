@@ -123,11 +123,17 @@ Scope {
     revision += 1
   }
 
-  function row(key, title, subtitle, accessory, extra) {
-    return Object.assign({
-      key: "displays:" + key, title: title, subtitle: subtitle, icon: "", glyph: Icons.glyph(0xF0379),
-      accessory: accessory, keepOpen: true
-    }, extra)
+  // extra: { run } to do something, { fill } to step into a setting, or
+  // nothing for a row that only informs.
+  function row(key, title, subtitle, chip, extra) {
+    var options = extra || {}
+    var actions = options.run ? [{ title: "Apply", run: options.run, keepOpen: true }]
+      : options.fill ? [{ title: "Choose", fill: options.fill }]
+      : []
+    return {
+      key: "displays:" + key, title: title, subtitle: subtitle, icon: "", glyph: options.glyph || Icons.glyph(0xF0379),
+      chip: chip, hint: options.hint === true, keepOpen: true, actions: actions
+    }
   }
 
   // What the launcher lists for the text after `displays:`.
@@ -166,7 +172,7 @@ Scope {
           if (filter !== "" && text2.indexOf(filter) === -1) continue
           var active = mode.size === current && Math.abs(mode.rate - monitor.refreshRate) < 0.05
           list.push(row(monitor.name + ":mode:" + mode.mode, mode.size, Math.round(mode.rate) + " Hz", active ? "Current" : "",
-            active ? { hint: false } : { run: (function(mon, md) { return () => root.change(mon, "mode", "\"" + md.mode + "\"", md.size + " at " + Math.round(md.rate) + " Hz") })(monitor, mode) }))
+            active ? {} : { run: (function(mon, md) { return () => root.change(mon, "mode", "\"" + md.mode + "\"", md.size + " at " + Math.round(md.rate) + " Hz") })(monitor, mode) }))
         }
         continue
       }

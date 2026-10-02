@@ -6,8 +6,8 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// Quick settings: now playing, output and input volume, and the Wi-Fi and
-// Bluetooth switches. Scroll on the button changes the volume, right click
+// Quick settings: session buttons, now playing, output and input volume, and
+// the Wi-Fi and Bluetooth switches. Scroll on the button changes the volume, right click
 // mutes.
 BarButton {
   id: root
@@ -19,6 +19,14 @@ BarButton {
   readonly property var pairedDevices: Bluetooth.devices.values.filter(d => d.paired || d.connected)
   readonly property var connectedDevices: pairedDevices.filter(d => d.connected)
   property bool showDevices: false
+  // Session action waiting for its second click.
+  property string armed: ""
+
+  Timer {
+    id: disarm
+    interval: 3000
+    onTriggered: root.armed = ""
+  }
 
   // The two-switch icon is its own one-glyph font (assets/build-glyph.py), so
   // the text renderer pixel-snaps it like the Nerd Font icons beside it.
@@ -149,6 +157,7 @@ BarButton {
     contentHeight: column.implicitHeight
 
     onOpenChanged: {
+      root.armed = ""
       if (open) Media.refreshPosition()
       else root.showDevices = false
     }
@@ -164,6 +173,72 @@ BarButton {
       id: column
       width: parent.width
       spacing: 12
+
+      // Session: lock, suspend, log out, restart, shut down. The ones that
+      // end the session need a second click.
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        uniformCellSizes: true
+
+        Repeater {
+          model: Session.actions
+
+          Rectangle {
+            id: sessionButton
+            required property var modelData
+
+            readonly property bool armed: root.armed === modelData.id
+
+            Layout.fillWidth: true
+            implicitHeight: 34
+            radius: Theme.controlRadius
+            // The ones that end the session warn in red as soon as they are hovered.
+            readonly property bool warning: modelData.confirm && sessionMouse.containsMouse
+
+            color: armed ? Theme.red
+              : warning ? Theme.alpha(Theme.red, 0.22)
+              : sessionMouse.containsMouse ? Theme.pressed : Theme.alpha(Theme.foreground, 0.05)
+            border.width: 1
+            border.color: warning || armed ? Theme.alpha(Theme.red, 0.6) : Theme.alpha(Theme.foreground, 0.12)
+
+            Label {
+              anchors.centerIn: parent
+              text: Icons.glyph(sessionButton.modelData.icon)
+              color: sessionButton.armed ? Theme.background : sessionButton.warning ? Theme.red : Theme.foreground
+              font.pixelSize: Theme.iconLarge
+              elide: Text.ElideNone
+            }
+
+            MouseArea {
+              id: sessionMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              onClicked: {
+                if (sessionButton.modelData.confirm && !sessionButton.armed) {
+                  root.armed = sessionButton.modelData.id
+                  disarm.restart()
+                  return
+                }
+                root.armed = ""
+                popup.close()
+                Session.run(sessionButton.modelData.id)
+              }
+            }
+          }
+        }
+      }
+
+      Label {
+        visible: root.armed !== ""
+        text: root.armed !== "" ? "Click again to " + Session.actions.find(a => a.id === root.armed).label.toLowerCase() : ""
+        color: Theme.red
+        font.pixelSize: Theme.fontSmall
+        Layout.alignment: Qt.AlignHCenter
+        Layout.topMargin: -6
+      }
+
+      Separator { Layout.fillWidth: true }
 
       SectionHeader { text: "NOW PLAYING" }
 

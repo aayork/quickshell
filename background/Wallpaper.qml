@@ -23,6 +23,9 @@ Scope {
       screen: modelData
       anchors { top: true; bottom: true; left: true; right: true }
       color: Theme.background
+      // The image can be ready before the surface has a size to crop it to.
+      onWidthChanged: probe.sample()
+      onHeightChanged: probe.sample()
       exclusionMode: ExclusionMode.Ignore
       WlrLayershell.namespace: "aayork-wallpaper"
       WlrLayershell.layer: WlrLayer.Background
@@ -39,8 +42,14 @@ Scope {
 
         property url loaded: ""
 
+        // WCAG relative luminance of an sRGB colour.
+        function luminance(r, g, b) {
+          function linear(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+          return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+        }
+
         function sample() {
-          if (!panel.primary || image.status !== Image.Ready) return
+          if (!panel.primary || image.status !== Image.Ready || panel.width <= 0 || panel.height <= 0) return
           if (loaded.toString() !== "" && loaded !== panel.source) unloadImage(loaded)
           loaded = panel.source
           if (isImageLoaded(loaded)) requestPaint()
@@ -63,11 +72,17 @@ Scope {
             Math.max(1, Math.floor(cropWidth) - 1), Math.max(1, Math.floor(Theme.barHeight / scale)),
             0, 0, width, height)
           var pixels = context.getImageData(0, 0, width, height).data
-          var total = 0
+          var sum = [0, 0, 0]
           for (var i = 0; i + 3 < pixels.length; i += 4)
-            total += 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]
-          var brightness = total / (pixels.length / 4) / 255
-          Theme.barForeground = brightness > 0.6 ? Theme.background : Theme.brightForeground
+            for (var c = 0; c < 3; c++) sum[c] += pixels[i + c]
+          var count = pixels.length / 4
+          var behind = probe.luminance(sum[0] / count / 255, sum[1] / count / 255, sum[2] / count / 255)
+          // Whichever of the theme's dark and light reads better against it.
+          var dark = Theme.background
+          var light = Theme.brightForeground
+          var darkContrast = (behind + 0.05) / (probe.luminance(dark.r, dark.g, dark.b) + 0.05)
+          var lightContrast = (probe.luminance(light.r, light.g, light.b) + 0.05) / (behind + 0.05)
+          Theme.barForeground = darkContrast > lightContrast ? dark : light
           unloadImage(loaded)
         }
       }

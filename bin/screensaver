@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Plays the Apple aerial videos full screen, one mpv per monitor. Started by
+# the shell's idle module. mpv's own input config quits on any key or mouse
+# movement, and the idle module notices the window closing.
+#
+# The window class is still Roseshell's: the fullscreen rule in hyprland.lua
+# matches on it.
+CLASS=org.roseshell.screensaver
+
+pgrep -f -- "--wayland-app-id=$CLASS" >/dev/null && exit 0
+
+shopt -s nullglob
+videos=("$HOME/Videos/aerial"/*.mov "$HOME/Videos/aerial"/*.mp4 "$HOME/Videos/aerial"/*.m4v)
+shopt -u nullglob
+
+(( ${#videos[@]} > 0 )) || exit 1
+
+focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
+
+for monitor in $(hyprctl monitors -j | jq -r '.[] | select(.disabled == false) | .name'); do
+  hyprctl dispatch "hl.dsp.focus({ monitor = \"$monitor\" })" >/dev/null
+
+  # panscan crops the 16:9 videos to fill a screen that is not 16:9. setsid
+  # puts mpv in its own session so it outlives this script.
+  setsid -f mpv \
+    --wayland-app-id="$CLASS" \
+    --fullscreen \
+    --no-osc \
+    --osd-level=0 \
+    --panscan=1.0 \
+    --input-conf="$HOME/.config/mpv/screensaver-input.conf" \
+    --loop-playlist=inf \
+    --shuffle \
+    --mute=yes \
+    --stop-screensaver=no \
+    --cursor-autohide=1000 \
+    --really-quiet \
+    --idle=no \
+    "${videos[@]}" >/dev/null 2>&1
+
+  sleep 0.3
+done
+
+[[ -n $focused ]] && hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })" >/dev/null

@@ -7,8 +7,9 @@ import Quickshell.Hyprland
 Singleton {
   id: root
 
-  // The lock screen listens for this.
+  // The lock screen listens for this, and reports back through `locked`.
   signal lockRequested()
+  property bool locked: false
 
   readonly property var actions: [
     { id: "lock", label: "Lock", icon: 0xF033E, confirm: false },
