@@ -9,9 +9,9 @@ import qs.ui
 // Settings: how things look, how the shell behaves, how windows are drawn,
 // and the network and Bluetooth panels.
 //
-// Theme, background, font, cursor and window style are still applied by
-// Roseshell's scripts (roseshell-theme-set and friends), which also recolour
-// the other apps. This is the front end for them.
+// Theme, background, font, cursor and window style are applied by the
+// scripts in bin/ (theme-set and friends), which also recolour the other
+// apps. This is the front end for them.
 Scope {
   id: root
 
@@ -55,6 +55,7 @@ Scope {
   property string swatchNote: ""
 
   readonly property string stateDir: Theme.stateDir
+  readonly property string bin: Quickshell.shellDir + "/bin/"
   readonly property string iconDirs: "\"$HOME/.local/share/icons\" \"$HOME/.icons\" /usr/share/icons"
 
   function show(which) {
@@ -89,13 +90,13 @@ Scope {
   // ---------------------------------------------------------------- appearance
   function applyTheme(name) {
     theme = name
-    Quickshell.execDetached(["roseshell-theme-set", name])
+    Quickshell.execDetached([root.bin + "theme-set", name])
     // The script takes about a second and picks the theme's own background.
     settle.restart()
   }
 
   function applyBackground(path) {
-    Quickshell.execDetached(["roseshell-theme-bg-set", path])
+    Quickshell.execDetached([root.bin + "theme-bg-set", path])
     settle.restart()
   }
 
@@ -103,7 +104,7 @@ Scope {
   // generated "Wallpaper" theme.
   function matchTheme() {
     if (Background.path === "" || matchProcess.running) return
-    matchProcess.command = ["roseshell-theme-from-background", Background.path]
+    matchProcess.command = [root.bin + "theme-from-background", Background.path]
     matchProcess.running = true
   }
 
@@ -116,14 +117,14 @@ Scope {
   // A chosen file is copied into the theme's own backgrounds folder, so it
   // stays selectable even if the original moves.
   readonly property string importScript: "src=$(realpath -- \"$1\") || exit 1; "
-    + "theme=$(cat \"$HOME/.local/state/roseshell/current/theme.name\" 2>/dev/null); "
-    + "dir=\"$HOME/.config/roseshell/backgrounds/$theme\"; "
-    + "themedir=$(realpath -m \"$HOME/.local/state/roseshell/current/theme/backgrounds\"); "
+    + "theme=$(cat \"$HOME/.local/state/aayork-quickshell/current/theme.name\" 2>/dev/null); "
+    + "dir=\"$HOME/.config/aayork-quickshell/backgrounds/$theme\"; "
+    + "themedir=$(realpath -m \"$HOME/.local/state/aayork-quickshell/current/theme/backgrounds\"); "
     + "case \"$src\" in \"$dir\"/*|\"$themedir\"/*) dest=$src ;; "
     + "*) mkdir -p \"$dir\" || exit 1; dest=\"$dir/${src##*/}\"; "
     + "if [ -e \"$dest\" ] && ! cmp -s \"$src\" \"$dest\"; then dest=\"$dir/$(date +%s)-${src##*/}\"; fi; "
     + "[ -e \"$dest\" ] || cp -- \"$src\" \"$dest\" || exit 1 ;; esac; "
-    + "roseshell-theme-bg-set \"$dest\""
+    + "\"$2theme-bg-set\" \"$dest\""
 
   function applyFont(name) {
     font = name
@@ -134,7 +135,7 @@ Scope {
   function applyCursor(name, size) {
     cursor = name
     cursorSize = size
-    Quickshell.execDetached(["roseshell-cursor-set", name, String(size)])
+    Quickshell.execDetached([root.bin + "cursor-set", name, String(size)])
   }
 
   function nearestCursorSize(size) {
@@ -152,7 +153,7 @@ Scope {
   // ---------------------------------------------------------------- windows
   function applyWindows() {
     var w = Config.windows
-    Quickshell.execDetached(["roseshell-window-style", String(w.rounding), String(w.gapsIn), String(w.gapsOut),
+    Quickshell.execDetached([root.bin + "window-style", String(w.rounding), String(w.gapsIn), String(w.gapsOut),
       String(w.border), w.shadow ? "on" : "off", w.animations])
   }
 
@@ -165,10 +166,10 @@ Scope {
     }
   }
 
-  Lines { id: themeList; command: ["roseshell-theme-list"]; onResultChanged: root.themes = result }
-  Lines { id: themeCurrent; command: ["roseshell-theme-current"]; onResultChanged: root.theme = result[0] || "" }
-  Lines { id: fontList; command: ["roseshell-font-list"]; onResultChanged: root.fonts = result }
-  Lines { id: fontCurrent; command: ["roseshell-font-current"]; onResultChanged: root.font = result[0] || "" }
+  Lines { id: themeList; command: [root.bin + "theme-list"]; onResultChanged: root.themes = result }
+  Lines { id: themeCurrent; command: [root.bin + "theme-current"]; onResultChanged: root.theme = result[0] || "" }
+  Lines { id: fontList; command: [root.bin + "font-list"]; onResultChanged: root.fonts = result }
+  Lines { id: fontCurrent; command: [root.bin + "font-current"]; onResultChanged: root.font = result[0] || "" }
   Lines {
     id: cursorList
     command: ["sh", "-c", "for d in " + root.iconDirs + "; do [ -d \"$d\" ] && find \"$d\" -mindepth 1 -maxdepth 1; done | while read -r t; do [ -d \"$t/cursors\" ] && basename \"$t\"; done | sort -u"]
@@ -200,8 +201,8 @@ Scope {
   // first. Only used to fill out the recents.
   Lines {
     id: backgroundList
-    command: ["sh", "-c", "theme=$(cat \"$HOME/.local/state/roseshell/current/theme.name\" 2>/dev/null); "
-      + "find -L \"$HOME/.config/roseshell/backgrounds/$theme/\" \"$HOME/.local/state/roseshell/current/theme/backgrounds/\" -maxdepth 1 -type f "
+    command: ["sh", "-c", "theme=$(cat \"$HOME/.local/state/aayork-quickshell/current/theme.name\" 2>/dev/null); "
+      + "find -L \"$HOME/.config/aayork-quickshell/backgrounds/$theme/\" \"$HOME/.local/state/aayork-quickshell/current/theme/backgrounds/\" -maxdepth 1 -type f "
       + "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \\) -printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | cut -f2- "
       // By content, not by name: a HEIF saved as .png cannot be drawn.
       + "| while IFS= read -r f; do case $(file -b --mime-type -- \"$f\") in image/jpeg|image/png|image/webp|image/gif) printf '%s\\n' \"$f\" ;; esac; done"]
@@ -223,7 +224,7 @@ Scope {
   onCursorChanged: {
     if (cursor === "") return
     cursorSizeList.running = false
-    cursorSizeList.command = ["roseshell-cursor-set", "--sizes", cursor]
+    cursorSizeList.command = [root.bin + "cursor-set", "--sizes", cursor]
     cursorSizeList.running = true
   }
 
@@ -234,12 +235,12 @@ Scope {
 
   Process {
     id: browseProcess
-    command: ["roseshell-pick-file", "--images", "--title", "Choose a background", "--folder", Quickshell.env("HOME") + "/Pictures"]
+    command: [root.bin + "pick-file", "--images", "--title", "Choose a background", "--folder", Quickshell.env("HOME") + "/Pictures"]
     stdout: StdioCollector {
       onStreamFinished: {
         var path = text.trim()
         if (path !== "") {
-          importProcess.command = ["sh", "-c", root.importScript, "sh", path]
+          importProcess.command = ["sh", "-c", root.importScript, "sh", path, root.bin]
           importProcess.running = true
         }
       }

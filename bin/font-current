@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Show current monospace font
+
+# fontconfig is the source of truth. fc-match returns a comma-separated
+# alias list (e.g. "JetBrainsMono Nerd Font,JetBrainsMono NF") so take
+# the first entry.
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+fc-match monospace -f '%{family}\n' | head -n1 | cut -d, -f1

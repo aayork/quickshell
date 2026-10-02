@@ -2,7 +2,6 @@
 
 # Sets the system monospace font: the terminals' own configs, then fontconfig,
 # which is what the shell and everything else asking for "monospace" reads.
-# Adapted from Roseshell's roseshell-font-set.
 
 font_name="${1:-}"
 [[ -n $font_name ]] || { echo "Usage: font-set <font-name>" >&2; exit 1; }

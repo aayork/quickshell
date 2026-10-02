@@ -4,9 +4,8 @@
 # the shell's idle module. mpv's own input config quits on any key or mouse
 # movement, and the idle module notices the window closing.
 #
-# The window class is still Roseshell's: the fullscreen rule in hyprland.lua
-# matches on it.
-CLASS=org.roseshell.screensaver
+# hyprland.lua has a fullscreen rule matching this window class.
+CLASS=org.aayork.screensaver
 
 pgrep -f -- "--wayland-app-id=$CLASS" >/dev/null && exit 0
 

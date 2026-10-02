@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Calendar backend, carried over from Roseshell.
+"""Calendar backend.
 
 Syncs events from iCloud (CalDAV, read/write) and plain ICS feed URLs
 (Google/Microsoft "secret address in iCal format" links, read-only) into a
 flat JSON cache the shell's Calendar plugin reads. Account metadata lives in
-~/.local/state/roseshell/settings/calendar.json (no secrets); passwords are
+~/.local/state/aayork-quickshell/settings/calendar.json (no secrets); passwords are
 stored via secret-tool (gnome-keyring), never written to disk in the clear.
 
-Paths and the keyring service name are still Roseshell's, so accounts added
-there keep working. Invoked by services/Calendar.qml as:
+Invoked by services/Calendar.qml as:
   python3 calendar_helper.py <subcommand> [args...]
 Not named calendar.py on purpose: this directory is sys.path[0] when run, so
 that name would shadow the stdlib calendar module (http.cookiejar imports it)
@@ -25,10 +24,10 @@ import tempfile
 import uuid
 from datetime import datetime, timedelta
 
-STATE_DIR = os.path.expanduser("~/.local/state/roseshell")
+STATE_DIR = os.path.expanduser("~/.local/state/aayork-quickshell")
 SETTINGS_PATH = os.path.join(STATE_DIR, "settings", "calendar.json")
 EVENTS_PATH = os.path.join(STATE_DIR, "calendar", "events.json")
-SECRET_SERVICE = "roseshell-calendar"
+SECRET_SERVICE = "aayork-quickshell-calendar"
 SYNC_DAYS_AHEAD = 14  # today .. +N days pulled on every sync
 
 PALETTE = ["#4C9F70", "#4C7EA8", "#A85C9F", "#C98A3B", "#C1503E", "#6C7BC9"]
@@ -131,7 +130,7 @@ def cmd_add_icloud(args):
 
     # Only store the credential once the connection (and thus the password)
     # is confirmed good.
-    secret_store(account_id, password, "Roseshell Calendar: %s" % email)
+    secret_store(account_id, password, "Calendar: %s" % email)
 
     settings = load_settings()
     settings["accounts"] = [a for a in settings["accounts"] if a.get("id") != account_id]
@@ -319,11 +318,11 @@ def cmd_create_event(args):
         return
 
     ical = ICalendar()
-    ical.add("prodid", "-//Roseshell Calendar//roseshell//")
+    ical.add("prodid", "-//aayork-quickshell//calendar//")
     ical.add("version", "2.0")
     vevent = IEvent()
     vevent.add("summary", payload["title"])
-    vevent.add("uid", str(uuid.uuid4()) + "@roseshell")
+    vevent.add("uid", str(uuid.uuid4()) + "@aayork-quickshell")
     start_dt = datetime.fromisoformat(payload["start"])
     end_dt = datetime.fromisoformat(payload["end"])
     if payload.get("allDay"):

@@ -8,9 +8,8 @@ import Quickshell.Io
 Singleton {
   id: root
 
-  // Still written by Roseshell's theme scripts. Moves to this shell's own
-  // state dir when theming is ported.
-  readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/roseshell"
+  // Written by bin/theme-set and bin/theme-bg-set.
+  readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/aayork-quickshell"
   readonly property string themeDir: stateDir + "/current/theme"
 
   property var colors: ({})

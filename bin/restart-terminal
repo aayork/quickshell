@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Reload supported terminal emulators after config changes
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+if [[ -f ~/.config/alacritty/alacritty.toml ]]; then
+  touch ~/.config/alacritty/alacritty.toml
+fi
+
+if pgrep -x kitty >/dev/null; then
+  killall -SIGUSR1 kitty >/dev/null
+fi
+
+if pgrep -x ghostty >/dev/null; then
+  killall -SIGUSR2 ghostty
+fi

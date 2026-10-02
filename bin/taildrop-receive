@@ -2,7 +2,6 @@
 
 # Saves files sent to this machine over Taildrop into ~/Downloads and says so.
 # Runs for as long as the shell does; started by services/Tailscale.qml.
-# Adapted from Roseshell's roseshell-tailscale-receive.
 
 set -euo pipefail
 

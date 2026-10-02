@@ -11,8 +11,8 @@ set -uo pipefail
 # for now the result goes to disk and the clipboard instead.
 
 # Fixed PATH so grim/slurp/jq/hyprctl resolve to the system binaries.
-# ~/.local/bin is last, for roseshell-capture-region (the region picker).
-export PATH=/usr/bin:/bin:"$HOME/.local/bin"
+export PATH=/usr/bin:/bin
+BIN="$(dirname "$(readlink -f "$0")")"
 
 MODE="${1:-smart}"
 SAVE_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
@@ -34,7 +34,7 @@ cleanup() {
 trap cleanup EXIT
 
 set_no_hw_cursors 0
-{ read -r FREEZE_PID; read -r SELECTION; } < <(roseshell-capture-region "$MODE" --keep-freeze)
+{ read -r FREEZE_PID; read -r SELECTION; } < <("$BIN/capture-region" "$MODE" --keep-freeze)
 
 [[ -z "$SELECTION" ]] && exit 1
 

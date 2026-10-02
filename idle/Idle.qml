@@ -26,7 +26,7 @@ Scope {
   property var saverWindows: ({})
   readonly property int saverCount: Object.keys(saverWindows).length
 
-  readonly property string saverClass: "org.roseshell.screensaver"
+  readonly property string saverClass: "org.aayork.screensaver"
 
   // Browsers ask to keep the screen awake over D-Bus, which nothing here
   // answers, so the idle monitor never hears about it. Check for playing

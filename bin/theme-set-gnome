@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Apply the current theme to GNOME color mode and icon settings
+
+# gsettings needs a user DBus session. During ISO installs this command can be
+# reached from arch-chroot while applying the initial theme; defer until
+# the user has a real session instead of emitting dconf warnings.
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+if [[ -z ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+  exit 0
+fi
+
+THEME_DIR=$HOME/.local/state/aayork-quickshell/current/theme
+COLORS_FILE="$THEME_DIR/colors.toml"
+
+# theme-color resolves mode from colors.toml (`mode = "light"`), a
+# legacy light.mode marker beside it, or background luminance for user themes.
+mode=$(theme-color --file "$COLORS_FILE" mode)
+
+if [[ $mode == "light" ]]; then
+  gsettings set org.gnome.desktop.interface color-scheme "prefer-light"
+  gsettings set org.gnome.desktop.interface gtk-theme "Adwaita"
+else
+  gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+  gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
+fi
+
+# Change gnome icon theme color
+GNOME_ICONS_THEME=$HOME/.local/state/aayork-quickshell/current/theme/icons.theme
+if [[ -f $GNOME_ICONS_THEME ]]; then
+  gsettings set org.gnome.desktop.interface icon-theme "$(<$GNOME_ICONS_THEME)"
+else
+  gsettings set org.gnome.desktop.interface icon-theme "Yaru-blue"
+fi

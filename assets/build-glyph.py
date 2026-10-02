@@ -62,11 +62,11 @@ glyph.draw(TransformPen(pen, transform))
 fb = FontBuilder(1000, isTTF=False)
 fb.setupGlyphOrder([".notdef", "switches"])
 fb.setupCharacterMap({CODEPOINT: "switches"})
-fb.setupCFF("RoseshellControlCenter", {"FullName": "Roseshell Control Center"},
+fb.setupCFF("ControlCenterGlyph", {"FullName": "Control Center Glyph"},
             {".notdef": T2CharStringPen(ADVANCE, None).getCharString(), "switches": pen.getCharString()}, {})
 fb.setupHorizontalMetrics({".notdef": (ADVANCE, 0), "switches": (ADVANCE, 0)})
 fb.setupHorizontalHeader(ascent=1025, descent=-275)
-fb.setupNameTable({"familyName": "Roseshell Control Center", "styleName": "Regular"})
+fb.setupNameTable({"familyName": "Control Center Glyph", "styleName": "Regular"})
 fb.setupOS2(sTypoAscender=1025, sTypoDescender=-275, sTypoLineGap=0, usWinAscent=1025, usWinDescent=275)
 fb.setupPost()
 out = os.path.join(HERE, "control-center.otf")

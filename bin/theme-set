@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# Apply a theme: stage its files, swap them in as the current theme, pick a
+# background, then retint every app that follows the theme.
+#
+#   theme-set "Tokyo Night"
+#
+# Themes live in themes/ beside this script; ~/.config/aayork-quickshell/themes
+# holds the user's own, laid over a bundled one of the same name.
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+if [[ -z $1 ]]; then
+  echo "Usage: theme-set <theme-name>"
+  exit 1
+fi
+
+STATE="$HOME/.local/state/aayork-quickshell/current"
+CURRENT_THEME_PATH="$STATE/theme"
+NEXT_THEME_PATH="$STATE/next-theme"
+CURRENT_BACKGROUND_LINK="$STATE/background"
+USER_THEMES_PATH="$HOME/.config/aayork-quickshell/themes"
+BUNDLED_THEMES_PATH="$SHELL_ROOT/themes"
+THEME_SET_LOCK="${XDG_RUNTIME_DIR:-/tmp}/aayork-theme-set.lock"
+
+run_parallel() {
+  local pid
+  local pids=()
+
+  for command in "$@"; do
+    bash -lc "$command" &
+    pids+=("$!")
+  done
+
+  for pid in "${pids[@]}"; do
+    wait "$pid"
+  done
+}
+
+# Sets CHOSEN_THEME_BACKGROUND: the one after the current background if that
+# belongs to this theme, otherwise the theme's first.
+choose_theme_background() {
+  local theme_path="${1:-$CURRENT_THEME_PATH}"
+  local current_theme_backgrounds="$CURRENT_THEME_PATH/backgrounds"
+  local backgrounds=()
+  local current_background index next_index i
+
+  CHOSEN_THEME_BACKGROUND=""
+  mapfile -d '' -t backgrounds < <(
+    find -L "$HOME/.config/aayork-quickshell/backgrounds/$THEME_NAME/" "$theme_path/backgrounds/" -maxdepth 1 -type f \
+      \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.webp' \) \
+      -print0 2>/dev/null | sort -z
+  )
+
+  (( ${#backgrounds[@]} > 0 )) || return 1
+
+  current_background=$(readlink "$CURRENT_BACKGROUND_LINK" 2>/dev/null || true)
+  if [[ $theme_path != $CURRENT_THEME_PATH && ${current_background%/*} == $current_theme_backgrounds ]]; then
+    current_background="$theme_path/backgrounds/${current_background##*/}"
+  fi
+
+  index=-1
+  for i in "${!backgrounds[@]}"; do
+    if [[ ${backgrounds[$i]} == $current_background ]]; then
+      index=$i
+      break
+    fi
+  done
+
+  if (( index == -1 )); then
+    CHOSEN_THEME_BACKGROUND="${backgrounds[0]}"
+  else
+    next_index=$(((index + 1) % ${#backgrounds[@]}))
+    CHOSEN_THEME_BACKGROUND="${backgrounds[$next_index]}"
+  fi
+}
+
+THEME_NAME=$(echo "$1" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+
+if [[ -z $THEME_NAME || $THEME_NAME == .* || $THEME_NAME == */* ]]; then
+  echo "Invalid theme name: $1"
+  exit 1
+fi
+
+if [[ ! -d $BUNDLED_THEMES_PATH/$THEME_NAME ]] && [[ ! -d $USER_THEMES_PATH/$THEME_NAME ]]; then
+  echo "Theme '$THEME_NAME' does not exist"
+  exit 1
+fi
+
+# One theme change at a time. They share the staging directory and the
+# current-theme links, and two at once can leave one selection ignored.
+exec 9>"$THEME_SET_LOCK"
+flock 9
+
+# Stage the theme: the bundled one, then the user's laid over it.
+rm -rf "$NEXT_THEME_PATH"
+mkdir -p "$NEXT_THEME_PATH"
+cp -r "$BUNDLED_THEMES_PATH/$THEME_NAME/"* "$NEXT_THEME_PATH/" 2>/dev/null
+cp -r "$USER_THEMES_PATH/$THEME_NAME/"* "$NEXT_THEME_PATH/" 2>/dev/null
+
+# A theme that only ships a terminal palette still gets a colors.toml.
+if [[ ! -f $NEXT_THEME_PATH/colors.toml && -f $NEXT_THEME_PATH/alacritty.toml ]]; then
+  theme-colors-from-alacritty "$NEXT_THEME_PATH"
+fi
+
+# Fill in the per-app configs from the templates.
+theme-set-templates
+
+# Choose the background while the old theme is still in place, so "the next
+# one after the current" can be worked out against it.
+CHOSEN_THEME_BACKGROUND=""
+if [[ $SHELL_THEME_SKIP_BACKGROUND != "1" ]] && choose_theme_background "$NEXT_THEME_PATH"; then
+  if [[ ${CHOSEN_THEME_BACKGROUND%/*} == "$NEXT_THEME_PATH/backgrounds" ]]; then
+    CHOSEN_THEME_BACKGROUND="$CURRENT_THEME_PATH/backgrounds/${CHOSEN_THEME_BACKGROUND##*/}"
+  fi
+fi
+
+# Swap the staged theme in.
+rm -rf "$CURRENT_THEME_PATH"
+mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
+
+if [[ $SHELL_THEME_SKIP_BACKGROUND != "1" ]]; then
+  if [[ -n $CHOSEN_THEME_BACKGROUND && -f $CHOSEN_THEME_BACKGROUND ]] || choose_theme_background; then
+    ln -nsf "$CHOSEN_THEME_BACKGROUND" "$CURRENT_BACKGROUND_LINK"
+  else
+    notify-send -a Theme -t 2000 "No background was found for this theme"
+  fi
+fi
+
+# The shell watches this file: writing it is what makes the bar and popups
+# take the new colours. It goes last so the palette and background are in place.
+echo "$THEME_NAME" >"$STATE/theme.name"
+qs -p "$SHELL_ROOT" ipc call wallpaper refresh >/dev/null 2>&1 || true
+
+# The swap is done. Let the next theme change queue behind that only, not
+# behind the slower retinting below.
+flock -u 9
+
+run_parallel \
+  restart-terminal \
+  restart-hyprctl \
+  restart-btop \
+  restart-opencode \
+  theme-set-tmux \
+  theme-set-gnome \
+  theme-set-claude \
+  theme-set-zen \
+  theme-set-thunderbird \
+  theme-set-vscode \
+  theme-set-obsidian \
+  theme-set-termusic \
+  theme-set-rmpc

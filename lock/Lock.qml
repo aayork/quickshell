@@ -37,10 +37,12 @@ Scope {
     }
   }
 
-  // Password check only; the stack is the one installed for Roseshell.
+  // Password check only. The PAM stack is lock/pam/password, loaded from
+  // this repo rather than /etc/pam.d.
   PamContext {
     id: pam
-    config: "roseshell-lock-password"
+    configDirectory: Quickshell.shellDir + "/lock/pam"
+    config: "password"
 
     onResponseRequiredChanged: if (responseRequired) respond(root.pending)
     onCompleted: function(result) {

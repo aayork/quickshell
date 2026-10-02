@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# List available themes
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+{
+  find ~/.config/aayork-quickshell/themes/ -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -printf '%f\n'
+  find "$SHELL_ROOT/themes/" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+} | sort -u | sed -E 's/(^|-)([a-z])/\1\u\2/g; s/-/ /g'

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Refresh the current theme from its templates.
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+THEME_NAME_PATH="$HOME/.local/state/aayork-quickshell/current/theme.name"
+
+if [[ -f $THEME_NAME_PATH ]]; then
+  SHELL_THEME_SKIP_BACKGROUND=1 theme-set "$(cat $THEME_NAME_PATH)"
+fi

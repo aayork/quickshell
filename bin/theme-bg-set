@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Set the current background image or video
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+if [[ -z $1 ]]; then
+  echo "Usage: theme-bg-set <path-to-media>" >&2
+  exit 1
+fi
+
+BACKGROUND="$(realpath "$1")"
+CURRENT_BACKGROUND_LINK="$HOME/.local/state/aayork-quickshell/current/background"
+
+if [[ ! -f $BACKGROUND ]]; then
+  echo "File does not exist: $BACKGROUND" >&2
+  exit 1
+fi
+
+# Create symlink to the new background media
+ln -nsf "$BACKGROUND" "$CURRENT_BACKGROUND_LINK"
+
+# The shell checks this link every few seconds; asking it saves the wait.
+qs -p "$SHELL_ROOT" ipc call wallpaper refresh >/dev/null 2>&1 || true

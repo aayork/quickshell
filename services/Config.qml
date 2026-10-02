@@ -66,7 +66,7 @@ Singleton {
         property real tint: 0
       }
 
-      // Hyprland window look; applied by roseshell-window-style.
+      // Hyprland window look; applied by bin/window-style.
       property JsonObject windows: JsonObject {
         property int rounding: 0
         property int gapsIn: 2

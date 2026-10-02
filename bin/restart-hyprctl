@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Reload hyprland configuration (run when the theme changes).
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+hyprctl reload >/dev/null

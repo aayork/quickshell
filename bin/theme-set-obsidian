@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Sync the theme to all Obsidian vaults
+
+# Where this shell lives, and its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+CURRENT_THEME_DIR="$HOME/.local/state/aayork-quickshell/current/theme"
+
+[[ -f $CURRENT_THEME_DIR/obsidian.css ]] || exit 0
+
+jq -r '.vaults | values[].path' ~/.config/obsidian/obsidian.json 2>/dev/null | while read -r vault_path; do
+  [[ -d $vault_path/.obsidian ]] || continue
+
+  theme_dir="$vault_path/.obsidian/themes/Desktop"
+  mkdir -p "$theme_dir"
+
+  [[ -f $theme_dir/manifest.json ]] || cat >"$theme_dir/manifest.json" <<'EOF'
+{
+  "name": "Desktop",
+  "version": "1.0.0",
+  "minAppVersion": "0.16.0",
+  "description": "Automatically syncs with your current system theme colors and fonts",
+  "author": "aayork",
+  "authorUrl": "https://github.com/aayork"
+}
+EOF
+
+  cp "$CURRENT_THEME_DIR/obsidian.css" "$theme_dir/theme.css"
+done
