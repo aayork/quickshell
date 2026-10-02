@@ -5,6 +5,7 @@ import qs.bar
 import qs.idle
 import qs.launcher
 import qs.lock
+import qs.nightlight
 import qs.notifications
 import qs.osd
 import qs.polkit
@@ -18,6 +19,7 @@ ShellRoot {
   Launcher {}
   Lock {}
   Idle {}
+  NightLight {}
   Polkit {}
   SessionOverlay {}
 }

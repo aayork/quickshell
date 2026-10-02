@@ -14,7 +14,7 @@ BarButton {
   readonly property alias popup: popup
 
   // Fri Oct 2 9:45 AM
-  property string format: "ddd MMM d h:mm AP"
+  readonly property string format: Config.clock.format
   // Other places worth knowing the time in.
   property var zones: [{ zone: "Asia/Seoul", label: "Seoul" }]
   // label -> minutes ahead of UTC, filled in when the popup opens.

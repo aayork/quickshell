@@ -76,10 +76,25 @@ Singleton {
   }
 
   FileView {
+    id: colorsFile
     path: root.themeDir + "/colors.toml"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
     onLoaded: root.load(text())
+  }
+
+  // A theme switch replaces the whole theme directory, which the watch on
+  // colors.toml does not survive. The name file next to it is rewritten in
+  // place every time, so it is the reliable signal.
+  signal themeChanged()
+  FileView {
+    path: root.stateDir + "/current/theme.name"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: {
+      colorsFile.reload()
+      root.themeChanged()
+    }
   }
 }

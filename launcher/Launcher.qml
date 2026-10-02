@@ -28,6 +28,7 @@ Scope {
   // Still Omacast's folder; these move with the rest of the config later.
   readonly property string extensionDir: Quickshell.env("HOME") + "/.config/roseshell/omacast/extensions"
   readonly property int maxRows: 60
+  readonly property int rowHeight: 32
 
   // key -> { count, last }
   property var frecency: ({})
@@ -482,7 +483,7 @@ Scope {
 
     visible: chipLabel.text !== ""
     implicitWidth: chipLabel.implicitWidth + 16
-    implicitHeight: 20
+    implicitHeight: 18
     radius: height / 2
     color: accented ? Theme.alpha(Theme.accent, 0.16) : Theme.alpha(Theme.foreground, 0.07)
 
@@ -536,12 +537,12 @@ Scope {
 
         RowLayout {
           Layout.fillWidth: true
-          Layout.margins: 12
+          Layout.margins: 10
           spacing: 10
 
           Label {
             text: Icons.glyph(0xF0349)
-            font.pixelSize: Theme.iconLarge
+            font.pixelSize: Theme.iconSize
             color: Theme.dim
             elide: Text.ElideNone
           }
@@ -554,16 +555,16 @@ Scope {
             selectionColor: Theme.selection
             selectedTextColor: Theme.brightForeground
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontLarge
+            font.pixelSize: Theme.fontSize + 1
             clip: true
             onTextEdited: root.query = text
 
             Label {
               anchors.fill: parent
               visible: input.text === ""
-              text: "Search apps, do math, run a command"
+              text: "Search apps and commands"
               color: Theme.dim
-              font.pixelSize: Theme.fontLarge
+              font.pixelSize: Theme.fontSize + 1
             }
 
             Keys.onPressed: function(event) {
@@ -588,9 +589,9 @@ Scope {
               } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab || (control && event.key === Qt.Key_P)) {
                 root.move(-1)
               } else if (event.key === Qt.Key_PageDown) {
-                root.move(9)
+                root.move(12)
               } else if (event.key === Qt.Key_PageUp) {
-                root.move(-9)
+                root.move(-12)
               } else if (control && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
                 // Run the nth row without walking to it; the dim numbers down
                 // the left are the other half of this.
@@ -625,7 +626,8 @@ Scope {
           Layout.fillWidth: true
           Layout.topMargin: 4
           Layout.bottomMargin: 4
-          implicitHeight: Math.min(contentHeight, 9 * 40 + 24)
+          // About twelve rows before it scrolls.
+          implicitHeight: Math.min(contentHeight, 12 * root.rowHeight + 22)
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           model: root.rows
@@ -648,7 +650,7 @@ Scope {
 
             Item {
               width: parent.width
-              height: visible ? 24 : 0
+              height: visible ? 22 : 0
               visible: row.modelData.header !== ""
 
               SectionHeader {
@@ -663,7 +665,8 @@ Scope {
 
             Item {
               width: parent.width
-              height: 40
+              // A row with a second line needs a little more room.
+              height: row.modelData.detail ? root.rowHeight + 6 : root.rowHeight
 
               Rectangle {
                 anchors.fill: parent
@@ -698,8 +701,8 @@ Scope {
 
               Item {
                 id: icon
-                width: 22
-                height: 22
+                width: 18
+                height: 18
                 anchors.left: parent.left
                 anchors.leftMargin: 34
                 anchors.verticalCenter: parent.verticalCenter
@@ -708,15 +711,15 @@ Scope {
                   anchors.fill: parent
                   visible: row.modelData.icon !== ""
                   source: row.modelData.icon
-                  sourceSize.width: 44
-                  sourceSize.height: 44
+                  sourceSize.width: 36
+                  sourceSize.height: 36
                   asynchronous: true
                 }
                 Label {
                   anchors.centerIn: parent
                   visible: row.modelData.icon === ""
                   text: row.modelData.glyph
-                  font.pixelSize: Theme.iconLarge
+                  font.pixelSize: Theme.iconSize
                   color: row.armed ? Theme.red : row.current ? Theme.foreground : Theme.dim
                   elide: Text.ElideNone
                 }
@@ -725,17 +728,17 @@ Scope {
               // Title, with a line of detail under it when there is one.
               Column {
                 anchors.left: icon.right
-                anchors.leftMargin: 12
+                anchors.leftMargin: 10
                 anchors.right: tail.left
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
+                spacing: 0
 
                 Label {
                   width: parent.width
                   text: row.armed ? "Enter again to " + row.modelData.title.toLowerCase() : row.modelData.title
                   color: row.armed ? Theme.red : row.modelData.hint ? Theme.dim : row.current ? Theme.brightForeground : Theme.foreground
-                  font.pixelSize: Theme.fontSize + 1
+                  font.pixelSize: Theme.fontSize
                 }
                 Label {
                   width: parent.width
@@ -766,7 +769,7 @@ Scope {
                     Rectangle {
                       required property string modelData
                       width: keyLabel.implicitWidth + 10
-                      height: 20
+                      height: 18
                       radius: Theme.controlRadius
                       color: Theme.alpha(Theme.foreground, 0.06)
                       border.width: 1
@@ -870,7 +873,7 @@ Scope {
             required property int index
 
             width: actionColumn.width
-            height: 32
+            height: 28
             radius: Theme.controlRadius
             color: root.actionCursor === index ? Theme.selection : "transparent"
 

@@ -10,11 +10,11 @@ import qs.services
 Scope {
   id: root
 
-  // Seconds without input.
-  property int screensaverSeconds: 300
-  property int lockSeconds: 450
+  // Seconds without input, from the config file.
+  readonly property int screensaverSeconds: Math.max(10, Config.idle.screensaver)
+  readonly property int lockSeconds: Math.max(screensaverSeconds + 1, Config.idle.lock)
   // Seconds the lock screen sits untouched before the panel turns off.
-  property int blankSeconds: 20
+  readonly property int blankSeconds: Math.max(5, Config.idle.blank)
 
   // Off while "stay awake" is on.
   property bool enabled: true
