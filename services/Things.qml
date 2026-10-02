@@ -125,7 +125,11 @@ Singleton {
     }
     onExited: function(code) {
       if (code !== 0) {
-        root.error = root.lastLine(listsError.text) || "Could not reach Things Cloud"
+        var message = root.lastLine(listsError.text)
+        // A login the server does not know comes back as a bare HTTP status.
+        root.error = /^login:.*(401|403|404|unauthorized)/i.test(message)
+          ? "Things Cloud didn't accept that email and password. Sign out and try again."
+          : message || "Could not reach Things Cloud"
         return
       }
       try {
