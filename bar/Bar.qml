@@ -4,6 +4,8 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
+// Qualified: the Bose and Tailscale widgets here share names with services.
+import qs.services as Services
 import qs.theme
 import qs.ui
 
@@ -103,10 +105,11 @@ Scope {
 
         HoverHandler { id: slideHover; enabled: bar.fullscreen }
 
+        // Solid over a fullscreen window; otherwise as much of the theme
+        // background as the tint setting asks for.
         Rectangle {
           anchors.fill: parent
-          visible: bar.fullscreen
-          color: Theme.background
+          color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.tint)
         }
 
         Workspaces {

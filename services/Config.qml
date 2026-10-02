@@ -11,6 +11,8 @@ Singleton {
   readonly property alias nightlight: adapter.nightlight
   readonly property alias idle: adapter.idle
   readonly property alias clock: adapter.clock
+  readonly property alias bar: adapter.bar
+  readonly property alias windows: adapter.windows
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -44,6 +46,26 @@ Singleton {
 
       property JsonObject clock: JsonObject {
         property string format: "ddd MMM d h:mm AP"
+        // Other places shown in the clock popup: [{ zone, label }].
+        property var zones: [{ zone: "Asia/Seoul", label: "Seoul" }]
+      }
+
+      property JsonObject bar: JsonObject {
+        // Frosted strip of wallpaper behind the bar.
+        property bool glass: true
+        // How much of the theme background the bar keeps, 0 (clear) to 1.
+        property real tint: 0
+      }
+
+      // Hyprland window look; applied by roseshell-window-style.
+      property JsonObject windows: JsonObject {
+        property int rounding: 0
+        property int gapsIn: 2
+        property int gapsOut: 4
+        property int border: 1
+        property bool shadow: false
+        // "off", "minimal" or "full".
+        property string animations: "minimal"
       }
     }
   }

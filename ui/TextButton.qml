@@ -1,16 +1,19 @@
 import QtQuick
 import qs.theme
 
-// A labelled button inside a popup. `selected` marks the current choice in a
-// group.
+// A labelled button inside a popup, optionally led by a glyph. `selected`
+// marks the current choice in a group.
 Rectangle {
   id: root
 
   property string text: ""
+  property string icon: ""
   property bool selected: false
   signal clicked()
 
-  implicitWidth: label.implicitWidth + 20
+  readonly property color ink: selected ? Theme.background : Theme.foreground
+
+  implicitWidth: content.implicitWidth + 20
   implicitHeight: Theme.rowHeight
   radius: Theme.controlRadius
   opacity: enabled ? 1 : 0.4
@@ -18,12 +21,25 @@ Rectangle {
   border.width: selected ? 0 : 1
   border.color: Theme.alpha(Theme.foreground, 0.2)
 
-  Label {
-    id: label
+  Row {
+    id: content
     anchors.centerIn: parent
-    text: root.text
-    color: root.selected ? Theme.background : Theme.foreground
-    elide: Text.ElideNone
+    spacing: 6
+
+    Label {
+      visible: root.icon !== ""
+      anchors.verticalCenter: parent.verticalCenter
+      text: root.icon
+      color: root.selected ? root.ink : Theme.accent
+      font.pixelSize: Theme.iconSize
+      elide: Text.ElideNone
+    }
+    Label {
+      anchors.verticalCenter: parent.verticalCenter
+      text: root.text
+      color: root.ink
+      elide: Text.ElideNone
+    }
   }
 
   MouseArea {

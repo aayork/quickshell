@@ -5,13 +5,17 @@ import qs.bar
 import qs.idle
 import qs.launcher
 import qs.lock
-import qs.nightlight
+import qs.services
 import qs.notifications
 import qs.osd
 import qs.polkit
 import qs.session
+import qs.settings
 
 ShellRoot {
+  // The night light is a service; naming it here is what starts it.
+  readonly property bool nightLight: NightLight.active
+
   Wallpaper {}
   Bar {}
   Toasts {}
@@ -19,7 +23,7 @@ ShellRoot {
   Launcher {}
   Lock {}
   Idle {}
-  NightLight {}
   Polkit {}
   SessionOverlay {}
+  Settings {}
 }

@@ -15,8 +15,13 @@ BarButton {
 
   // Fri Oct 2 9:45 AM
   readonly property string format: Config.clock.format
-  // Other places worth knowing the time in.
-  property var zones: [{ zone: "Asia/Seoul", label: "Seoul" }]
+  // Other places worth knowing the time in, from the config file.
+  readonly property var zones: Config.clock.zones || []
+  // Adding a time zone: the search box is open, and what it has found.
+  property bool addingZone: false
+  property var allZones: []
+  // Day whose events are listed; today unless another is clicked.
+  property date selectedDay: new Date()
   // label -> minutes ahead of UTC, filled in when the popup opens.
   property var zoneOffsets: ({})
   // Months away from the current one the calendar is showing.
@@ -32,6 +37,7 @@ BarButton {
     for (var i = 0; i < 42; i++) {
       var day = new Date(first.getFullYear(), first.getMonth(), 1 - lead + i)
       list.push({
+        date: day,
         number: day.getDate(),
         inMonth: day.getMonth() === first.getMonth(),
         today: day.toDateString() === now.toDateString()
@@ -55,6 +61,19 @@ BarButton {
     return Qt.formatTime(there, "h:mm AP") + (days > 0 ? " tomorrow" : days < 0 ? " yesterday" : "")
   }
 
+  function addZone(zone) {
+    var label = zone.replace(/^.*\//, "").replace(/_/g, " ")
+    if (zones.some(z => z.zone === zone)) return
+    Config.clock.zones = zones.concat([{ zone: zone, label: label }])
+    addingZone = false
+  }
+
+  function removeZone(zone) {
+    Config.clock.zones = zones.filter(z => z.zone !== zone)
+  }
+
+  onZonesChanged: if (popup.open) offsets.running = true
+
   function ago(time) {
     var minutes = Math.floor((now.getTime() - time) / 60000)
     if (minutes < 1) return "now"
@@ -76,7 +95,7 @@ BarButton {
   // `date` knows every zone's current offset, daylight saving included.
   Process {
     id: offsets
-    command: ["sh", "-c", root.zones.map(z => "printf '%s|%s\\n' \"$1\" \"$(TZ=\"$2\" date +%z)\"; shift 2").join("; "), "sh"]
+    command: ["sh", "-c", root.zones.map(z => "printf '%s|%s\\n' \"$1\" \"$(TZ=\"$2\" date +%z)\"; shift 2").concat(["true"]).join("; "), "sh"]
       .concat(root.zones.reduce((all, z) => all.concat([z.label, z.zone]), []))
     stdout: StdioCollector {
       onStreamFinished: {
@@ -91,17 +110,29 @@ BarButton {
     }
   }
 
+  // Every zone name the system knows, for the add box.
+  Process {
+    id: zoneList
+    command: ["timedatectl", "list-timezones", "--no-pager"]
+    stdout: StdioCollector {
+      onStreamFinished: root.allZones = text.split("\n").filter(l => l !== "")
+    }
+  }
+
   Popup {
     id: popup
     anchorItem: root
-    contentWidth: 320
+    contentWidth: 340
     contentHeight: column.implicitHeight
 
     onOpenChanged: {
+      root.addingZone = false
       if (!open) return
       root.monthOffset = 0
+      root.selectedDay = new Date()
       offsets.running = true
       Weather.refresh()
+      Calendar.refresh()
     }
 
     ColumnLayout {
@@ -123,11 +154,90 @@ BarButton {
         model: root.zones
 
         RowLayout {
+          id: zoneRow
           required property var modelData
           Layout.fillWidth: true
           Layout.topMargin: -6
-          Label { text: modelData.label; color: Theme.dim; Layout.fillWidth: true }
-          Label { text: root.zoneTime(modelData.label); color: Theme.dim; elide: Text.ElideNone }
+
+          HoverHandler { id: zoneHover }
+
+          Label { text: zoneRow.modelData.label; color: Theme.dim; Layout.fillWidth: true }
+          Label {
+            text: zoneHover.hovered ? "Remove" : root.zoneTime(zoneRow.modelData.label)
+            color: zoneHover.hovered && removeMouse.containsMouse ? Theme.red : Theme.dim
+            elide: Text.ElideNone
+            MouseArea {
+              id: removeMouse
+              anchors.fill: parent
+              anchors.margins: -4
+              hoverEnabled: true
+              onClicked: root.removeZone(zoneRow.modelData.zone)
+            }
+          }
+        }
+      }
+
+      Label {
+        visible: !root.addingZone
+        Layout.topMargin: -6
+        text: "+ Add a time zone"
+        color: addZoneMouse.containsMouse ? Theme.foreground : Theme.muted
+        font.pixelSize: Theme.fontSmall
+        MouseArea {
+          id: addZoneMouse
+          anchors.fill: parent
+          anchors.margins: -4
+          hoverEnabled: true
+          onClicked: {
+            if (root.allZones.length === 0) zoneList.running = true
+            root.addingZone = true
+            zoneFilter.text = ""
+            zoneFilter.focusInput()
+          }
+        }
+      }
+
+      ColumnLayout {
+        visible: root.addingZone
+        Layout.fillWidth: true
+        spacing: 2
+
+        readonly property var matches: {
+          var needle = zoneFilter.text.trim().toLowerCase().replace(/ /g, "_")
+          if (needle.length < 2) return []
+          return root.allZones.filter(z => z.toLowerCase().indexOf(needle) !== -1).slice(0, 6)
+        }
+
+        Field {
+          id: zoneFilter
+          Layout.fillWidth: true
+          placeholder: "City, like Tokyo or London"
+          onAccepted: if (parent.matches.length > 0) root.addZone(parent.matches[0])
+          onCancelled: root.addingZone = false
+        }
+
+        Repeater {
+          model: parent.matches
+
+          Rectangle {
+            required property string modelData
+            Layout.fillWidth: true
+            implicitHeight: Theme.rowHeight - 4
+            radius: Theme.controlRadius
+            color: matchMouse.containsMouse ? Theme.hover : "transparent"
+
+            Label {
+              anchors.fill: parent
+              anchors.leftMargin: 8
+              text: parent.modelData.replace(/_/g, " ")
+            }
+            MouseArea {
+              id: matchMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              onClicked: root.addZone(parent.modelData)
+            }
+          }
         }
       }
 
@@ -173,23 +283,92 @@ BarButton {
           model: root.cells
 
           Item {
+            id: cell
             required property var modelData
+
+            readonly property bool selected: modelData.date.toDateString() === root.selectedDay.toDateString()
+
             Layout.fillWidth: true
-            Layout.preferredHeight: 26
+            Layout.preferredHeight: 28
 
             Rectangle {
               anchors.centerIn: parent
-              width: 24
-              height: 22
+              width: 26
+              height: 24
               radius: Theme.controlRadius
-              color: modelData.today ? Theme.accent : "transparent"
+              color: cell.modelData.today ? Theme.accent : cellMouse.containsMouse ? Theme.hover : "transparent"
+              border.width: cell.selected && !cell.modelData.today ? 1 : 0
+              border.color: Theme.accent
             }
 
             Label {
               anchors.centerIn: parent
-              text: modelData.number
-              color: modelData.today ? Theme.background : modelData.inMonth ? Theme.foreground : Theme.muted
-              font.bold: modelData.today
+              text: cell.modelData.number
+              color: cell.modelData.today ? Theme.background : cell.modelData.inMonth ? Theme.foreground : Theme.muted
+              font.bold: cell.modelData.today
+            }
+
+            // Something is on that day.
+            Rectangle {
+              visible: Calendar.hasEvents(cell.modelData.date)
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: 2
+              width: 3
+              height: 3
+              radius: 2
+              color: cell.modelData.today ? Theme.background : Theme.accent
+            }
+
+            MouseArea {
+              id: cellMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              onClicked: root.selectedDay = cell.modelData.date
+            }
+          }
+        }
+      }
+
+      // The selected day's events.
+      ColumnLayout {
+        visible: Calendar.connected
+        Layout.fillWidth: true
+        spacing: 2
+
+        readonly property var dayEvents: Calendar.eventsOn(root.selectedDay)
+
+        SectionHeader {
+          text: (root.selectedDay.toDateString() === root.now.toDateString() ? "TODAY" : Qt.formatDate(root.selectedDay, "dddd, MMM d").toUpperCase())
+        }
+
+        Label {
+          visible: parent.dayEvents.length === 0
+          text: "Nothing scheduled"
+          color: Theme.dim
+        }
+
+        Repeater {
+          model: parent.dayEvents
+
+          RowLayout {
+            id: eventRow
+            required property var modelData
+            Layout.fillWidth: true
+            spacing: 8
+
+            Rectangle {
+              implicitWidth: 3
+              implicitHeight: 16
+              radius: 2
+              color: eventRow.modelData.color || Theme.accent
+            }
+            Label { text: eventRow.modelData.title; Layout.fillWidth: true }
+            Label {
+              text: Calendar.timeText(eventRow.modelData)
+              color: Theme.dim
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
             }
           }
         }
@@ -228,23 +407,49 @@ BarButton {
         }
       }
 
-      RowLayout {
+      // The week: each day gets an equal share of the width, set outright
+      // so the columns cannot crowd each other.
+      Row {
+        id: week
         visible: Weather.ready
         Layout.fillWidth: true
-        spacing: 0
-        uniformCellSizes: true
+        Layout.topMargin: 6
 
         Repeater {
           model: Weather.days
 
-          ColumnLayout {
+          Column {
             required property var modelData
-            Layout.fillWidth: true
-            spacing: 2
+            required property int index
+            width: week.width / Math.max(1, Weather.days.length)
+            spacing: 5
 
-            Label { text: modelData.day; color: Theme.dim; font.pixelSize: Theme.fontSmall; Layout.alignment: Qt.AlignHCenter }
-            Label { text: modelData.icon; font.pixelSize: Theme.iconLarge; Layout.alignment: Qt.AlignHCenter; elide: Text.ElideNone }
-            Label { text: modelData.high + " " + modelData.low; font.pixelSize: Theme.fontSmall; Layout.alignment: Qt.AlignHCenter }
+            Label {
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: index === 0 ? "Today" : modelData.day
+              color: index === 0 ? Theme.foreground : Theme.dim
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
+            Label {
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.icon
+              font.pixelSize: Theme.iconLarge
+              elide: Text.ElideNone
+            }
+            Label {
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.high
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
+            Label {
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.low
+              color: Theme.dim
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
           }
         }
       }

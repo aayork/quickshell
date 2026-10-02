@@ -50,8 +50,9 @@ Scope {
 
         function sample() {
           if (!panel.primary || image.status !== Image.Ready || panel.width <= 0 || panel.height <= 0) return
-          if (loaded.toString() !== "" && loaded !== panel.source) unloadImage(loaded)
-          loaded = panel.source
+          // The plain file URL: the canvas does not load one with a query on
+          // it, and it is unloaded after every reading so nothing goes stale.
+          loaded = "file://" + Background.path
           if (isImageLoaded(loaded)) requestPaint()
           else loadImage(loaded)
         }
@@ -76,6 +77,8 @@ Scope {
           for (var i = 0; i + 3 < pixels.length; i += 4)
             for (var c = 0; c < 3; c++) sum[c] += pixels[i + c]
           var count = pixels.length / 4
+          // Nothing was drawn; keep the last answer over guessing from black.
+          if (sum[0] + sum[1] + sum[2] === 0) return
           var behind = probe.luminance(sum[0] / count / 255, sum[1] / count / 255, sum[2] / count / 255)
           // Whichever of the theme's dark and light reads better against it.
           var dark = Theme.background
@@ -110,6 +113,7 @@ Scope {
       Item {
         id: glass
 
+        visible: Config.bar.glass
         readonly property int fade: 40
         readonly property int depth: Theme.barHeight + fade
 

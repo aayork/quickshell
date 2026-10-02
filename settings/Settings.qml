@@ -1,0 +1,1110 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Io
+import Quickshell.Wayland
+import qs.services
+import qs.theme
+import qs.ui
+
+// Settings: how things look, how the shell behaves, how windows are drawn,
+// and the network and Bluetooth panels.
+//
+// Theme, background, font, cursor and window style are still applied by
+// Roseshell's scripts (roseshell-theme-set and friends), which also recolour
+// the other apps. This is the front end for them.
+Scope {
+  id: root
+
+  property bool open: false
+  property string tab: "appearance"
+
+  readonly property var tabs: [
+    { id: "appearance", label: "Appearance", glyph: 0xF03D8, about: "Theme, background, font, cursor and icons" },
+    { id: "shell", label: "Shell", glyph: 0xF0379, about: "Night light, the bar, and what happens when you step away" },
+    { id: "windows", label: "Windows", glyph: 0xF05AF, about: "How Hyprland draws and spaces windows" },
+    { id: "network", label: "Network", glyph: 0xF0928, about: "Wi-Fi networks in range" },
+    { id: "bluetooth", label: "Bluetooth", glyph: 0xF00AF, about: "Paired devices and new ones nearby" },
+    { id: "calendar", label: "Calendar", glyph: 0xF00ED, about: "Accounts whose events show in the clock popup" }
+  ]
+  readonly property var currentTab: tabs.find(t => t.id === tab) ?? tabs[0]
+
+  // ---------------------------------------------------------------- state
+  property var themes: []
+  property string theme: ""
+  // [{ path, label }] for the current theme.
+  property var backgrounds: []
+  property var fonts: []
+  property string font: ""
+  property var cursors: []
+  property string cursor: ""
+  property int cursorSize: 24
+  // Sizes this cursor theme has crisp bitmaps for.
+  property var cursorSizes: []
+  property var iconThemes: []
+  property string iconTheme: ""
+  // Hex just copied from a swatch, or the swatch under the pointer.
+  property string swatchNote: ""
+
+  readonly property string stateDir: Theme.stateDir
+  readonly property string iconDirs: "\"$HOME/.local/share/icons\" \"$HOME/.icons\" /usr/share/icons"
+
+  function show(which) {
+    if (tabs.some(t => t.id === which)) tab = which
+    load()
+    open = true
+  }
+
+  function hide() {
+    open = false
+  }
+
+  function load() {
+    themeList.running = true
+    themeCurrent.running = true
+    backgroundList.running = true
+    fontList.running = true
+    fontCurrent.running = true
+    cursorList.running = true
+    cursorCurrent.running = true
+    iconList.running = true
+    iconCurrent.running = true
+    Background.check()
+  }
+
+  function pretty(name) {
+    return String(name || "").replace(/\.[^.]+$/, "").replace(/^\d+-/, "").replace(/[-_]/g, " ")
+      .replace(/\b\w/g, function(c) { return c.toUpperCase() })
+  }
+
+  // ---------------------------------------------------------------- appearance
+  function applyTheme(name) {
+    theme = name
+    Quickshell.execDetached(["roseshell-theme-set", name])
+    // The script takes about a second and picks the theme's own background.
+    settle.restart()
+  }
+
+  function applyBackground(path) {
+    Quickshell.execDetached(["roseshell-theme-bg-set", path])
+    settle.restart()
+  }
+
+  function nextBackground() {
+    Quickshell.execDetached(["roseshell-theme-bg-next"])
+    settle.restart()
+  }
+
+  // Builds a palette from the current background and applies it as the
+  // generated "Wallpaper" theme.
+  function matchTheme() {
+    if (Background.path === "" || matchProcess.running) return
+    matchProcess.command = ["roseshell-theme-from-background", Background.path]
+    matchProcess.running = true
+  }
+
+  // The desktop's own file chooser. This overlay holds the keyboard, so it
+  // steps aside while the chooser is up and comes back afterwards.
+  function browseBackground() {
+    browseProcess.running = true
+    hide()
+  }
+
+  // A chosen file is copied into the theme's own backgrounds folder, so it
+  // stays selectable even if the original moves.
+  readonly property string importScript: "src=$(realpath -- \"$1\") || exit 1; "
+    + "theme=$(cat \"$HOME/.local/state/roseshell/current/theme.name\" 2>/dev/null); "
+    + "dir=\"$HOME/.config/roseshell/backgrounds/$theme\"; "
+    + "themedir=$(realpath -m \"$HOME/.local/state/roseshell/current/theme/backgrounds\"); "
+    + "case \"$src\" in \"$dir\"/*|\"$themedir\"/*) dest=$src ;; "
+    + "*) mkdir -p \"$dir\" || exit 1; dest=\"$dir/${src##*/}\"; "
+    + "if [ -e \"$dest\" ] && ! cmp -s \"$src\" \"$dest\"; then dest=\"$dir/$(date +%s)-${src##*/}\"; fi; "
+    + "[ -e \"$dest\" ] || cp -- \"$src\" \"$dest\" || exit 1 ;; esac; "
+    + "roseshell-theme-bg-set \"$dest\""
+
+  function applyFont(name) {
+    font = name
+    // Restarts the shell at the end, since Qt reads fonts once at startup.
+    Quickshell.execDetached([Quickshell.shellDir + "/bin/font-set", name])
+  }
+
+  function applyCursor(name, size) {
+    cursor = name
+    cursorSize = size
+    Quickshell.execDetached(["roseshell-cursor-set", name, String(size)])
+  }
+
+  function nearestCursorSize(size) {
+    var best = cursorSizes[0] || size
+    for (var i = 1; i < cursorSizes.length; i++)
+      if (Math.abs(cursorSizes[i] - size) < Math.abs(best - size)) best = cursorSizes[i]
+    return best
+  }
+
+  function applyIconTheme(name) {
+    iconTheme = name
+    Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", name])
+  }
+
+  // ---------------------------------------------------------------- windows
+  function applyWindows() {
+    var w = Config.windows
+    Quickshell.execDetached(["roseshell-window-style", String(w.rounding), String(w.gapsIn), String(w.gapsOut),
+      String(w.border), w.shadow ? "on" : "off", w.animations])
+  }
+
+  // ---------------------------------------------------------------- probes
+  component Lines: Process {
+    id: lines
+    property var result: []
+    stdout: StdioCollector {
+      onStreamFinished: lines.result = text.split("\n").filter(l => l !== "")
+    }
+  }
+
+  Lines { id: themeList; command: ["roseshell-theme-list"]; onResultChanged: root.themes = result }
+  Lines { id: themeCurrent; command: ["roseshell-theme-current"]; onResultChanged: root.theme = result[0] || "" }
+  Lines { id: fontList; command: ["roseshell-font-list"]; onResultChanged: root.fonts = result }
+  Lines { id: fontCurrent; command: ["roseshell-font-current"]; onResultChanged: root.font = result[0] || "" }
+  Lines {
+    id: cursorList
+    command: ["sh", "-c", "for d in " + root.iconDirs + "; do [ -d \"$d\" ] && find \"$d\" -mindepth 1 -maxdepth 1; done | while read -r t; do [ -d \"$t/cursors\" ] && basename \"$t\"; done | sort -u"]
+    onResultChanged: root.cursors = result
+  }
+  Lines {
+    id: cursorCurrent
+    command: ["sh", "-c", "gsettings get org.gnome.desktop.interface cursor-theme | tr -d \"'\"; gsettings get org.gnome.desktop.interface cursor-size"]
+    onResultChanged: {
+      root.cursor = result[0] || ""
+      root.cursorSize = parseInt(result[1], 10) || 24
+    }
+  }
+  Lines {
+    id: cursorSizeList
+    onResultChanged: root.cursorSizes = result.map(n => parseInt(n, 10)).filter(n => n > 0)
+  }
+  Lines {
+    id: iconList
+    command: ["sh", "-c", "for d in " + root.iconDirs + "; do [ -d \"$d\" ] && find \"$d\" -mindepth 1 -maxdepth 1; done | while read -r t; do [ -f \"$t/index.theme\" ] && [ ! -d \"$t/cursors\" -o -d \"$t/apps\" -o -d \"$t/scalable\" -o -d \"$t/48x48\" ] && basename \"$t\"; done | sort -u"]
+    onResultChanged: root.iconThemes = result
+  }
+  Lines {
+    id: iconCurrent
+    command: ["sh", "-c", "gsettings get org.gnome.desktop.interface icon-theme | tr -d \"'\""]
+    onResultChanged: root.iconTheme = result[0] || ""
+  }
+  // Backgrounds belong to the current theme, plus the user's own for it.
+  Lines {
+    id: backgroundList
+    command: ["sh", "-c", "theme=$(cat \"$HOME/.local/state/roseshell/current/theme.name\" 2>/dev/null); "
+      + "find -L \"$HOME/.config/roseshell/backgrounds/$theme/\" \"$HOME/.local/state/roseshell/current/theme/backgrounds/\" -maxdepth 1 -type f "
+      + "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \\) 2>/dev/null | sort -u"]
+    onResultChanged: root.backgrounds = result.map(p => ({ path: p, label: root.pretty(p.replace(/^.*\//, "")) }))
+  }
+
+  // The command is set here, not bound: a binding on `cursor` is not
+  // guaranteed to have caught up when this handler runs.
+  onCursorChanged: {
+    if (cursor === "") return
+    cursorSizeList.running = false
+    cursorSizeList.command = ["roseshell-cursor-set", "--sizes", cursor]
+    cursorSizeList.running = true
+  }
+
+  Process {
+    id: matchProcess
+    onExited: root.load()
+  }
+
+  Process {
+    id: browseProcess
+    command: ["roseshell-pick-file", "--images", "--title", "Choose a background", "--folder", Quickshell.env("HOME") + "/Pictures"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var path = text.trim()
+        if (path !== "") {
+          importProcess.command = ["sh", "-c", root.importScript, "sh", path]
+          importProcess.running = true
+        }
+        root.show("appearance")
+      }
+    }
+  }
+
+  Process {
+    id: importProcess
+    onExited: settle.restart()
+  }
+
+  // After a theme or background change, once the scripts have finished.
+  Timer {
+    id: settle
+    interval: 1300
+    onTriggered: {
+      themeCurrent.running = true
+      backgroundList.running = true
+      Background.check()
+    }
+  }
+
+  // The launcher's Settings command asks through the same channel the bar
+  // popups use.
+  Connections {
+    target: PopupState
+    function onRequested(name) { if (name === "settings") root.show("") }
+  }
+
+  IpcHandler {
+    target: "settings"
+    function toggle(): void { if (root.open) root.hide(); else root.show("") }
+    function open(tab: string): void { root.show(tab) }
+    function close(): void { root.hide() }
+  }
+
+  // ---------------------------------------------------------------- pieces
+  // A setting: an icon, what it is, and its control on the right.
+  component Setting: RowLayout {
+    id: setting
+    property int glyph: 0
+    property alias label: name.text
+    property string note: ""
+    default property alias control: slot.data
+
+    Layout.fillWidth: true
+    spacing: 12
+
+    Label {
+      visible: setting.glyph !== 0
+      text: setting.glyph !== 0 ? Icons.glyph(setting.glyph) : ""
+      color: Theme.accent
+      font.pixelSize: Theme.iconLarge
+      horizontalAlignment: Text.AlignHCenter
+      Layout.preferredWidth: 22
+      elide: Text.ElideNone
+    }
+    ColumnLayout {
+      Layout.fillWidth: true
+      spacing: 0
+      Label { id: name; Layout.fillWidth: true }
+      Label {
+        visible: text !== ""
+        text: setting.note
+        color: Theme.dim
+        font.pixelSize: Theme.fontSmall
+        Layout.fillWidth: true
+      }
+    }
+    RowLayout { id: slot; spacing: 8 }
+  }
+
+  // A softly raised group of related settings, under a small heading.
+  component Card: ColumnLayout {
+    property alias title: heading.text
+    default property alias content: body.data
+
+    Layout.fillWidth: true
+    spacing: 6
+
+    SectionHeader {
+      id: heading
+      visible: text !== ""
+      Layout.leftMargin: 2
+    }
+
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: body.implicitHeight + 28
+      radius: Theme.controlRadius + 4
+      color: Theme.alpha(Theme.foreground, 0.035)
+      border.width: 1
+      border.color: Theme.alpha(Theme.foreground, 0.1)
+
+      ColumnLayout {
+        id: body
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 14
+        spacing: 14
+      }
+    }
+  }
+
+  component Swatches: Row {
+    property var keys: []
+    spacing: 4
+
+    Repeater {
+      model: parent.keys.filter(k => Theme.colors[k] !== undefined)
+
+      Rectangle {
+        required property string modelData
+        width: 26
+        height: 26
+        radius: Theme.controlRadius
+        color: Theme.colors[modelData]
+        border.width: 1
+        border.color: Theme.alpha(Theme.foreground, swatchMouse.containsMouse ? 0.7 : 0.15)
+
+        MouseArea {
+          id: swatchMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          onEntered: root.swatchNote = parent.modelData.replace(/_/g, " ") + "  " + Theme.colors[parent.modelData]
+          onClicked: {
+            Quickshell.execDetached(["wl-copy", "--", Theme.colors[parent.modelData]])
+            root.swatchNote = "Copied " + Theme.colors[parent.modelData]
+          }
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- window
+  PanelWindow {
+    screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
+    visible: root.open
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: Theme.alpha(Theme.background, 0.35)
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.namespace: "aayork-settings"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+    onVisibleChanged: if (visible) keys.forceActiveFocus()
+
+    MouseArea {
+      anchors.fill: parent
+      onClicked: root.hide()
+    }
+
+    Rectangle {
+      id: card
+      width: 760
+      height: Math.min(620, parent.height - 80)
+      anchors.centerIn: parent
+      color: Theme.background
+      border.width: Theme.borderWidth
+      border.color: Theme.accent
+      radius: Theme.radius
+
+      // Clicking empty space takes focus back from a text field.
+      MouseArea {
+        anchors.fill: parent
+        onClicked: keys.forceActiveFocus()
+      }
+
+      FocusScope {
+        id: keys
+        anchors.fill: parent
+        anchors.margins: Theme.borderWidth
+        focus: true
+
+        Keys.onPressed: function(event) {
+          var index = root.tabs.findIndex(t => t.id === root.tab)
+          event.accepted = true
+          if (event.key === Qt.Key_Escape) root.hide()
+          else if (event.key === Qt.Key_Tab && (event.modifiers & Qt.ControlModifier)) root.tab = root.tabs[(index + 1) % root.tabs.length].id
+          else if (event.key === Qt.Key_Backtab && (event.modifiers & Qt.ControlModifier)) root.tab = root.tabs[(index + root.tabs.length - 1) % root.tabs.length].id
+          else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key < Qt.Key_1 + root.tabs.length) root.tab = root.tabs[event.key - Qt.Key_1].id
+          else event.accepted = false
+        }
+
+        // Tabs down the left.
+        ColumnLayout {
+          id: sidebar
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.margins: 10
+          width: 150
+          spacing: 2
+
+          Label {
+            text: "Settings"
+            font.bold: true
+            font.pixelSize: Theme.fontLarge
+            Layout.margins: 8
+          }
+
+          Repeater {
+            model: root.tabs
+
+            Rectangle {
+              id: tabButton
+              required property var modelData
+              required property int index
+
+              readonly property bool current: root.tab === modelData.id
+
+              Layout.fillWidth: true
+              implicitHeight: 30
+              radius: Theme.controlRadius
+              color: current ? Theme.selection : tabMouse.containsMouse ? Theme.hover : "transparent"
+
+              RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 10
+
+                Label {
+                  text: Icons.glyph(tabButton.modelData.glyph)
+                  font.pixelSize: Theme.iconSize
+                  color: tabButton.current ? Theme.accent : Theme.dim
+                  elide: Text.ElideNone
+                }
+                Label {
+                  text: tabButton.modelData.label
+                  color: tabButton.current ? Theme.brightForeground : Theme.foreground
+                  Layout.fillWidth: true
+                }
+                Label {
+                  text: "^" + (tabButton.index + 1)
+                  color: Theme.muted
+                  font.pixelSize: Theme.fontSmall
+                  elide: Text.ElideNone
+                }
+              }
+
+              MouseArea {
+                id: tabMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: root.tab = tabButton.modelData.id
+              }
+            }
+          }
+
+          Item { Layout.fillHeight: true }
+        }
+
+        Rectangle {
+          id: divider
+          anchors.left: sidebar.right
+          anchors.leftMargin: 10
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          width: 1
+          color: Theme.separator
+        }
+
+        Scrollbar {
+          flickable: page
+          anchors.right: parent.right
+          anchors.rightMargin: 8
+          anchors.top: page.top
+          anchors.bottom: page.bottom
+        }
+
+        Flickable {
+          id: page
+          anchors.left: divider.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.margins: 18
+          anchors.rightMargin: 22
+          contentHeight: content.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          // A new tab starts at its top.
+          Connections {
+            target: root
+            function onTabChanged() { page.contentY = 0 }
+          }
+
+          ColumnLayout {
+            id: content
+            width: page.width
+            spacing: 0
+
+            // What this page is, with its icon on an accent tile.
+            RowLayout {
+              Layout.fillWidth: true
+              Layout.bottomMargin: 16
+              spacing: 12
+
+              Rectangle {
+                implicitWidth: 36
+                implicitHeight: 36
+                radius: Theme.controlRadius + 4
+                color: Theme.alpha(Theme.accent, 0.16)
+
+                Label {
+                  anchors.centerIn: parent
+                  text: Icons.glyph(root.currentTab.glyph)
+                  color: Theme.accent
+                  font.pixelSize: 20
+                  elide: Text.ElideNone
+                }
+              }
+              ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 0
+                Label { text: root.currentTab.label; font.bold: true; font.pixelSize: Theme.fontLarge + 2; Layout.fillWidth: true }
+                Label { text: root.currentTab.about; color: Theme.dim; font.pixelSize: Theme.fontSmall; Layout.fillWidth: true }
+              }
+            }
+
+            // ------------------------------------------------ appearance
+            ColumnLayout {
+              visible: root.tab === "appearance"
+              Layout.fillWidth: true
+              spacing: 16
+
+              Card {
+              title: "THEME"
+
+              Picker {
+                Layout.fillWidth: true
+                options: root.themes
+                current: root.theme
+                onPicked: function(value) { root.applyTheme(value) }
+              }
+
+              ColumnLayout {
+                spacing: 4
+                Swatches { keys: ["darker_background", "background", "lighter_background", "selection", "muted", "dark_foreground", "foreground", "bright_foreground", "accent"] }
+                Swatches { keys: ["red", "orange", "yellow", "green", "cyan", "blue", "magenta", "brown"] }
+                Swatches { keys: ["bright_red", "bright_yellow", "bright_green", "bright_cyan", "bright_blue", "bright_magenta"] }
+                Label {
+                  text: root.swatchNote !== "" ? root.swatchNote : "Click a colour to copy it"
+                  color: Theme.dim
+                  font.pixelSize: Theme.fontSmall
+                }
+              }
+
+              }
+
+              Card {
+              title: "BACKGROUND"
+
+              // Three rows at a time; a theme with many backgrounds scrolls here
+              // instead of pushing the rest of the page away.
+              Flickable {
+                id: thumbs
+                visible: root.backgrounds.length > 0
+                Layout.fillWidth: true
+                implicitHeight: Math.min(grid.implicitHeight, 3 * 66 + 2 * 8)
+                contentHeight: grid.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                Scrollbar {
+                  flickable: thumbs
+                  parent: thumbs
+                  anchors.right: parent.right
+                  height: thumbs.height
+                  z: 2
+                }
+
+              GridLayout {
+                id: grid
+                width: thumbs.width - 12
+                columns: 5
+                rowSpacing: 8
+                columnSpacing: 8
+
+                Repeater {
+                  model: root.backgrounds
+
+                  Rectangle {
+                    id: thumb
+                    required property var modelData
+
+                    readonly property bool current: modelData.path === Background.path
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 66
+                    color: Theme.surface
+                    border.width: current ? 2 : 1
+                    border.color: current ? Theme.accent : Theme.alpha(Theme.foreground, thumbMouse.containsMouse ? 0.5 : 0.15)
+                    radius: Theme.controlRadius
+
+                    Image {
+                      anchors.fill: parent
+                      anchors.margins: thumb.border.width
+                      source: "file://" + thumb.modelData.path
+                      sourceSize.width: 256
+                      sourceSize.height: 160
+                      fillMode: Image.PreserveAspectCrop
+                      asynchronous: true
+                    }
+
+                    MouseArea {
+                      id: thumbMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      onClicked: root.applyBackground(thumb.modelData.path)
+                    }
+                  }
+                }
+              }
+              }
+
+              Label {
+                visible: root.backgrounds.length === 0
+                text: "This theme has no backgrounds of its own."
+                color: Theme.dim
+              }
+
+              RowLayout {
+                spacing: 6
+                TextButton { text: "Next"; icon: Icons.glyph(0xF04AD); onClicked: root.nextBackground() }
+                TextButton { text: "Choose file…"; icon: Icons.glyph(0xF024B); onClicked: root.browseBackground() }
+                TextButton {
+                  icon: Icons.glyph(0xF0E09)
+                  text: matchProcess.running ? "Matching…" : "Match theme to background"
+                  enabled: !matchProcess.running
+                  onClicked: root.matchTheme()
+                }
+              }
+
+              }
+
+              Card {
+              title: "STYLE"
+
+              Setting {
+                glyph: 0xF06D6
+                label: "Font"
+                note: "Restarts the shell"
+                Picker {
+                  Layout.preferredWidth: 300
+                  options: root.fonts
+                  current: root.font
+                  onPicked: function(value) { root.applyFont(value) }
+                }
+              }
+
+              Setting {
+                glyph: 0xF01C0
+                label: "Cursor"
+                Picker {
+                  Layout.preferredWidth: 300
+                  options: root.cursors
+                  current: root.cursor
+                  onPicked: function(value) {
+                    root.cursor = value
+                    // The old size may fall between this theme's bitmaps.
+                    snap.restart()
+                  }
+                }
+              }
+
+              Timer {
+                id: snap
+                interval: 400
+                onTriggered: root.applyCursor(root.cursor, root.nearestCursorSize(root.cursorSize))
+              }
+
+              Setting {
+                glyph: 0xF0A68
+                label: "Cursor size"
+                note: "One notch for each size this cursor is drawn at"
+                Label {
+                  text: root.cursorSize + " px"
+                  color: Theme.dim
+                  elide: Text.ElideNone
+                }
+                NotchSlider {
+                  Layout.preferredWidth: 260
+                  stops: root.cursorSizes
+                  value: root.nearestCursorSize(root.cursorSize)
+                  onMoved: function(value) { root.applyCursor(root.cursor, value) }
+                }
+              }
+
+              Setting {
+                glyph: 0xF003B
+                label: "Icons"
+                note: "For apps that follow the system icon theme"
+                Picker {
+                  Layout.preferredWidth: 300
+                  options: root.iconThemes
+                  current: root.iconTheme
+                  onPicked: function(value) { root.applyIconTheme(value) }
+                }
+              }
+              }
+            }
+
+            // ------------------------------------------------ shell
+            ColumnLayout {
+              visible: root.tab === "shell"
+              Layout.fillWidth: true
+              spacing: 16
+
+              Card {
+              title: "NIGHT LIGHT"
+
+              Setting {
+                glyph: 0xF0594
+                label: "Night light"
+                note: NightLight.active ? "On now" : "Off now"
+                Toggle {
+                  checked: NightLight.active
+                  onToggled: NightLight.toggle()
+                }
+              }
+
+              Setting {
+                glyph: 0xF0150
+                label: "Schedule"
+                note: Config.nightlight.schedule === "off" ? "Only when switched on by hand"
+                  : NightLight.windowText !== "" ? NightLight.windowText : ""
+                Segmented {
+                  options: [
+                    { label: "Off", value: "off", icon: Icons.glyph(0xF073A) },
+                    { label: "Sunset to sunrise", value: "sunset", icon: Icons.glyph(0xF059B) },
+                    { label: "Custom", value: "custom", icon: Icons.glyph(0xF0954) }
+                  ]
+                  current: Config.nightlight.schedule
+                  onPicked: function(value) { Config.nightlight.schedule = value }
+                }
+              }
+
+              Setting {
+                visible: Config.nightlight.schedule === "custom"
+                glyph: 0xF051F
+                label: "From"
+                note: "24-hour, like 20:00"
+                Field {
+                  Layout.preferredWidth: 80
+                  text: Config.nightlight.start
+                  onAccepted: if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(text)) Config.nightlight.start = text
+                  onCancelled: text = Config.nightlight.start
+                }
+                Label { text: "to"; color: Theme.dim }
+                Field {
+                  Layout.preferredWidth: 80
+                  text: Config.nightlight.end
+                  onAccepted: if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(text)) Config.nightlight.end = text
+                  onCancelled: text = Config.nightlight.end
+                }
+              }
+
+              Setting {
+                glyph: 0xF050F
+                label: "Warmth"
+                note: Config.nightlight.temperature + " K"
+                Slider {
+                  Layout.preferredWidth: 260
+                  // Left is neutral, right is warmest.
+                  value: (5500 - Config.nightlight.temperature) / 3000
+                  step: 250 / 3000
+                  onMoved: function(value) { Config.nightlight.temperature = Math.round((5500 - value * 3000) / 50) * 50 }
+                }
+              }
+
+              }
+
+              Card {
+              title: "BAR"
+
+              Setting {
+                glyph: 0xF00B5
+                label: "Glass"
+                note: "Blur the wallpaper behind the bar"
+                Toggle {
+                  checked: Config.bar.glass
+                  onToggled: Config.bar.glass = !Config.bar.glass
+                }
+              }
+
+              Setting {
+                glyph: 0xF05CC
+                label: "Tint"
+                note: Math.round(Config.bar.tint * 100) + "% of the theme background"
+                Slider {
+                  Layout.preferredWidth: 260
+                  value: Config.bar.tint
+                  onMoved: function(value) { Config.bar.tint = Math.round(value * 20) / 20 }
+                }
+              }
+
+              Setting {
+                glyph: 0xF0954
+                label: "Clock format"
+                note: Qt.formatDateTime(new Date(), Config.clock.format)
+                Field {
+                  Layout.preferredWidth: 220
+                  text: Config.clock.format
+                  onAccepted: if (text.trim() !== "") Config.clock.format = text.trim()
+                  onCancelled: text = Config.clock.format
+                }
+              }
+
+              }
+
+              Card {
+              title: "WHEN IDLE"
+
+              Setting {
+                glyph: 0xF1104
+                label: "Screensaver after"
+                Stepper {
+                  value: Math.round(Config.idle.screensaver / 60)
+                  from: 1
+                  to: 60
+                  suffix: " min"
+                  onMoved: function(value) {
+                    Config.idle.screensaver = value * 60
+                    if (Config.idle.lock <= Config.idle.screensaver) Config.idle.lock = Config.idle.screensaver + 60
+                  }
+                }
+              }
+
+              Setting {
+                glyph: 0xF033E
+                label: "Lock after"
+                note: "Counted from the last input, not from the screensaver"
+                // In seconds underneath, so half minutes are possible.
+                Stepper {
+                  value: Config.idle.lock
+                  from: Config.idle.screensaver + 30
+                  to: 7200
+                  step: 30
+                  display: (value / 60) + " min"
+                  onMoved: function(value) { Config.idle.lock = value }
+                }
+              }
+
+              Setting {
+                glyph: 0xF0D90
+                label: "Screen off after"
+                note: "Once locked and untouched"
+                Stepper {
+                  value: Config.idle.blank
+                  from: 5
+                  to: 300
+                  step: 5
+                  suffix: " s"
+                  onMoved: function(value) { Config.idle.blank = value }
+                }
+              }
+              }
+            }
+
+            // ------------------------------------------------ windows
+            ColumnLayout {
+              visible: root.tab === "windows"
+              Layout.fillWidth: true
+              spacing: 16
+
+              Card {
+              title: "SHAPE"
+
+              Setting {
+                glyph: 0xF0607
+                label: "Corner radius"
+                Stepper {
+                  value: Config.windows.rounding
+                  to: 30
+                  suffix: " px"
+                  onMoved: function(value) { Config.windows.rounding = value; root.applyWindows() }
+                }
+              }
+              Setting {
+                glyph: 0xF00C7
+                label: "Border"
+                Stepper {
+                  value: Config.windows.border
+                  to: 8
+                  suffix: " px"
+                  onMoved: function(value) { Config.windows.border = value; root.applyWindows() }
+                }
+              }
+              Setting {
+                glyph: 0xF0637
+                label: "Shadows"
+                Toggle {
+                  checked: Config.windows.shadow
+                  onToggled: { Config.windows.shadow = !Config.windows.shadow; root.applyWindows() }
+                }
+              }
+
+              }
+
+              Card {
+              title: "SPACING"
+
+              Setting {
+                glyph: 0xF084E
+                label: "Between windows"
+                Stepper {
+                  value: Config.windows.gapsIn
+                  to: 30
+                  suffix: " px"
+                  onMoved: function(value) { Config.windows.gapsIn = value; root.applyWindows() }
+                }
+              }
+              Setting {
+                glyph: 0xF00CE
+                label: "Around the screen edge"
+                Stepper {
+                  value: Config.windows.gapsOut
+                  to: 60
+                  suffix: " px"
+                  onMoved: function(value) { Config.windows.gapsOut = value; root.applyWindows() }
+                }
+              }
+
+              }
+
+              Card {
+              title: "MOTION"
+
+              Setting {
+                glyph: 0xF05D8
+                label: "Animations"
+                note: Config.windows.animations === "minimal" ? "Workspace switches only" : ""
+                Segmented {
+                  options: [{ label: "Off", value: "off" }, { label: "Minimal", value: "minimal" }, { label: "Full", value: "full" }]
+                  current: Config.windows.animations
+                  onPicked: function(value) { Config.windows.animations = value; root.applyWindows() }
+                }
+              }
+              }
+            }
+
+            // ------------------------------------------------ network
+            Card {
+              visible: root.tab === "network"
+              WifiPanel {
+                Layout.fillWidth: true
+                active: root.open && root.tab === "network"
+                maxRows: 13
+              }
+            }
+
+            // ------------------------------------------------ calendar
+            ColumnLayout {
+              visible: root.tab === "calendar"
+              Layout.fillWidth: true
+              spacing: 16
+
+              Card {
+              title: "ACCOUNTS"
+
+              Label {
+                visible: !Calendar.connected
+                text: "No calendars connected yet."
+                color: Theme.dim
+              }
+
+              Repeater {
+                model: Calendar.accounts
+
+                Setting {
+                  id: account
+                  required property var modelData
+                  glyph: modelData.provider === "icloud" ? 0xF0035 : 0xF046B
+                  label: (modelData.provider === "icloud" ? "iCloud" : "Feed") + " · " + modelData.label
+                  note: (modelData.calendars || []).map(c => c.displayName).join(", ")
+                  TextButton {
+                    text: "Remove"
+                    enabled: !Calendar.busy
+                    onClicked: Calendar.removeAccount(account.modelData.id)
+                  }
+                }
+              }
+
+              RowLayout {
+                spacing: 8
+                TextButton { icon: Icons.glyph(0xF04E6); text: Calendar.busy ? "Working…" : "Sync now"; enabled: Calendar.connected && !Calendar.busy; onClicked: Calendar.refresh() }
+                Label {
+                  text: Calendar.status !== "" ? Calendar.status
+                    : Calendar.errors.length > 0 ? String(Calendar.errors[0].message || Calendar.errors[0])
+                    : Calendar.connected ? Calendar.events.length + " events in the next two weeks" : ""
+                  color: Calendar.status !== "" || Calendar.errors.length > 0 ? Theme.yellow : Theme.dim
+                  font.pixelSize: Theme.fontSmall
+                  Layout.fillWidth: true
+                }
+              }
+
+              }
+
+              Card {
+              title: "ADD ICLOUD"
+
+              Label {
+                text: "Use an app-specific password from account.apple.com, not your Apple Account password. It is kept in the keyring."
+                color: Theme.dim
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.Wrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+              }
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Field { id: icloudEmail; Layout.fillWidth: true; placeholder: "Apple Account email"; onAccepted: icloudPassword.focusInput() }
+                Field {
+                  id: icloudPassword
+                  Layout.preferredWidth: 200
+                  placeholder: "App-specific password"
+                  password: true
+                  onAccepted: icloudAdd.clicked()
+                }
+                TextButton {
+                  id: icloudAdd
+                  text: "Connect"
+                  enabled: !Calendar.busy && icloudEmail.text !== "" && icloudPassword.text !== ""
+                  onClicked: {
+                    Calendar.addIcloud(icloudEmail.text.trim(), icloudPassword.text)
+                    icloudPassword.text = ""
+                  }
+                }
+              }
+
+              }
+
+              Card {
+              title: "ADD A FEED"
+
+              Label {
+                text: "A read-only .ics address, like the secret iCal link Google and Outlook calendars offer."
+                color: Theme.dim
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.Wrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+              }
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Field { id: feedUrl; Layout.fillWidth: true; placeholder: "https://…/basic.ics"; onAccepted: feedLabel.focusInput() }
+                Field { id: feedLabel; Layout.preferredWidth: 140; placeholder: "Name"; onAccepted: feedAdd.clicked() }
+                TextButton {
+                  id: feedAdd
+                  text: "Add"
+                  enabled: !Calendar.busy && /^https?:\/\//.test(feedUrl.text.trim())
+                  onClicked: {
+                    Calendar.addFeed(feedUrl.text.trim(), feedLabel.text.trim())
+                    feedUrl.text = ""
+                    feedLabel.text = ""
+                  }
+                }
+              }
+              }
+            }
+
+            // ------------------------------------------------ bluetooth
+            Card {
+              visible: root.tab === "bluetooth"
+              BluetoothPanel {
+                Layout.fillWidth: true
+                active: root.open && root.tab === "bluetooth"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

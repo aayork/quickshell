@@ -1,12 +1,12 @@
+pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import qs.services
 import "Sun.js" as Sun
 
 // Warms the screen at night through hyprsunset. On the "sunset" schedule the
 // times come from where the system timezone says this machine is.
-Scope {
+Singleton {
   id: root
 
   readonly property int neutral: 6000
@@ -101,9 +101,20 @@ Scope {
     }
   }
 
+  // Today's window as "6:37 PM – 6:53 AM", or "" without a schedule.
+  readonly property string windowText: {
+    var _ = [schedule, latitude, Config.nightlight.start, Config.nightlight.end]
+    var span = window()
+    if (!span) return ""
+    function clock(m) { return Qt.formatTime(new Date(2000, 0, 1, Math.floor(m / 60), m % 60), "h:mm AP") }
+    return clock(span[0]) + " – " + clock(span[1])
+  }
+
+  function toggle() { set(!active) }
+
   IpcHandler {
     target: "nightlight"
-    function toggle(): void { root.set(!root.active) }
+    function toggle(): void { root.toggle() }
     function status(): string {
       var span = root.window()
       return JSON.stringify({ active: root.active, schedule: root.schedule, temperature: root.warmth, window: span })

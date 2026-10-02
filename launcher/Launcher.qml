@@ -68,6 +68,7 @@ Scope {
     { id: "control-center", title: "Control Center", glyph: 0xF057E, words: "audio sound output input now playing", run: () => PopupState.request("control-center") },
     { id: "tailscale", title: "Tailscale", glyph: 0xF0582, words: "vpn tailnet", run: () => PopupState.request("tailscale") },
     { id: "calendar", title: "Calendar and Weather", glyph: 0xF0599, words: "clock date notifications", run: () => PopupState.request("clock") },
+    { id: "settings", title: "Settings", glyph: 0xF0493, words: "preferences theme background font cursor night light windows", run: () => PopupState.request("settings") },
     { id: "colorpicker", title: "Color Picker", glyph: 0xF0349, words: "colour pick hex hyprpicker", run: () => Quickshell.execDetached(["hyprpicker", "-a"]) },
     { id: "reload", title: "Reload Shell", glyph: 0xF0450, words: "restart quickshell", run: () => Quickshell.reload(true) }
   ].filter(c => !scopes.some(s => s.keyword === c.id))

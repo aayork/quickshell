@@ -15,6 +15,11 @@ Singleton {
   property int reloads: 0
   readonly property url source: path ? "file://" + path + (reloads ? "?" + reloads : "") : ""
 
+  // Looks for a new path without reloading an unchanged one.
+  function check() {
+    if (!resolve.running) resolve.running = true
+  }
+
   // An asked-for refresh reloads the image even when the path is unchanged.
   property bool forced: false
   function refresh() {
