@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Runs the Things Cloud CLI (things-cli, from arthursoares/things-cloud-sdk)
+# with your login taken from the keyring, so the password is never in a file
+# or on a command line.
+#
+#   things today | inbox | projects | create "Title" --when today | complete <uuid> ...
+#   things login <email>      store the login; the password is read from stdin
+#   things logout             forget it
+#   things status             "ready", "no-cli" or "no-login"
+#
+# Exit 3 means it is not set up yet (see `things status`).
+
+SERVICE=aayork-quickshell-things
+
+cli=$(command -v things-cli || true)
+[[ -z $cli && -x $HOME/go/bin/things-cli ]] && cli=$HOME/go/bin/things-cli
+[[ -z $cli && -x $HOME/.local/bin/things-cli ]] && cli=$HOME/.local/bin/things-cli
+
+# The keyring entry carries the email as an attribute and the password as
+# the secret.
+lookup() {
+  local found
+  found=$(secret-tool search --unlock service "$SERVICE" 2>&1) || return 1
+  email=$(sed -n 's/^attribute\.account = //p' <<<"$found" | head -n1)
+  password=$(sed -n 's/^secret = //p' <<<"$found" | head -n1)
+  [[ -n $email && -n $password ]]
+}
+
+case "${1:-}" in
+login)
+  [[ -n ${2:-} ]] || { echo "Usage: things login <email>   (password on stdin)" >&2; exit 1; }
+  IFS= read -r password
+  [[ -n $password ]] || { echo "No password given" >&2; exit 1; }
+  secret-tool clear service "$SERVICE" 2>/dev/null
+  printf '%s' "$password" | secret-tool store --label "Things Cloud: $2" service "$SERVICE" account "$2"
+  exit
+  ;;
+logout)
+  secret-tool clear service "$SERVICE"
+  rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/aayork-quickshell/things-state.json"
+  exit
+  ;;
+status)
+  if [[ -z $cli ]]; then echo no-cli
+  elif ! lookup; then echo no-login
+  else echo ready
+  fi
+  exit 0
+  ;;
+esac
+
+[[ -n $cli ]] || { echo "things-cli is not installed" >&2; exit 3; }
+lookup || { echo "No Things Cloud login stored" >&2; exit 3; }
+
+mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/aayork-quickshell"
+THINGS_USERNAME=$email THINGS_PASSWORD=$password \
+  THINGS_CLI_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/aayork-quickshell/things-state.json" \
+  exec "$cli" "$@"

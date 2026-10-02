@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
-// Qualified: the Bose and Tailscale widgets here share names with services.
+// Qualified: the Bose, Tailscale and Things widgets here share names with services.
 import qs.services as Services
 import qs.theme
 import qs.ui
@@ -62,7 +62,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -126,6 +126,7 @@ Scope {
 
           Tray { foreground: bar.foreground }
           Bose { id: bose; foreground: bar.foreground }
+          Things { id: things; foreground: bar.foreground }
           Tailscale { id: tailscale; foreground: bar.foreground }
           Network { id: network; foreground: bar.foreground }
           ControlCenter { id: controlCenter; foreground: bar.foreground }
