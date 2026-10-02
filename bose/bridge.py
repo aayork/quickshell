@@ -49,7 +49,7 @@ ERROR_DETAIL_LIMIT = 500
 # ours. All checks below run against the opened fd (never a re-looked-up
 # path), so a swap between check and use cannot redirect them.
 SELECTION_MAX_BYTES = 4096
-SELECTION_DIRECTORY_PARTS = (".local", "state", "omarchy")
+SELECTION_DIRECTORY_PARTS = (".local", "state", "aayork-quickshell")
 SELECTION_FILENAME = "omabose.json"
 UNSAFE_WRITE_BITS = stat.S_IWGRP | stat.S_IWOTH
 MAC_RE = re.compile(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")

@@ -1,16 +1,23 @@
 #!/bin/bash
 
-# Keep the Strata file manager on the current theme.
+# Give the Strata file manager the current theme.
 #
-# Strata follows a desktop theme by watching one fixed place,
-# ~/.local/state/omarchy/current (theme.name and theme/colors.toml), which is
-# where Omarchy keeps the same files this shell keeps. A link from there to
-# this shell's state is all it needs; with "Follow Omarchy" on in Strata's
-# Appearance settings, it then recolours itself whenever the theme changes.
+# The template engine has already written strata.toml; this installs it as
+# one of Strata's own custom themes, "desktop", and selects it. Strata reads
+# its themes when it starts, so a window that is already open keeps its
+# colours until Strata is next launched.
 
-state="$HOME/.local/state"
+theme="$HOME/.local/state/aayork-quickshell/current/theme/strata.toml"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/strata"
+settings="$config/settings.toml"
 
-# Only ever replace a link, never a real directory someone put there.
-if [[ -L $state/omarchy || ! -e $state/omarchy ]]; then
-  ln -sfn aayork-quickshell "$state/omarchy"
+[[ -f $theme && -d $config ]] || exit 0
+
+mkdir -p "$config/themes"
+cp "$theme" "$config/themes/desktop.toml"
+
+# Select it, once. Both keys sit at the top level of settings.toml.
+[[ -f $settings ]] || exit 0
+if ! grep -qx 'theme = "desktop"' "$settings" || ! grep -qx 'mode = "theme"' "$settings"; then
+  sed -i -E 's/^mode = .*/mode = "theme"/; s/^theme = .*/theme = "desktop"/' "$settings"
 fi
