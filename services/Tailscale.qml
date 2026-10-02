@@ -19,7 +19,7 @@ Singleton {
   property string tailnet: ""
   property string selfName: ""
   property string selfIp: ""
-  // [{ id, name, ip, online, exitNode, exitNodeOption }], online first.
+  // [{ id, name, ip, online, exitNode, exitNodeOption, taildrop }], online first.
   property var peers: []
   // [{ id, label, selected }]
   property var accounts: []
@@ -74,7 +74,9 @@ Singleton {
         ip: firstIPv4(peer.TailscaleIPs),
         online: peer.Online === true,
         exitNode: peer.ExitNode === true,
-        exitNodeOption: peer.ExitNodeOption === true
+        exitNodeOption: peer.ExitNodeOption === true,
+        // 1 is Tailscale's "can take files right now".
+        taildrop: peer.TaildropTarget === 1
       })
     }
     list.sort(function(a, b) {
@@ -132,6 +134,27 @@ Singleton {
   readonly property bool needsOperator: error.indexOf("--operator") !== -1 || error.toLowerCase().indexOf("access denied") !== -1
   function authorize() {
     run(["pkexec", "tailscale", "set", "--operator=" + Quickshell.env("USER")])
+  }
+
+  // Taildrop: pick a file with the desktop's chooser and send it. The
+  // result arrives as a notification.
+  function sendFile(peer) {
+    if (!peer.taildrop || send.running) return
+    send.command = ["sh", "-c", "file=$(roseshell-pick-file --title \"Send to $2\" --folder \"$HOME\") || exit 0; [ -n \"$file\" ] || exit 0; "
+      + "if error=$(tailscale file cp --update-interval=0 -- \"$file\" \"$1:\" 2>&1); then notify-send -a Taildrop \"Sent to $2\" \"$(basename \"$file\")\"; "
+      + "else notify-send -a Taildrop -u critical \"Could not send to $2\" \"${error:-Taildrop transfer failed}\"; fi", "sh", peer.ip, peer.name]
+    send.running = true
+  }
+
+  Process {
+    id: send
+  }
+
+  // Incoming files land in ~/Downloads while Tailscale is up. The
+  // script takes its `tailscale file get` down with it when the shell stops.
+  Process {
+    running: root.running
+    command: [Quickshell.shellDir + "/bin/taildrop-receive"]
   }
 
   function copy(text) {

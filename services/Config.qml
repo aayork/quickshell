@@ -11,6 +11,7 @@ Singleton {
   readonly property alias nightlight: adapter.nightlight
   readonly property alias idle: adapter.idle
   readonly property alias clock: adapter.clock
+  readonly property alias screensaver: adapter.screensaver
   readonly property alias bar: adapter.bar
   readonly property alias windows: adapter.windows
 
@@ -42,6 +43,14 @@ Singleton {
         property int lock: 450
         // Seconds an untouched lock screen stays lit.
         property int blank: 20
+      }
+
+      property JsonObject screensaver: JsonObject {
+        // Off: the screen just locks when its time comes.
+        property bool enabled: true
+        // Folder of videos to play, shuffled.
+        property string folder: "~/Videos/aerial"
+        property bool sound: false
       }
 
       property JsonObject clock: JsonObject {

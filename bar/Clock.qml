@@ -22,6 +22,12 @@ BarButton {
   property var allZones: []
   // Day whose events are listed; today unless another is clicked.
   property date selectedDay: new Date()
+  // The new-event form is open.
+  property bool addingEvent: false
+  // Calendar the next new event goes to.
+  property string eventCalendar: ""
+  // uid of the event waiting for a second click to delete.
+  property string deleting: ""
   // label -> minutes ahead of UTC, filled in when the popup opens.
   property var zoneOffsets: ({})
   // Months away from the current one the calendar is showing.
@@ -127,6 +133,8 @@ BarButton {
 
     onOpenChanged: {
       root.addingZone = false
+      root.addingEvent = false
+      root.deleting = ""
       if (!open) return
       root.monthOffset = 0
       root.selectedDay = new Date()
@@ -354,8 +362,13 @@ BarButton {
           RowLayout {
             id: eventRow
             required property var modelData
+
+            readonly property bool deleting: root.deleting === modelData.uid
+
             Layout.fillWidth: true
             spacing: 8
+
+            HoverHandler { id: eventHover }
 
             Rectangle {
               implicitWidth: 3
@@ -364,12 +377,114 @@ BarButton {
               color: eventRow.modelData.color || Theme.accent
             }
             Label { text: eventRow.modelData.title; Layout.fillWidth: true }
+            // The time, or on hover the way to delete it (two clicks).
             Label {
-              text: Calendar.timeText(eventRow.modelData)
-              color: Theme.dim
+              readonly property bool offer: eventHover.hovered && Calendar.canDelete(eventRow.modelData)
+              text: eventRow.deleting ? "Click again to delete" : offer ? "Delete" : Calendar.timeText(eventRow.modelData)
+              color: eventRow.deleting || (offer && deleteMouse.containsMouse) ? Theme.red : Theme.dim
               font.pixelSize: Theme.fontSmall
               elide: Text.ElideNone
+              MouseArea {
+                id: deleteMouse
+                anchors.fill: parent
+                anchors.margins: -4
+                hoverEnabled: true
+                enabled: parent.offer || eventRow.deleting
+                onClicked: {
+                  if (!eventRow.deleting) {
+                    root.deleting = eventRow.modelData.uid
+                    return
+                  }
+                  root.deleting = ""
+                  Calendar.deleteEvent(eventRow.modelData)
+                }
+              }
             }
+          }
+        }
+
+        Label {
+          visible: !root.addingEvent && Calendar.writable.length > 0
+          text: Calendar.busy && Calendar.status !== "" ? Calendar.status : "+ New event"
+          color: newEventMouse.containsMouse ? Theme.foreground : Theme.muted
+          font.pixelSize: Theme.fontSmall
+          MouseArea {
+            id: newEventMouse
+            anchors.fill: parent
+            anchors.margins: -4
+            hoverEnabled: true
+            enabled: !Calendar.busy
+            onClicked: {
+              if (!Calendar.writable.some(c => c.url === root.eventCalendar)) root.eventCalendar = Calendar.writable[0].url
+              root.addingEvent = true
+              eventTitle.text = ""
+              eventTime.text = ""
+              eventTitle.focusInput()
+            }
+          }
+        }
+
+        Label {
+          visible: !root.addingEvent && !Calendar.busy && Calendar.status !== ""
+          text: Calendar.status
+          color: Theme.red
+          font.pixelSize: Theme.fontSmall
+          wrapMode: Text.Wrap
+          elide: Text.ElideNone
+          Layout.fillWidth: true
+        }
+
+        // New event on the selected day: a title, an optional time, a calendar.
+        ColumnLayout {
+          id: eventForm
+          visible: root.addingEvent
+          Layout.fillWidth: true
+          Layout.topMargin: 4
+          spacing: 6
+
+          readonly property var times: Calendar.parseTimes(eventTime.text)
+          readonly property bool valid: eventTitle.text.trim() !== "" && times !== undefined
+
+          function submit() {
+            if (!valid) return
+            var calendar = Calendar.writable.find(c => c.url === root.eventCalendar) ?? Calendar.writable[0]
+            Calendar.createEvent(calendar, root.selectedDay, eventTitle.text.trim(), times)
+            root.addingEvent = false
+          }
+
+          Field {
+            id: eventTitle
+            Layout.fillWidth: true
+            placeholder: "Event title"
+            onAccepted: eventTime.focusInput()
+            onCancelled: root.addingEvent = false
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Field {
+              id: eventTime
+              Layout.fillWidth: true
+              placeholder: "Time, like 3pm or 9-10:30am. Empty for all day"
+              border.color: eventForm.times === undefined ? Theme.red : Theme.alpha(Theme.foreground, 0.25)
+              onAccepted: eventForm.submit()
+              onCancelled: root.addingEvent = false
+            }
+            TextButton {
+              text: "Add"
+              enabled: eventForm.valid
+              onClicked: eventForm.submit()
+            }
+          }
+
+          Select {
+            Layout.fillWidth: true
+            visible: Calendar.writable.length > 1
+            options: Calendar.writable.map(c => ({ label: c.name, value: c.url }))
+            current: root.eventCalendar
+            onPicked: function(value) { root.eventCalendar = value }
           }
         }
       }

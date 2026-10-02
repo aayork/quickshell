@@ -22,7 +22,7 @@ Scope {
 
   readonly property var tabs: [
     { id: "appearance", label: "Appearance", glyph: 0xF03D8, about: "Theme, background, font, cursor and icons" },
-    { id: "shell", label: "Shell", glyph: 0xF0379, about: "Night light, the bar, and what happens when you step away" },
+    { id: "shell", label: "Shell", glyph: 0xF0379, about: "Night light, the bar, the screensaver and the lock" },
     { id: "windows", label: "Windows", glyph: 0xF05AF, about: "How Hyprland draws and spaces windows" },
     { id: "network", label: "Network", glyph: 0xF0928, about: "Wi-Fi networks in range" },
     { id: "bluetooth", label: "Bluetooth", glyph: 0xF00AF, about: "Paired devices and new ones nearby" },
@@ -33,8 +33,17 @@ Scope {
   // ---------------------------------------------------------------- state
   property var themes: []
   property string theme: ""
-  // [{ path, label }] for the current theme.
-  property var backgrounds: []
+  // Background files on hand, newest first.
+  property var available: []
+  // What the Background card shows: the ones used last, topped up with the
+  // newest files until there are five. Anything else comes from "Choose file".
+  readonly property var backgrounds: {
+    // Only files the list below vouched for: drawable, and still there.
+    var list = Background.recent.filter(p => available.indexOf(p) !== -1)
+    for (var i = 0; i < available.length && list.length < Background.recentLimit; i++)
+      if (list.indexOf(available[i]) === -1) list.push(available[i])
+    return list.slice(0, Background.recentLimit).map(p => ({ path: p }))
+  }
   property var fonts: []
   property string font: ""
   property var cursors: []
@@ -70,6 +79,7 @@ Scope {
     cursorCurrent.running = true
     iconList.running = true
     iconCurrent.running = true
+    videoCount.running = true
     Background.check()
   }
 
@@ -88,11 +98,6 @@ Scope {
 
   function applyBackground(path) {
     Quickshell.execDetached(["roseshell-theme-bg-set", path])
-    settle.restart()
-  }
-
-  function nextBackground() {
-    Quickshell.execDetached(["roseshell-theme-bg-next"])
     settle.restart()
   }
 
@@ -194,13 +199,26 @@ Scope {
     command: ["sh", "-c", "gsettings get org.gnome.desktop.interface icon-theme | tr -d \"'\""]
     onResultChanged: root.iconTheme = result[0] || ""
   }
-  // Backgrounds belong to the current theme, plus the user's own for it.
+  // The current theme's backgrounds plus the user's own for it, newest file
+  // first. Only used to fill out the recents.
   Lines {
     id: backgroundList
     command: ["sh", "-c", "theme=$(cat \"$HOME/.local/state/roseshell/current/theme.name\" 2>/dev/null); "
       + "find -L \"$HOME/.config/roseshell/backgrounds/$theme/\" \"$HOME/.local/state/roseshell/current/theme/backgrounds/\" -maxdepth 1 -type f "
-      + "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \\) 2>/dev/null | sort -u"]
-    onResultChanged: root.backgrounds = result.map(p => ({ path: p, label: root.pretty(p.replace(/^.*\//, "")) }))
+      + "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \\) -printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | cut -f2- "
+      // By content, not by name: a HEIF saved as .png cannot be drawn.
+      + "| while IFS= read -r f; do case $(file -b --mime-type -- \"$f\") in image/jpeg|image/png|image/webp|image/gif) printf '%s\\n' \"$f\" ;; esac; done"]
+    onResultChanged: root.available = result
+  }
+
+  // How many videos the screensaver folder holds.
+  Lines {
+    id: videoCount
+    command: ["sh", "-c", "d=\"$1\"; d=\"${d/#\\~/$HOME}\"; find -L \"$d\" -maxdepth 1 -type f \\( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.m4v' -o -iname '*.mkv' -o -iname '*.webm' \\) 2>/dev/null | wc -l", "sh", Config.screensaver.folder]
+  }
+  Connections {
+    target: Config.screensaver
+    function onFolderChanged() { videoCount.running = true }
   }
 
   // The command is set here, not bound: a binding on `cursor` is not
@@ -579,33 +597,14 @@ Scope {
               }
 
               Card {
-              title: "BACKGROUND"
+              title: "RECENT BACKGROUNDS"
 
-              // Three rows at a time; a theme with many backgrounds scrolls here
-              // instead of pushing the rest of the page away.
-              Flickable {
-                id: thumbs
-                visible: root.backgrounds.length > 0
+              // The five used most recently.
+              RowLayout {
                 Layout.fillWidth: true
-                implicitHeight: Math.min(grid.implicitHeight, 3 * 66 + 2 * 8)
-                contentHeight: grid.implicitHeight
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-
-                Scrollbar {
-                  flickable: thumbs
-                  parent: thumbs
-                  anchors.right: parent.right
-                  height: thumbs.height
-                  z: 2
-                }
-
-              GridLayout {
-                id: grid
-                width: thumbs.width - 12
-                columns: 5
-                rowSpacing: 8
-                columnSpacing: 8
+                spacing: 8
+                uniformCellSizes: true
+                visible: root.backgrounds.length > 0
 
                 Repeater {
                   model: root.backgrounds
@@ -616,14 +615,18 @@ Scope {
 
                     readonly property bool current: modelData.path === Background.path
 
+                    // A file Qt cannot decode (a HEIF saved as .png, say) would
+                    // sit here as a blank tile and make a blank wallpaper.
+                    visible: preview.status !== Image.Error
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 66
+                    Layout.preferredHeight: 72
                     color: Theme.surface
                     border.width: current ? 2 : 1
                     border.color: current ? Theme.accent : Theme.alpha(Theme.foreground, thumbMouse.containsMouse ? 0.5 : 0.15)
                     radius: Theme.controlRadius
 
                     Image {
+                      id: preview
                       anchors.fill: parent
                       anchors.margins: thumb.border.width
                       source: "file://" + thumb.modelData.path
@@ -642,17 +645,15 @@ Scope {
                   }
                 }
               }
-              }
 
               Label {
                 visible: root.backgrounds.length === 0
-                text: "This theme has no backgrounds of its own."
+                text: "No backgrounds yet. Choose a file to add one."
                 color: Theme.dim
               }
 
               RowLayout {
                 spacing: 6
-                TextButton { text: "Next"; icon: Icons.glyph(0xF04AD); onClicked: root.nextBackground() }
                 TextButton { text: "Choose file…"; icon: Icons.glyph(0xF024B); onClicked: root.browseBackground() }
                 TextButton {
                   icon: Icons.glyph(0xF0E09)
@@ -840,11 +841,30 @@ Scope {
               }
 
               Card {
-              title: "WHEN IDLE"
+              title: "SCREENSAVER"
 
               Setting {
                 glyph: 0xF1104
-                label: "Screensaver after"
+                label: "Screensaver"
+                note: Config.screensaver.enabled ? "Plays your videos before the screen locks" : "Off: the screen just locks"
+                TextButton {
+                  text: "Preview"
+                  icon: Icons.glyph(0xF040A)
+                  onClicked: {
+                    root.hide()
+                    Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver", Config.screensaver.folder, Config.screensaver.sound ? "yes" : "no"])
+                  }
+                }
+                Toggle {
+                  checked: Config.screensaver.enabled
+                  onToggled: Config.screensaver.enabled = !Config.screensaver.enabled
+                }
+              }
+
+              Setting {
+                glyph: 0xF051F
+                label: "Start after"
+                note: "Held off while something is playing or fullscreen"
                 Stepper {
                   value: Math.round(Config.idle.screensaver / 60)
                   from: 1
@@ -856,6 +876,31 @@ Scope {
                   }
                 }
               }
+
+              Setting {
+                glyph: 0xF024B
+                label: "Videos"
+                note: videoCount.result.length > 0 ? videoCount.result[0] + " videos, shuffled" : ""
+                Field {
+                  Layout.preferredWidth: 260
+                  text: Config.screensaver.folder
+                  onAccepted: if (text.trim() !== "") Config.screensaver.folder = text.trim()
+                  onCancelled: text = Config.screensaver.folder
+                }
+              }
+
+              Setting {
+                glyph: 0xF057E
+                label: "Sound"
+                Toggle {
+                  checked: Config.screensaver.sound
+                  onToggled: Config.screensaver.sound = !Config.screensaver.sound
+                }
+              }
+              }
+
+              Card {
+              title: "LOCK"
 
               Setting {
                 glyph: 0xF033E

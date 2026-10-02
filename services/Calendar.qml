@@ -61,6 +61,74 @@ Singleton {
     run(["add-ics", url, "--label", label || "Calendar", "--provider", "ics"], "", "Adding the feed…")
   }
 
+  // Calendars an event can be added to: iCloud ones, minus Reminders lists.
+  readonly property var writable: {
+    var list = []
+    for (var a = 0; a < accounts.length; a++) {
+      var account = accounts[a]
+      if (account.type !== "caldav") continue
+      var calendars = account.calendars || []
+      for (var c = 0; c < calendars.length; c++) {
+        if (calendars[c].enabled === false || /reminders/i.test(calendars[c].displayName)) continue
+        list.push({ accountId: account.id, url: calendars[c].url, name: calendars[c].displayName.replace(/[^\x20-\x7E]/g, "").trim(), color: calendars[c].color })
+      }
+    }
+    return list
+  }
+
+  // "9am", "9:30", "14:00", "3pm-4:30pm". Returns { start, end } in minutes
+  // after midnight, null for all day (empty text), or undefined if unreadable.
+  function parseTimes(text) {
+    var clean = String(text || "").trim().toLowerCase()
+    if (clean === "") return null
+    var parts = clean.split(/\s*(?:-|–|to)\s*/)
+    function minutes(word, hint) {
+      var match = word.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$/)
+      if (!match) return -1
+      var hour = Number(match[1])
+      var suffix = match[3] ? match[3].charAt(0) : hint
+      if (hour > 23 || Number(match[2] || 0) > 59) return -1
+      if (suffix === "p" && hour < 12) hour += 12
+      if (suffix === "a" && hour === 12) hour = 0
+      return hour * 60 + Number(match[2] || 0)
+    }
+    var endHint = parts.length > 1 ? (parts[1].match(/(am|pm|a|p)$/) || [""])[0].charAt(0) : ""
+    var start = minutes(parts[0], endHint)
+    if (start < 0) return undefined
+    var end = parts.length > 1 ? minutes(parts[1], "") : start + 60
+    if (end < 0) return undefined
+    if (end <= start) end = start + 60
+    return { start: start, end: end }
+  }
+
+  // times: what parseTimes returned (null for all day).
+  function createEvent(calendar, day, title, times) {
+    var start = new Date(day.getFullYear(), day.getMonth(), day.getDate())
+    var end = new Date(start)
+    if (times) {
+      start.setMinutes(times.start)
+      end.setMinutes(times.end)
+    } else {
+      end.setDate(end.getDate() + 1)
+    }
+    function local(date) { return Qt.formatDateTime(date, "yyyy-MM-ddTHH:mm:ss") }
+    run(["create-event"], JSON.stringify({
+      accountId: calendar.accountId, calendarUrl: calendar.url, title: title,
+      start: times ? start.toISOString() : local(start), end: times ? end.toISOString() : local(end), allDay: !times
+    }), "Adding the event…")
+  }
+
+  function canDelete(event) {
+    return accounts.some(a => a.id === event.accountId && a.type === "caldav")
+  }
+
+  function deleteEvent(event) {
+    var account = accounts.find(a => a.id === event.accountId)
+    var calendar = account ? (account.calendars || []).find(c => c.displayName === event.calendar) : null
+    if (!calendar) return
+    run(["delete-event"], JSON.stringify({ accountId: event.accountId, calendarUrl: calendar.url, uid: event.uid }), "Deleting…")
+  }
+
   function removeAccount(id) {
     run(["remove-account", id], "", "Removing…")
   }
@@ -105,7 +173,10 @@ Singleton {
     onStarted: {
       if (input !== "") write(input)
       input = ""
+      // The helper reads its input to the end, so it has to be told it ended.
+      stdinEnabled = false
     }
+    onExited: stdinEnabled = true
   }
 
   FileView {

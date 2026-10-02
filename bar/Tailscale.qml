@@ -6,7 +6,7 @@ import qs.theme
 import qs.ui
 
 // Tailscale: on/off, the machines on the tailnet (click one to copy its
-// address), and the exit node.
+// address, or send it a file), and the exit node.
 BarButton {
   id: root
 
@@ -46,6 +46,8 @@ BarButton {
     property string ip: ""
     property bool online: true
     property string note: ""
+    // The peer, when files can be sent to it.
+    property var sendTo: null
 
     Layout.fillWidth: true
     implicitHeight: Theme.rowHeight
@@ -87,13 +89,31 @@ BarButton {
         font.pixelSize: Theme.fontSmall
         elide: Text.ElideNone
       }
+
+      // Taildrop, offered on hover to machines that can take a file.
+      Label {
+        id: sendLabel
+        visible: machine.sendTo !== null && mouse.containsMouse
+        text: "Send file"
+        color: Theme.accent
+        font.pixelSize: Theme.fontSmall
+        elide: Text.ElideNone
+      }
     }
 
     MouseArea {
       id: mouse
       anchors.fill: parent
       hoverEnabled: true
-      onClicked: root.copy(machine.ip)
+      onClicked: function(event) {
+        // The right end of the row is the send button while it shows.
+        if (sendLabel.visible && event.x >= sendLabel.mapToItem(machine, 0, 0).x - 6) {
+          popup.close()
+          Tailscale.sendFile(machine.sendTo)
+        } else {
+          root.copy(machine.ip)
+        }
+      }
     }
   }
 
@@ -190,6 +210,7 @@ BarButton {
               ip: modelData.ip
               online: modelData.online
               note: modelData.exitNode ? "Exit node" : ""
+              sendTo: modelData.taildrop ? modelData : null
             }
           }
         }

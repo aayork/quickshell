@@ -15,6 +15,36 @@ Singleton {
   property int reloads: 0
   readonly property url source: path ? "file://" + path + (reloads ? "?" + reloads : "") : ""
 
+  // The backgrounds used most recently, newest first.
+  property var recent: []
+  readonly property int recentLimit: 5
+
+  onPathChanged: {
+    if (path === "" || !recentLoaded) return
+    recent = [path].concat(recent.filter(p => p !== path)).slice(0, recentLimit)
+    recentFile.setText(JSON.stringify(recent))
+  }
+
+  property bool recentLoaded: false
+  FileView {
+    id: recentFile
+    path: Quickshell.env("HOME") + "/.local/state/aayork-quickshell/backgrounds.json"
+    printErrors: false
+    atomicWrites: true
+    onLoaded: {
+      try {
+        var saved = JSON.parse(text())
+        if (Array.isArray(saved)) root.recent = saved
+      } catch (e) {}
+      root.recentLoaded = true
+      root.pathChanged()
+    }
+    onLoadFailed: {
+      root.recentLoaded = true
+      root.pathChanged()
+    }
+  }
+
   // Looks for a new path without reloading an unchanged one.
   function check() {
     if (!resolve.running) resolve.running = true

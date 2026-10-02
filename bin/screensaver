@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Plays the Apple aerial videos full screen, one mpv per monitor. Started by
+# Plays a folder of videos full screen, shuffled, one mpv per monitor. Started by
 # the shell's idle module. mpv's own input config quits on any key or mouse
 # movement, and the idle module notices the window closing.
 #
@@ -10,9 +10,14 @@ CLASS=org.roseshell.screensaver
 
 pgrep -f -- "--wayland-app-id=$CLASS" >/dev/null && exit 0
 
-shopt -s nullglob
-videos=("$HOME/Videos/aerial"/*.mov "$HOME/Videos/aerial"/*.mp4 "$HOME/Videos/aerial"/*.m4v)
-shopt -u nullglob
+# screensaver [folder] [sound: yes|no]
+folder="${1:-$HOME/Videos/aerial}"
+folder="${folder/#\~/$HOME}"
+sound="${2:-no}"
+
+shopt -s nullglob nocaseglob
+videos=("$folder"/*.mov "$folder"/*.mp4 "$folder"/*.m4v "$folder"/*.mkv "$folder"/*.webm)
+shopt -u nullglob nocaseglob
 
 (( ${#videos[@]} > 0 )) || exit 1
 
@@ -32,7 +37,7 @@ for monitor in $(hyprctl monitors -j | jq -r '.[] | select(.disabled == false) |
     --input-conf="$HOME/.config/mpv/screensaver-input.conf" \
     --loop-playlist=inf \
     --shuffle \
-    --mute=yes \
+    --mute="$([[ $sound == yes ]] && echo no || echo yes)" \
     --stop-screensaver=no \
     --cursor-autohide=1000 \
     --really-quiet \

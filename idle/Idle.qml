@@ -36,13 +36,21 @@ Scope {
     + "hyprctl -j clients 2>/dev/null | jq -e --argjson active \"${active:-[]}\" "
     + "'any(.[]; .fullscreen > 0 and .class != \"" + saverClass + "\" and (.workspace.id as $w | $active | index($w)))' >/dev/null && echo fullscreen"
 
+  function launchScreensaver() {
+    Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver", Config.screensaver.folder, Config.screensaver.sound ? "yes" : "no"])
+  }
+
   function start() {
     if (cycling) return
-    console.log("idle: screensaver")
     cycling = true
     saverWindows = ({})
-    Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver"])
-    grace.restart()
+    if (Config.screensaver.enabled) {
+      console.log("idle: screensaver")
+      launchScreensaver()
+      grace.restart()
+    } else {
+      console.log("idle: waiting to lock")
+    }
     lockTimer.restart()
   }
 
@@ -171,6 +179,6 @@ Scope {
         inhibitedBy: root.inhibitedBy, locked: Session.locked, blanked: root.blanked })
     }
     function toggle(): void { root.enabled = !root.enabled }
-    function screensaver(): void { root.start() }
+    function screensaver(): void { root.launchScreensaver() }
   }
 }
