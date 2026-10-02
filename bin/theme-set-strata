@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Keep the Strata file manager on the current theme.
+#
+# Strata follows a desktop theme by watching one fixed place,
+# ~/.local/state/omarchy/current (theme.name and theme/colors.toml), which is
+# where Omarchy keeps the same files this shell keeps. A link from there to
+# this shell's state is all it needs; with "Follow Omarchy" on in Strata's
+# Appearance settings, it then recolours itself whenever the theme changes.
+
+state="$HOME/.local/state"
+
+# Only ever replace a link, never a real directory someone put there.
+if [[ -L $state/omarchy || ! -e $state/omarchy ]]; then
+  ln -sfn aayork-quickshell "$state/omarchy"
+fi

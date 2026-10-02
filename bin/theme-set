@@ -146,6 +146,8 @@ run_parallel \
   theme-set-gnome \
   theme-set-claude \
   theme-set-zen \
+  theme-set-zed \
+  theme-set-strata \
   theme-set-thunderbird \
   theme-set-vscode \
   theme-set-obsidian \

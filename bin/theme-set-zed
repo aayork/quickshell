@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Give Zed the current theme. The template engine has already written
+# zed.json; this puts it where Zed looks for themes and, the first time,
+# points Zed's settings at it. Zed reloads a changed theme file by itself.
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+theme="$HOME/.local/state/aayork-quickshell/current/theme/zed.json"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/zed"
+settings="$config/settings.json"
+
+[[ -f $theme && -d $config ]] || exit 0
+
+mkdir -p "$config/themes"
+cp "$theme" "$config/themes/desktop.json"
+
+# settings.json has comments and trailing commas, so it is edited as text:
+# whatever "theme" is set to becomes the generated theme for light and dark.
+[[ -f $settings ]] || exit 0
+grep -q '"dark": "Desktop"' "$settings" && exit 0
+
+python3 - "$settings" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+text = open(path).read()
+wanted = '"theme": {\n    "mode": "system",\n    "light": "Desktop",\n    "dark": "Desktop"\n  }'
+
+block = re.compile(r'"theme"\s*:\s*(\{[^{}]*\}|"[^"]*")')
+if block.search(text):
+    text = block.sub(lambda _: wanted, text, count=1)
+else:
+    # No theme set yet: add it as the first setting.
+    text = re.sub(r'\{', '{\n  ' + wanted + ',', text, count=1)
+
+open(path, "w").write(text)
+PY
