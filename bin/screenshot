@@ -1,21 +1,19 @@
 #!/bin/bash
 set -uo pipefail
 
-# Takes a screenshot: region, smart (drag, or click a window), or fullscreen.
-# The picture is saved to ~/Pictures/Screenshots and copied to the clipboard.
+# Takes a screenshot: region, smart (drag, or click a window), or fullscreen,
+# and hands it to the shell, where it lands in the quick-access stack to be
+# copied, saved, edited or pinned.
 #
 # Bound straight from hyprland.lua, never run through a Quickshell Process:
 # that breaks hyprpicker's screen freeze and cuts slurp's first click short.
-#
-# The capture part is VibeShot's capture.sh. Its editor is not ported yet, so
-# for now the result goes to disk and the clipboard instead.
 
 # Fixed PATH so grim/slurp/jq/hyprctl resolve to the system binaries.
 export PATH=/usr/bin:/bin
 BIN="$(dirname "$(readlink -f "$0")")"
 
 MODE="${1:-smart}"
-SAVE_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
+CAPTURES="$HOME/.local/state/aayork-quickshell/captures"
 
 # A second press while a selection is in progress cancels it.
 pkill slurp && exit 0
@@ -38,8 +36,12 @@ set_no_hw_cursors 0
 
 [[ -z "$SELECTION" ]] && exit 1
 
-mkdir -p "$SAVE_DIR"
-FILE="$SAVE_DIR/Screenshot $(date '+%Y-%m-%d %H-%M-%S').png"
+mkdir -p "$CAPTURES"
+FILE="$CAPTURES/capture-$(date +%s%N | cut -c1-13).png"
 grim -g "$SELECTION" "$FILE" || { rm -f "$FILE"; exit 1; }
-wl-copy --type image/png <"$FILE"
-notify-send -a Screenshot -i "$FILE" "Screenshot copied" "$(basename "$FILE")"
+
+# Without the shell there is nowhere to show it, so fall back to the clipboard.
+if ! qs -p "$BIN/.." ipc call capture add "$FILE" >/dev/null 2>&1; then
+  wl-copy --type image/png <"$FILE"
+  notify-send -a Screenshot -i "$FILE" "Screenshot copied" "The shell was not running to receive it"
+fi

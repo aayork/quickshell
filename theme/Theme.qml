@@ -25,6 +25,7 @@ Singleton {
 
   readonly property color background: pick("background", "#141c1f")
   readonly property color surface: pick("lighter_background", "#1e2a2e")
+  readonly property color darkerBackground: pick("darker_background", "#0a0e0f")
   readonly property color foreground: pick("foreground", "#c3d0d5")
   readonly property color brightForeground: pick("bright_foreground", "#e6edf0")
   readonly property color dim: pick("dark_foreground", "#7c949c")

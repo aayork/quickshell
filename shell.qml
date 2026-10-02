@@ -2,6 +2,7 @@
 import Quickshell
 import qs.background
 import qs.bar
+import qs.capture
 import qs.idle
 import qs.launcher
 import qs.lock
@@ -26,6 +27,11 @@ ShellRoot {
   Lock {}
   Idle {}
   Polkit {}
+  QuickAccess {}
+  Pins {}
+  Editor {}
+  CaptureMenu {}
   SessionOverlay {}
   Settings {}
 }
+

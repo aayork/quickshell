@@ -48,7 +48,9 @@ Scope {
     { id: "displays", title: "Displays", subtitle: "Resolution and scale", keyword: "displays",
       aliases: ["display", "monitor", "monitors", "resolution", "scale"], glyph: Icons.glyph(0xF0379), minChars: 0, debounceMs: 0, maxRows: 60, provider: displays },
     { id: "clipboard", title: "Clipboard History", subtitle: "What you copied", keyword: "ch",
-      aliases: ["clipboard", "clip", "paste", "copied", "history"], glyph: Icons.glyph(0xF014D), minChars: 0, debounceMs: 0, maxRows: 100, provider: clipboard }
+      aliases: ["clipboard", "clip", "paste", "copied", "history"], glyph: Icons.glyph(0xF014D), minChars: 0, debounceMs: 0, maxRows: 100, provider: clipboard },
+    { id: "shots", title: "Capture History", subtitle: "Screenshots you took", keyword: "shots",
+      aliases: ["screenshots", "screenshot", "captures", "capture"], glyph: Icons.glyph(0xF02E9), minChars: 0, debounceMs: 0, maxRows: 100, provider: shots }
   ]
   readonly property var scopes: builtins.concat(extensions)
 
@@ -63,6 +65,7 @@ Scope {
 
   Displays { id: displays }
   ClipboardSource { id: clipboard }
+  ShotsSource { id: shots }
 
   // Things the shell does itself. A command with the same id as an extension
   // keyword steps aside for the extension.
@@ -76,6 +79,7 @@ Scope {
     { id: "tailscale", title: "Tailscale", glyph: 0xF0582, mark: "tailscale", words: "vpn tailnet", run: () => PopupState.request("tailscale") },
     { id: "calendar", title: "Calendar and Weather", glyph: 0xF0599, words: "clock date notifications", run: () => PopupState.request("clock") },
     { id: "settings", title: "Settings", glyph: 0xF0493, words: "preferences theme background font cursor night light windows", run: () => PopupState.request("settings") },
+    { id: "capture", title: "Take a Screenshot", glyph: 0xF0E51, words: "screenshot capture region area window fullscreen scroll", run: () => Captures.menuRequested() },
     { id: "colorpicker", title: "Color Picker", glyph: 0xF0349, words: "colour pick hex hyprpicker", run: () => Quickshell.execDetached(["hyprpicker", "-a"]) },
     { id: "reload", title: "Reload Shell", glyph: 0xF0450, words: "restart quickshell", run: () => Quickshell.reload(true) }
   ].filter(c => !scopes.some(s => s.keyword === c.id))
@@ -481,6 +485,12 @@ Scope {
         root.frecency = JSON.parse(text())
       } catch (e) {}
     }
+  }
+
+  // Other parts of the shell can ask for one of the built-in views.
+  Connections {
+    target: PopupState
+    function onRequested(name) { if (name === "shots") root.show("shots: ") }
   }
 
   IpcHandler {

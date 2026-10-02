@@ -1,0 +1,56 @@
+#!/bin/bash
+set -uo pipefail
+
+# Scrolling capture, as a toggle. The first run picks an area and starts
+# grabbing it every moment; scroll the content yourself while it runs. The
+# second run stops it and hands the stitched tall picture to the shell.
+#
+# Nothing on Wayland can scroll another app for you, so the scrolling is by
+# hand. Frames are joined by capture/stitch-frame.py, which finds where each
+# new frame overlaps the last.
+
+export PATH=/usr/bin:/bin
+BIN="$(dirname "$(readlink -f "$0")")"
+ROOT="$(cd "$BIN/.." && pwd)"
+CAPTURES="$HOME/.local/state/aayork-quickshell/captures"
+WORK="${XDG_RUNTIME_DIR:-/tmp}/aayork-scroll-capture"
+TICK=0.7
+MAX_SECONDS=120
+
+shell() { qs -p "$ROOT" ipc call capture "$@" >/dev/null 2>&1 || true; }
+
+# Second run: stop and finish.
+if [[ -f $WORK/pid ]]; then
+  pid=$(<"$WORK/pid")
+  kill -- "-$pid" 2>/dev/null
+  sleep 0.2
+  mkdir -p "$CAPTURES"
+  if [[ -f $WORK/stitched.png ]]; then
+    final="$CAPTURES/capture-$(date +%s%N | cut -c1-13).png"
+    mv -- "$WORK/stitched.png" "$final"
+    shell add "$final"
+  fi
+  rm -rf -- "$WORK"
+  shell scrolling false
+  exit 0
+fi
+
+selection=$("$BIN/capture-region" region) || exit 0
+[[ -n $selection ]] || exit 0
+
+rm -rf -- "$WORK"
+mkdir -m 700 -p "$WORK"
+grim -g "$selection" "$WORK/prev.png" || { rm -rf -- "$WORK"; exit 1; }
+cp -- "$WORK/prev.png" "$WORK/stitched.png"
+
+setsid timeout --kill-after=5 "$MAX_SECONDS" bash -c '
+  work="$1"; selection="$2"; tick="$3"; stitch="$4"
+  while true; do
+    sleep "$tick"
+    grim -g "$selection" "$work/new.png" 2>/dev/null || continue
+    python3 "$stitch" "$work/prev.png" "$work/new.png" "$work/stitched.png" >"$work/log" 2>&1
+    mv "$work/new.png" "$work/prev.png"
+  done
+' bash "$WORK" "$selection" "$TICK" "$ROOT/capture/stitch-frame.py" &
+echo $! >"$WORK/pid"
+shell scrolling true
