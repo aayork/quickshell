@@ -15,6 +15,8 @@ import qs.settings
 ShellRoot {
   // The night light is a service; naming it here is what starts it.
   readonly property bool nightLight: NightLight.active
+  // Likewise the clipboard history, which has to be recording from the start.
+  readonly property int clipboardEntries: Clipboard.entries.length
 
   Wallpaper {}
   Bar {}

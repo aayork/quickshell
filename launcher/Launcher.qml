@@ -46,7 +46,9 @@ Scope {
   // so they win over an extension file with the same keyword.
   readonly property var builtins: [
     { id: "displays", title: "Displays", subtitle: "Resolution and scale", keyword: "displays",
-      aliases: ["display", "monitor", "monitors", "resolution", "scale"], glyph: Icons.glyph(0xF0379), minChars: 0, debounceMs: 0, maxRows: 60, provider: displays }
+      aliases: ["display", "monitor", "monitors", "resolution", "scale"], glyph: Icons.glyph(0xF0379), minChars: 0, debounceMs: 0, maxRows: 60, provider: displays },
+    { id: "clipboard", title: "Clipboard History", subtitle: "What you copied", keyword: "ch",
+      aliases: ["clipboard", "clip", "paste", "copied", "history"], glyph: Icons.glyph(0xF014D), minChars: 0, debounceMs: 0, maxRows: 100, provider: clipboard }
   ]
   readonly property var scopes: builtins.concat(extensions)
 
@@ -60,6 +62,7 @@ Scope {
   }
 
   Displays { id: displays }
+  ClipboardSource { id: clipboard }
 
   // Things the shell does itself. A command with the same id as an extension
   // keyword steps aside for the extension.
@@ -80,6 +83,8 @@ Scope {
   // What is listed. Each row carries a `header` when it starts a new group.
   readonly property var rows: withHeaders(scoped ? scopedRows() : query.trim() === "" ? emptyRows() : searchRows())
   readonly property var currentRow: rows[cursor] ?? null
+  // Rows that carry a preview get a pane beside the list.
+  readonly property bool split: rows.some(r => r.preview !== undefined)
   readonly property var currentActions: currentRow && !currentRow.hint ? currentRow.actions : []
 
   // Second and later things the current row can do (Ctrl+K).
@@ -660,13 +665,20 @@ Scope {
 
         Separator { Layout.fillWidth: true; visible: list.count > 0 }
 
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: 0
+
         ListView {
           id: list
-          Layout.fillWidth: true
+          Layout.fillWidth: !root.split
+          Layout.preferredWidth: root.split ? 290 : -1
+          Layout.alignment: Qt.AlignTop
           Layout.topMargin: 4
           Layout.bottomMargin: 4
           // About twelve rows before it scrolls.
-          implicitHeight: Math.min(contentHeight, 12 * root.rowHeight + 22)
+          // A split view keeps its full height so the preview has room.
+          implicitHeight: root.split ? 12 * root.rowHeight + 22 : Math.min(contentHeight, 12 * root.rowHeight + 22)
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           model: root.rows
@@ -846,6 +858,78 @@ Scope {
                   horizontalAlignment: Text.AlignRight
                   width: Math.min(implicitWidth, list.width * 0.38)
                 }
+              }
+            }
+          }
+        }
+
+          Rectangle {
+            visible: root.split
+            Layout.fillHeight: true
+            implicitWidth: 1
+            color: Theme.separator
+          }
+
+          // What the current row is: its text or picture, and a few facts
+          // about it underneath.
+          ColumnLayout {
+            id: pane
+            visible: root.split
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.margins: 12
+            spacing: 10
+
+            readonly property var preview: root.currentRow && root.currentRow.preview ? root.currentRow.preview : null
+
+            Item {
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              clip: true
+
+              Image {
+                anchors.fill: parent
+                visible: pane.preview !== null && pane.preview.image !== ""
+                source: visible ? pane.preview.image : ""
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                sourceSize.width: 800
+                sourceSize.height: 800
+              }
+
+              Rectangle {
+                anchors.centerIn: parent
+                visible: pane.preview !== null && pane.preview.colour !== ""
+                width: 96
+                height: 96
+                radius: Theme.controlRadius + 4
+                color: visible ? pane.preview.colour : "transparent"
+                border.width: 1
+                border.color: Theme.alpha(Theme.foreground, 0.2)
+              }
+
+              Label {
+                anchors.fill: parent
+                visible: pane.preview !== null && pane.preview.image === "" && pane.preview.colour === ""
+                text: pane.preview ? pane.preview.text : ""
+                wrapMode: Text.Wrap
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignTop
+                font.pixelSize: Theme.fontSmall
+              }
+            }
+
+            Separator { Layout.fillWidth: true }
+            SectionHeader { text: "INFORMATION" }
+
+            Repeater {
+              model: pane.preview ? pane.preview.info : []
+
+              RowLayout {
+                required property var modelData
+                Layout.fillWidth: true
+                Label { text: modelData[0]; color: Theme.dim; font.pixelSize: Theme.fontSmall; Layout.fillWidth: true }
+                Label { text: modelData[1]; font.pixelSize: Theme.fontSmall; elide: Text.ElideNone }
               }
             }
           }

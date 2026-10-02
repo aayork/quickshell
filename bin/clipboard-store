@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Adds what was just copied to the clipboard history.
+
+Run by `wl-paste --watch`, once for text and once for images, with the
+content on stdin:
+
+    wl-paste --type text      --watch clipboard-store text
+    wl-paste --type image/png --watch clipboard-store image
+
+History is ~/.local/state/aayork-quickshell/clipboard/history.json, newest
+first, with images kept as files beside it. Anything a password manager marks
+as secret is left out.
+"""
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+
+STATE = os.path.expanduser("~/.local/state/aayork-quickshell/clipboard")
+HISTORY = os.path.join(STATE, "history.json")
+IMAGES = os.path.join(STATE, "images")
+LIMIT = 100
+TEXT_LIMIT = 200_000
+
+
+def load():
+    try:
+        with open(HISTORY) as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def save(entries):
+    os.makedirs(STATE, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=STATE)
+    with os.fdopen(fd, "w") as f:
+        json.dump(entries, f)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, HISTORY)
+
+
+def secret():
+    """Password managers flag what they copy; honour that."""
+    try:
+        types = subprocess.run(["wl-paste", "--list-types"], capture_output=True, text=True, timeout=2).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "x-kde-passwordManagerHint" in types
+
+
+def main():
+    kind = sys.argv[1] if len(sys.argv) > 1 else "text"
+    data = sys.stdin.buffer.read()
+    if not data or secret():
+        return
+
+    digest = hashlib.sha256(data).hexdigest()[:16]
+    entries = load()
+    # Copying something again moves it to the top rather than adding a twin.
+    entries = [e for e in entries if e.get("id") != digest]
+    entry = {"id": digest, "kind": kind, "time": int(time.time() * 1000), "size": len(data)}
+
+    if kind == "image":
+        os.makedirs(IMAGES, mode=0o700, exist_ok=True)
+        path = os.path.join(IMAGES, digest + ".png")
+        if not os.path.exists(path):
+            with open(path, "wb") as f:
+                f.write(data)
+            os.chmod(path, 0o600)
+        entry["path"] = path
+    else:
+        if len(data) > TEXT_LIMIT:
+            return
+        text = data.decode("utf-8", errors="replace")
+        if not text.strip():
+            return
+        entry["text"] = text
+
+    entries.insert(0, entry)
+    for old in entries[LIMIT:]:
+        if old.get("path"):
+            try:
+                os.remove(old["path"])
+            except OSError:
+                pass
+    save(entries[:LIMIT])
+
+
+if __name__ == "__main__":
+    main()
