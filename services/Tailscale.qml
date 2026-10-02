@@ -19,7 +19,8 @@ Singleton {
   property string tailnet: ""
   property string selfName: ""
   property string selfIp: ""
-  // [{ id, name, ip, online, exitNode, exitNodeOption, taildrop }], online first.
+  property string selfOs: ""
+  // [{ id, name, ip, os, online, shared, owner, exitNode, exitNodeOption, taildrop }], online first.
   property var peers: []
   // [{ id, label, selected }]
   property var accounts: []
@@ -28,6 +29,9 @@ Singleton {
   property int pending: -1
   readonly property bool active: pending !== -1 ? pending === 1 : running
   readonly property bool busy: action.running
+
+  readonly property var ownPeers: peers.filter(p => !p.shared)
+  readonly property var sharedPeers: peers.filter(p => p.shared)
 
   readonly property var exitNodeOptions: peers.filter(p => p.exitNodeOption)
   readonly property var exitNode: peers.find(p => p.exitNode) ?? null
@@ -63,6 +67,9 @@ Singleton {
     tailnet = data.CurrentTailnet ? String(data.CurrentTailnet.Name || "") : ""
     selfName = data.Self ? shortName(data.Self) : ""
     selfIp = data.Self ? firstIPv4(data.Self.TailscaleIPs) : ""
+    selfOs = data.Self ? String(data.Self.OS || "") : ""
+    var selfUser = data.Self ? String(data.Self.UserID) : ""
+    var users = data.User || {}
 
     var list = []
     var all = data.Peer || {}
@@ -75,6 +82,10 @@ Singleton {
         online: peer.Online === true,
         exitNode: peer.ExitNode === true,
         exitNodeOption: peer.ExitNodeOption === true,
+        os: String(peer.OS || ""),
+        // A machine someone else owns and shared in from their own tailnet.
+        shared: String(peer.UserID) !== selfUser,
+        owner: users[peer.UserID] ? String(users[peer.UserID].LoginName || "") : "",
         // 1 is Tailscale's "can take files right now".
         taildrop: peer.TaildropTarget === 1
       })

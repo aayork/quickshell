@@ -21,6 +21,16 @@ BarButton {
     copiedTimer.restart()
   }
 
+  function osGlyph(os) {
+    var name = String(os || "").toLowerCase()
+    if (name === "macos") return Icons.glyph(0xF0322)
+    if (name === "ios" || name === "android") return Icons.glyph(0xF011C)
+    if (name === "tvos") return Icons.glyph(0xF0502)
+    if (name === "windows") return Icons.glyph(0xF05B3)
+    if (name === "linux") return Icons.glyph(0xF033D)
+    return Icons.glyph(0xF07C0)
+  }
+
   visible: Tailscale.available
   active: popup.open
   onClicked: function(button) {
@@ -45,12 +55,15 @@ BarButton {
     property string name: ""
     property string ip: ""
     property bool online: true
+    property string os: ""
+    // Who owns it, for a machine shared in from someone else's tailnet.
+    property string owner: ""
     property string note: ""
     // The peer, when files can be sent to it.
     property var sendTo: null
 
     Layout.fillWidth: true
-    implicitHeight: Theme.rowHeight
+    implicitHeight: owner !== "" ? Theme.rowHeight + 10 : Theme.rowHeight
     radius: Theme.controlRadius
     color: mouse.containsMouse ? Theme.hover : "transparent"
 
@@ -70,9 +83,30 @@ BarButton {
       }
 
       Label {
-        text: machine.name
+        text: root.osGlyph(machine.os)
         color: machine.online ? Theme.foreground : Theme.dim
+        font.pixelSize: Theme.iconSize
+        horizontalAlignment: Text.AlignHCenter
+        Layout.preferredWidth: 16
+        elide: Text.ElideNone
+      }
+
+      ColumnLayout {
         Layout.fillWidth: true
+        spacing: 0
+
+        Label {
+          text: machine.name
+          color: machine.online ? Theme.foreground : Theme.dim
+          Layout.fillWidth: true
+        }
+        Label {
+          visible: machine.owner !== ""
+          text: machine.owner
+          color: Theme.dim
+          font.pixelSize: Theme.fontSmall
+          Layout.fillWidth: true
+        }
       }
 
       Label {
@@ -120,7 +154,7 @@ BarButton {
   Popup {
     id: popup
     anchorItem: root
-    contentWidth: 320
+    contentWidth: 340
     contentHeight: column.implicitHeight
 
     onOpenChanged: Tailscale.watching = open
@@ -185,7 +219,7 @@ BarButton {
         id: list
         visible: Tailscale.running
         Layout.fillWidth: true
-        implicitHeight: Math.min(machines.implicitHeight, Theme.rowHeight * 10)
+        implicitHeight: Math.min(machines.implicitHeight, Theme.rowHeight * 12)
         contentHeight: machines.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -195,22 +229,50 @@ BarButton {
           width: list.width
           spacing: 0
 
+          SectionHeader { text: "MY DEVICES"; Layout.leftMargin: 6; Layout.topMargin: 2; Layout.bottomMargin: 2 }
+
           Machine {
             name: Tailscale.selfName
             ip: Tailscale.selfIp
+            os: Tailscale.selfOs
             note: "This device"
           }
 
           Repeater {
-            model: Tailscale.peers
+            model: Tailscale.ownPeers
 
             Machine {
               required property var modelData
               name: modelData.name
               ip: modelData.ip
+              os: modelData.os
               online: modelData.online
               note: modelData.exitNode ? "Exit node" : ""
               sendTo: modelData.taildrop ? modelData : null
+            }
+          }
+
+          // Machines other people own and shared in. They are reachable, but
+          // they are not on this tailnet, and Taildrop does not cross accounts.
+          SectionHeader {
+            visible: Tailscale.sharedPeers.length > 0
+            text: "SHARED WITH ME · OTHER TAILNETS"
+            Layout.leftMargin: 6
+            Layout.topMargin: 10
+            Layout.bottomMargin: 2
+          }
+
+          Repeater {
+            model: Tailscale.sharedPeers
+
+            Machine {
+              required property var modelData
+              name: modelData.name
+              ip: modelData.ip
+              os: modelData.os
+              online: modelData.online
+              owner: modelData.owner !== "" ? modelData.owner : "Someone else's machine"
+              note: modelData.exitNode ? "Exit node" : ""
             }
           }
         }

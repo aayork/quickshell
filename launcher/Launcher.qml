@@ -66,7 +66,7 @@ Scope {
     { id: "reboot", title: "Restart", glyph: 0xF0709, words: "reboot", confirm: true, run: () => Session.run("reboot") },
     { id: "shutdown", title: "Shut down", glyph: 0xF0425, words: "power off poweroff", confirm: true, run: () => Session.run("shutdown") },
     { id: "control-center", title: "Control Center", glyph: 0xF057E, words: "audio sound output input now playing", run: () => PopupState.request("control-center") },
-    { id: "tailscale", title: "Tailscale", glyph: 0xF0582, words: "vpn tailnet", run: () => PopupState.request("tailscale") },
+    { id: "tailscale", title: "Tailscale", glyph: 0xF0582, mark: "tailscale", words: "vpn tailnet", run: () => PopupState.request("tailscale") },
     { id: "calendar", title: "Calendar and Weather", glyph: 0xF0599, words: "clock date notifications", run: () => PopupState.request("clock") },
     { id: "settings", title: "Settings", glyph: 0xF0493, words: "preferences theme background font cursor night light windows", run: () => PopupState.request("settings") },
     { id: "colorpicker", title: "Color Picker", glyph: 0xF0349, words: "colour pick hex hyprpicker", run: () => Quickshell.execDetached(["hyprpicker", "-a"]) },
@@ -119,6 +119,8 @@ Scope {
       subtitle: "Command",
       icon: "",
       glyph: Icons.glyph(command.glyph),
+      // A drawn logo to show in place of the glyph.
+      mark: command.mark || "",
       chip: "",
       confirm: command.confirm === true,
       score: score,
@@ -747,9 +749,15 @@ Scope {
                   sourceSize.height: 36
                   asynchronous: true
                 }
+                TailscaleIcon {
+                  anchors.centerIn: parent
+                  visible: row.modelData.mark === "tailscale"
+                  size: 14
+                  color: row.current ? Theme.foreground : Theme.dim
+                }
                 Label {
                   anchors.centerIn: parent
-                  visible: row.modelData.icon === ""
+                  visible: row.modelData.icon === "" && !row.modelData.mark
                   text: row.modelData.glyph
                   font.pixelSize: Theme.iconSize
                   color: row.armed ? Theme.red : row.current ? Theme.foreground : Theme.dim
