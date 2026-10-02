@@ -477,6 +477,37 @@ Scope {
     function close(): void { root.hide() }
   }
 
+  // A key, drawn like one.
+  component Keycap: Rectangle {
+    property alias text: capLabel.text
+
+    implicitWidth: Math.max(20, capLabel.implicitWidth + 10)
+    implicitHeight: 20
+    radius: 5
+    color: Theme.alpha(Theme.foreground, 0.06)
+    border.width: 1
+    border.color: Theme.alpha(Theme.foreground, 0.22)
+
+    // The darker lower edge that makes it read as a raised key.
+    Rectangle {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.leftMargin: 4
+      anchors.rightMargin: 4
+      height: 1
+      color: Theme.alpha(Theme.foreground, 0.28)
+    }
+
+    Label {
+      id: capLabel
+      anchors.centerIn: parent
+      color: Theme.foreground
+      font.pixelSize: Theme.fontSmall
+      elide: Text.ElideNone
+    }
+  }
+
   component Chip: Rectangle {
     property alias text: chipLabel.text
     property bool accented: false
@@ -808,37 +839,55 @@ Scope {
 
         Separator { Layout.fillWidth: true; visible: footer.visible }
 
-        // What Enter does to the current row, and how to get at the rest.
+        // What Enter does to the current row, and how to get at the rest,
+        // with the keys drawn as keys.
         RowLayout {
           id: footer
           visible: root.currentActions.length > 0
           Layout.fillWidth: true
-          Layout.leftMargin: 14
-          Layout.rightMargin: 14
+          Layout.leftMargin: 12
+          Layout.rightMargin: 12
           Layout.topMargin: 6
           Layout.bottomMargin: 6
-          spacing: 14
+          spacing: 6
 
           Label {
-            text: "↵  " + (root.currentActions.length > 0 ? root.currentActions[0].title : "")
-            color: Theme.dim
+            text: root.currentActions.length > 0 ? root.currentActions[0].title : ""
             font.pixelSize: Theme.fontSmall
-            Layout.fillWidth: true
+            Layout.maximumWidth: 220
           }
+          Keycap { text: "↵" }
+
+          Item { Layout.fillWidth: true }
+
           Label {
             visible: root.currentActions.length > 1
-            text: "⇧↵  " + (root.currentActions.length > 1 ? root.currentActions[1].title : "")
+            text: root.currentActions.length > 1 ? root.currentActions[1].title : ""
             color: Theme.dim
             font.pixelSize: Theme.fontSmall
-            elide: Text.ElideNone
+            Layout.maximumWidth: 180
           }
+          Keycap { visible: root.currentActions.length > 1; text: "⇧" }
+          Keycap { visible: root.currentActions.length > 1; text: "↵" }
+
+          Rectangle {
+            visible: root.currentActions.length > 1
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            implicitWidth: 1
+            implicitHeight: 14
+            color: Theme.separator
+          }
+
           Label {
             visible: root.currentActions.length > 1
-            text: "Ctrl K  Actions"
+            text: "Actions"
             color: root.actionsOpen ? Theme.accent : Theme.dim
             font.pixelSize: Theme.fontSmall
             elide: Text.ElideNone
           }
+          Keycap { visible: root.currentActions.length > 1; text: "Ctrl" }
+          Keycap { visible: root.currentActions.length > 1; text: "K" }
         }
       }
     }
@@ -884,15 +933,14 @@ Scope {
               anchors.verticalCenter: parent.verticalCenter
               text: actionRow.modelData.title
             }
-            Label {
+            Row {
               id: hint
               anchors.right: parent.right
-              anchors.rightMargin: 10
+              anchors.rightMargin: 8
               anchors.verticalCenter: parent.verticalCenter
-              text: actionRow.index === 0 ? "↵" : actionRow.index === 1 ? "⇧↵" : ""
-              color: Theme.dim
-              font.pixelSize: Theme.fontSmall
-              elide: Text.ElideNone
+              spacing: 4
+              Keycap { visible: actionRow.index === 1; text: "⇧" }
+              Keycap { visible: actionRow.index < 2; text: "↵" }
             }
 
             MouseArea {
