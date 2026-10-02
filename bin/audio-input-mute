@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Mute or unmute the default microphone.
+wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle

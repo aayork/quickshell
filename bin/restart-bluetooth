@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Unblock and restart the bluetooth service.
+
+# Where this shell lives, with its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$SHELL_ROOT/launcher/scripts:$PATH"
+
+echo -e "Unblocking bluetooth...\n"
+rfkill unblock bluetooth
+rfkill list bluetooth

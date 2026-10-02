@@ -1,0 +1,13 @@
+#!/bin/bash
+# The `issue:` keyword, which is `omacast-gh` in issues mode.
+#
+# A name of its own rather than a first argument, because `bo test` runs an
+# extension's cases by calling the first word of its `search` with the query as
+# the only argument. A script that read the mode out of argv could never be
+# tested through that door, which is exactly how gh: and pr: ended up with no
+# cases at all.
+# Where this shell lives, with its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)"
+PATH="$SHELL_ROOT/bin:$SHELL_ROOT/launcher/scripts:$PATH"
+
+exec env OMACAST_GH_MODE=issues omacast-gh "$@"

@@ -1,0 +1,20 @@
+{
+  "id": "date",
+  "title": "Date",
+  "keyword": "date",
+  "aliases": [
+    "when",
+    "day",
+    "days"
+  ],
+  "subtitle": "Dates, holidays and day counts",
+  "glyph": "",
+  "search": "q={query}; omacast-date \"${q:-today}\"",
+  "testQuery": "christmas",
+  "minChars": 0,
+  "debounceMs": 120,
+  "maxRows": 6,
+  "tier": "prefix",
+  "view": "hero",
+  "always": true
+}

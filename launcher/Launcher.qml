@@ -14,7 +14,8 @@ import "Calc.js" as Calc
 // keyword and a colon (`vim:`, `def:`) to ask one of the extensions.
 //
 // An extension is a JSON file naming a keyword and a command; the command
-// prints one JSON row per line. Same format Omacast used, so those carry over.
+// prints one JSON row per line. The bundled ones are in launcher/extensions,
+// with their scripts in launcher/scripts.
 Scope {
   id: root
 
@@ -25,8 +26,11 @@ Scope {
   property string armed: ""
 
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/aayork-quickshell"
-  // Still Omacast's folder; these move with the rest of the config later.
-  readonly property string extensionDir: Quickshell.env("HOME") + "/.config/roseshell/omacast/extensions"
+  // Extension definitions: the ones that ship here, then the user's own,
+  // which win when both define the same id.
+  readonly property var extensionDirs: [Quickshell.shellDir + "/launcher/extensions", Quickshell.env("HOME") + "/.config/aayork-quickshell/extensions"]
+  // Every extension command runs with the shell's own scripts on its PATH.
+  readonly property string scriptPath: "PATH=" + quote(Quickshell.shellDir + "/bin:" + Quickshell.shellDir + "/launcher/scripts") + ":\"$PATH\"; "
   readonly property int maxRows: 60
   readonly property int rowHeight: 32
 
@@ -274,7 +278,7 @@ Scope {
     var text = scoped.text
     search.extensionId = extension.id
     search.limit = extension.maxRows
-    search.command = ["sh", "-c", extension.search.replace(/\{([a-z0-9_-]+)\}/gi, function(whole, name) {
+    search.command = ["sh", "-c", scriptPath + extension.search.replace(/\{([a-z0-9_-]+)\}/gi, function(whole, name) {
       return root.quote(name.toLowerCase() === "query" ? text : "")
     })]
     search.running = true
@@ -336,7 +340,7 @@ Scope {
     var stay = action.keepOpen === true || row.keepOpen === true || action.query !== undefined
     if (!stay) remember(row.key)
     if (action.run) action.run()
-    else if (action.exec) Quickshell.execDetached(["sh", "-c", String(action.exec)])
+    else if (action.exec) Quickshell.execDetached(["sh", "-c", scriptPath + String(action.exec)])
     // An action can ask to land on another query instead of closing.
     if (action.query !== undefined) query = String(action.query)
     else if (!stay) hide()
@@ -430,9 +434,9 @@ Scope {
   Process {
     id: loadExtensions
     running: true
-    command: ["sh", "-c", "for f in \"$1\"/*.json; do case \"$f\" in *.cases.json) continue;; esac; "
+    command: ["sh", "-c", root.scriptPath + "for d in \"$@\"; do for f in \"$d\"/*.json; do case \"$f\" in *.cases.json) continue;; esac; "
       + "[ -f \"$f\" ] || continue; when=$(jq -r '.when // \"\"' \"$f\" 2>/dev/null) || continue; "
-      + "if [ -z \"$when\" ] || sh -c \"$when\" >/dev/null 2>&1; then jq -c . \"$f\"; fi; done", "sh", root.extensionDir]
+      + "if [ -z \"$when\" ] || sh -c \"$when\" >/dev/null 2>&1; then jq -c . \"$f\"; fi; done; done", "sh"].concat(root.extensionDirs)
     stdout: StdioCollector {
       onStreamFinished: {
         var list = []
@@ -442,6 +446,7 @@ Scope {
           try {
             var raw = JSON.parse(lines[i])
             if (!raw.id || !raw.search) continue
+            list = list.filter(e => e.id !== String(raw.id))
             list.push({
               id: String(raw.id),
               title: String(raw.title || raw.id),

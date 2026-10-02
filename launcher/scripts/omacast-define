@@ -1,0 +1,411 @@
+#!/usr/bin/env python3
+# Emits JSON rows for Omacast's `def:` keyword: a dictionary and a thesaurus.
+#
+#   def:ephemeral     every sense, by part of speech, with synonyms
+#   def:set           the long ones too, because the pane can hold them
+#   def:ice cream     a phrase, which is one entry and not two words
+#   def:went          the inflection, answered from the entry for go
+#   def:recieve       the misspelling, answered from the word that was meant
+#
+# Nothing here touches the network. The dictionary is WordNet 3.1, unpacked
+# under ~/.local/share/omacast/wordnet/dict, and a lookup is a seek into its
+# own index files: no daemon, no cache, no request per keystroke. This used to
+# ask api.dictionaryapi.dev and Datamuse, which made a definition depend on two
+# servers being up and sent every half-typed word to both of them.
+#
+#   omacast-define --fetch    downloads the database, once
+#
+# What people type is not what the dictionary is indexed by. "cats", "went",
+# "happier" and "recieve" are four spellings of words that have entries under
+# other spellings. So a miss is not the end: the word is reduced the way
+# WordNet's own morphy does it (its exception lists first, then suffix rules),
+# the phrase is tried whole and then by its first word, and a spelling nothing
+# rescues gets one guess from the index itself. Whatever answers, the row says
+# which spelling answered it.
+#
+# The view is `split` because a definition is a paragraph. In a list every row
+# would elide at the same width and every sense of "set" would read alike; on
+# the right there is room for the sense, the example and the synonyms at once.
+
+import json
+import os
+import re
+import shlex
+import sys
+import unicodedata
+
+DATA_HOME = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+WORDNET = os.path.join(DATA_HOME, "omacast", "wordnet")
+DICT = os.path.join(WORDNET, "dict")
+SOURCE = "https://wordnetcode.princeton.edu/wn3.1.dict.tar.gz"
+
+POS_FILE = {"n": "noun", "v": "verb", "a": "adj", "r": "adv"}
+POS_NAME = {"n": "noun", "v": "verb", "a": "adjective", "s": "adjective", "r": "adverb"}
+
+# WordNet's own detachment rules, in its order. Every result is checked against
+# the index before it is shown, so a stem that is not a word never appears.
+SUFFIXES = {
+    "n": [("s", ""), ("ses", "s"), ("xes", "x"), ("zes", "z"), ("ches", "ch"),
+          ("shes", "sh"), ("men", "man"), ("ies", "y")],
+    "v": [("s", ""), ("ies", "y"), ("es", "e"), ("es", ""), ("ed", "e"),
+          ("ed", ""), ("ing", "e"), ("ing", "")],
+    "a": [("er", ""), ("est", ""), ("er", "e"), ("est", "e")],
+    "r": [],
+}
+
+# The launcher draws `maxRows` of these, and "set" has forty-five senses. One
+# row is kept back for the thesaurus line at the end.
+MAX_SENSES = 11
+
+
+def fetch():
+    import io
+    import tarfile
+    import urllib.request
+
+    os.makedirs(WORDNET, exist_ok=True)
+    with urllib.request.urlopen(SOURCE, timeout=120) as response:
+        archive = io.BytesIO(response.read())
+    with tarfile.open(fileobj=archive, mode="r:gz") as tar:
+        tar.extractall(WORDNET, filter="data")
+    print(DICT)
+
+
+_files = {}
+
+
+def contents(name):
+    if name not in _files:
+        try:
+            with open(os.path.join(DICT, name), "rb") as handle:
+                _files[name] = handle.read()
+        except OSError:
+            _files[name] = b""
+    return _files[name]
+
+
+def index_entry(pos, lemma):
+    """The synset offsets for a lemma, most used sense first, and how many of
+    its senses turn up in tagged text, which is the nearest thing the database
+    has to how common the word is in that part of speech."""
+    data = contents("index." + POS_FILE[pos])
+    key = b"\n" + lemma.replace(" ", "_").encode("utf-8", "ignore") + b" "
+    at = data.find(key)
+    if at < 0:
+        return None
+    end = data.find(b"\n", at + 1)
+    fields = data[at + 1:end if end > 0 else None].decode("utf-8", "replace").split()
+    try:
+        pointers = int(fields[3])
+        tagged = int(fields[5 + pointers])
+        return {"offsets": fields[6 + pointers:], "tagged": tagged}
+    except (IndexError, ValueError):
+        return None
+
+
+def synset(pos, offset):
+    data = contents("data." + POS_FILE[pos])
+    at = int(offset)
+    end = data.find(b"\n", at)
+    line = data[at:end if end > 0 else None].decode("utf-8", "replace")
+    head, _, gloss = line.partition(" | ")
+    fields = head.split()
+    try:
+        count = int(fields[3], 16)
+        # Adjectives carry a position marker on the word itself: "galore(ip)".
+        words = [re.sub(r"\([a-z]+\)$", "", fields[4 + i * 2]).replace("_", " ")
+                 for i in range(count)]
+        cursor = 4 + count * 2
+        pointers = []
+        for i in range(int(fields[cursor])):
+            symbol, target, target_pos, link = fields[cursor + 1 + i * 4:cursor + 5 + i * 4]
+            pointers.append((symbol, target, target_pos, int(link[:2], 16), int(link[2:], 16)))
+    except (IndexError, ValueError):
+        return None
+
+    gloss = gloss.strip()
+    text, quote, rest = gloss.partition('; "')
+    examples = re.findall(r'"([^"]+)"', quote + rest) if quote else []
+    return {"type": fields[2], "words": words, "pointers": pointers,
+            "text": text.strip().rstrip(";"), "examples": examples}
+
+
+def senses(pos, lemma):
+    entry = index_entry(pos, lemma)
+    if not entry:
+        return None
+
+    out = []
+    for offset in entry["offsets"]:
+        found = synset(pos, offset)
+        if not found or not found["text"]:
+            continue
+
+        # The synset spells the word the way it is written, capitals included,
+        # where the index only has it lowered.
+        number = next((i for i, w in enumerate(found["words"]) if w.lower() == lemma), 0)
+        word = found["words"][number] if found["words"] else lemma
+
+        antonyms = []
+        for symbol, target, target_pos, source, dest in found["pointers"]:
+            if symbol != "!" or source != number + 1:
+                continue
+            other = synset("a" if target_pos == "s" else target_pos, target)
+            if other and 0 < dest <= len(other["words"]):
+                antonyms.append(other["words"][dest - 1])
+
+        out.append({"word": word, "pos": POS_NAME.get(found["type"], POS_NAME[pos]),
+                    "text": found["text"], "examples": found["examples"],
+                    "syn": [w for i, w in enumerate(found["words"]) if i != number],
+                    "ant": antonyms})
+    if not out:
+        return None
+    return {"pos": pos, "tagged": entry["tagged"], "senses": out}
+
+
+def exact(lemma, only=None):
+    groups = [g for g in (senses(p, lemma) for p in (only or "nvar")) if g]
+    # The part of speech the word is mostly used as goes first: "run" is a verb
+    # before it is a noun, and "set" is the other way round by a hair.
+    groups.sort(key=lambda g: -g["tagged"])
+    return groups
+
+
+def exceptions(pos, word):
+    data = contents(POS_FILE[pos] + ".exc")
+    key = b"\n" + word.replace(" ", "_").encode("utf-8", "ignore") + b" "
+    at = (b"\n" + data).find(key)
+    if at < 0:
+        return []
+    end = data.find(b"\n", at)
+    return data[at:end if end > 0 else None].decode("utf-8", "replace").split()[1:]
+
+
+def bases(word):
+    """Every (part of speech, base form) the word could be an inflection of."""
+    out = []
+    for pos in "nvar":
+        forms = [b.replace("_", " ") for b in exceptions(pos, word)]
+        for suffix, ending in SUFFIXES[pos]:
+            if word.endswith(suffix) and len(word) > len(suffix) + 1:
+                forms.append(word[:-len(suffix)] + ending)
+        if word.endswith("'s"):
+            forms.append(word[:-2])
+        for form in forms:
+            if form != word and (pos, form) not in out:
+                out.append((pos, form))
+    return out
+
+
+def resolve(lemma):
+    """An entry for the word under the spelling it was typed in, then under
+    the ones it is an inflection of. Returns the groups and the word shown."""
+    groups = exact(lemma)
+    if groups:
+        return groups, lemma
+
+    spellings = []
+    if "-" in lemma:
+        spellings.append(lemma.replace("-", " "))
+    # WordNet is ASCII: "café" is filed under "cafe".
+    plain = unicodedata.normalize("NFKD", lemma).encode("ascii", "ignore").decode()
+    if plain and plain != lemma:
+        spellings.append(plain)
+    for spelling in spellings:
+        groups = exact(spelling)
+        if groups:
+            return groups, spelling
+
+    shown = ""
+    for pos, base in bases(lemma):
+        if shown and base != shown:
+            continue
+        found = exact(base, pos)
+        if found:
+            groups += found
+            shown = base
+    groups.sort(key=lambda g: -g["tagged"])
+    return groups, shown
+
+
+def distance(a, b):
+    # Edits, with a swapped pair counted as one: "recieve" is one slip from
+    # "receive", not two.
+    rows = [list(range(len(b) + 1))]
+    for i in range(1, len(a) + 1):
+        row = [i] + [0] * len(b)
+        for j in range(1, len(b) + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            row[j] = min(rows[i - 1][j] + 1, row[j - 1] + 1, rows[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                row[j] = min(row[j], rows[i - 2][j - 2] + 1)
+        rows.append(row)
+    return rows[-1][-1]
+
+
+def guess(word):
+    """One guess at a spelling, from the index. A guess is only worth showing
+    when it is a typo away from what was typed: same first letter, two edits at
+    most. Between equals, the more common word wins."""
+    first = word[:1].encode("utf-8", "ignore")
+    best = None
+    for pos in "nvar":
+        for line in contents("index." + POS_FILE[pos]).split(b"\n"):
+            if not line.startswith(first) or line.startswith(b" "):
+                continue
+            fields = line.split(b" ", 6)
+            lemma = fields[0].decode("utf-8", "replace")
+            if "_" in lemma or abs(len(lemma) - len(word)) > 2:
+                continue
+            gap = distance(word, lemma)
+            if gap > 2:
+                continue
+            try:
+                tagged = int(line.split()[5 + int(fields[3])])
+            except (IndexError, ValueError):
+                tagged = 0
+            rank = (gap, -tagged, lemma)
+            if best is None or rank < best:
+                best = rank
+    return best[2] if best else ""
+
+
+def copy(text):
+    return "printf %s " + shlex.quote(text) + " | wl-copy"
+
+
+def emit(row):
+    print(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
+
+
+def main():
+    query = sys.argv[1] if len(sys.argv) > 1 else ""
+    if query == "--fetch":
+        return fetch()
+
+    term = re.sub(r"\s+", " ", query.strip())
+    # Punctuation is what a sentence ends with, not what a word is spelled with.
+    term = re.sub(r"[.,;:!?]$", "", term).strip('"').strip()
+    if len(term) < 2:
+        return
+    # A word or a short phrase, not a path and not a query string.
+    if not re.fullmatch(r"[^\W\d_](?:[^\W\d_]|[' -])*", term):
+        return
+    # Four words is a sentence, and the dictionary is not indexed by sentences.
+    if term.count(" ") > 2:
+        return
+
+    if not contents("index.noun"):
+        fetcher = shlex.quote(os.path.realpath(__file__)) + " --fetch"
+        emit({"id": "def-missing", "title": "Dictionary not downloaded",
+              "subtitle": "Enter downloads WordNet (about 16 MB) for offline lookups",
+              "detail": "One download, then no network",
+              "preview": "The offline dictionary is not installed.\n\nEnter downloads WordNet 3.1 to\n"
+                         + DICT + "\n\nAfter that every lookup is answered from disk.",
+              "exec": fetcher, "score": 90000, "view": "split", "glyph": "",
+              "actions": [{"title": "Download Dictionary", "shortcut": "↵", "exec": fetcher}]})
+        return
+
+    lower = term.lower()
+    note = ""
+    groups, shown = resolve(lower)
+    if groups and shown != lower:
+        note = "No entry for “%s” — showing “%s”" % (term, shown)
+
+    # A phrase the dictionary does not carry is still worth answering by its
+    # head word, and the row says that is what happened.
+    if not groups and " " in lower:
+        head = lower.split(" ")[0]
+        if len(head) >= 2:
+            groups, shown = resolve(head)
+            if groups:
+                note = "No entry for “%s” — showing “%s”" % (term, shown)
+
+    if not groups and lower.isalpha() and len(lower) >= 4:
+        candidate = guess(lower)
+        if candidate:
+            groups = exact(candidate)
+            if groups:
+                note = "No entry for “%s” — did you mean “%s”?" % (term, candidate)
+
+    # No entry, under any spelling. Worth answering out loud rather than going
+    # quiet. The web search is something Enter does, never something typing does.
+    if not groups:
+        search = "xdg-open " + shlex.quote(
+            "https://www.google.com/search?q=define+" + lower.replace(" ", "+"))
+        emit({"id": "def-none", "title": 'No definition for "%s"' % term,
+              "subtitle": "Dictionary", "detail": "Enter searches the web instead",
+              "preview": 'No dictionary entry for "%s".\n\nEnter searches the web for it.' % term,
+              "exec": search, "score": 90000, "view": "split", "glyph": "",
+              "actions": [{"title": "Search the Web", "shortcut": "↵", "exec": search}]})
+        return
+
+    # Senses are dealt out one part of speech at a time, so a word that is a
+    # noun thirteen ways still shows what it means as a verb.
+    quota = [0] * len(groups)
+    left = MAX_SENSES
+    while left > 0:
+        dealt = False
+        for i, group in enumerate(groups):
+            if left > 0 and quota[i] < len(group["senses"]):
+                quota[i] += 1
+                left -= 1
+                dealt = True
+        if not dealt:
+            break
+
+    rows = []
+    synonyms = []
+    for i, group in enumerate(groups):
+        for sense in group["senses"]:
+            for word in sense["syn"]:
+                if word not in synonyms:
+                    synonyms.append(word)
+        for number, sense in enumerate(group["senses"][:quota[i]], 1):
+            rows.append(dict(sense, number=number))
+
+    for i, sense in enumerate(rows):
+        syn = ", ".join(sense["syn"])
+        ant = ", ".join(sense["ant"])
+        preview = ([note + "\n"] if note else []) + [sense["word"] + "   " + sense["pos"], "", sense["text"]]
+        preview += ["\n“" + example + "”" for example in sense["examples"]]
+        if syn:
+            preview.append("\nSynonyms: " + syn)
+        if ant:
+            preview.append(("" if syn else "\n") + "Antonyms: " + ant)
+
+        actions = [
+            {"title": "Copy Definition", "shortcut": "↵", "exec": copy(sense["text"])},
+            {"title": "Copy Word", "exec": copy(sense["word"])},
+            {"title": "Copy Sense",
+             "exec": copy("%s (%s): %s" % (sense["word"], sense["pos"], sense["text"]))},
+        ]
+        if syn:
+            actions.append({"title": "Copy Synonyms", "exec": copy(syn)})
+
+        emit({"id": "def-%s-%d" % (sense["pos"], i),
+              "title": sense["word"] + "  ·  " + sense["pos"]
+                       + ("  %d" % sense["number"] if sense["number"] > 1 else ""),
+              "subtitle": sense["text"],
+              # The strip beside the pane is the only place a row can say it is
+              # answering a spelling other than the one that was typed.
+              "detail": note or ("syn. " + syn if syn else sense["pos"]),
+              "preview": "\n".join(preview),
+              "exec": copy(sense["text"]),
+              "score": 95000 - i * 100,
+              "view": "split", "glyph": "", "actions": actions})
+
+    # One thesaurus row at the end, gathering every synonym the entry carries.
+    # It is last because a definition is what `def:` was typed for.
+    if synonyms:
+        word = rows[0]["word"]
+        everything = ", ".join(synonyms)
+        emit({"id": "def-synonyms", "title": word + "  ·  synonyms",
+              "subtitle": everything, "detail": "Thesaurus",
+              "preview": "Synonyms for " + word + "\n\n" + "\n".join(synonyms),
+              "exec": copy(everything), "score": 80000, "view": "split", "glyph": "",
+              "actions": [{"title": "Copy Synonyms", "shortcut": "↵", "exec": copy(everything)}]})
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,75 @@
+#!/bin/bash
+# Emits a slider row for Omacast's `bri:` keyword: screen brightness on the
+# focused display.
+#
+#   bri:             the slider
+#
+# The row carries value, min, max, step and setExec, where setExec holds the
+# literal token {value} for the view to replace with the number you land on.
+#
+# Everything goes through brightness-display, which already knows the
+# three ways a display is dimmed: brightnessctl for an internal panel, DDC over
+# the monitor's own control channel for an external one, and the Apple protocol
+# for a Studio Display. Called with no argument it prints the current percentage;
+# called with "40%" it sets it and draws the OSD. So this script reads and writes
+# through the same command and owns none of that.
+#
+# The floor is 1, not 0. Zero on a backlight is a black screen with no way to
+# find the slider again.
+
+# Where this shell lives, with its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)"
+PATH="$SHELL_ROOT/bin:$SHELL_ROOT/launcher/scripts:$PATH"
+
+set -uo pipefail
+
+query="${1:-}"
+needle="${query,,}"
+
+command -v brightness-display >/dev/null 2>&1 || exit 0
+
+if [[ -n $needle ]]; then
+  [[ "brightness screen display dim backlight" == *"$needle"* ]] || exit 0
+fi
+
+monitor=$(hyprland-monitor-focused 2>/dev/null)
+
+# A monitor that answers no control channel has no reading at all. That used to
+# be silence, which from the outside is a keyword that does nothing, so it is
+# one plain row saying why instead. An external display is dimmed over DDC, and
+# without ddcutil there is nothing to speak it with; that is the one cause with
+# a fix, so it is the one Enter helps with.
+level=$(brightness-display 2>/dev/null)
+if [[ ! $level =~ ^[0-9]+$ ]]; then
+  if [[ -n $monitor && ! $monitor =~ ^(eDP|LVDS|DSI)- ]] && ! command -v ddcutil >/dev/null 2>&1; then
+    fix="printf %s 'sudo pacman -S ddcutil' | wl-copy"
+    jq -cn --arg s "$monitor" --arg e "$fix" \
+      '{ id: "brightness-unavailable", title: "Needs ddcutil",
+         subtitle: ($s + " is dimmed over DDC, and ddcutil is not installed"),
+         group: "Brightness", view: "list",
+         exec: $e, score: 90000,
+         actions: [{ title: "Copy Install Command", shortcut: "↵", exec: $e }] }'
+  else
+    jq -cn --arg s "${monitor:-This display}" \
+      '{ id: "brightness-unavailable", title: "Brightness unavailable",
+         subtitle: ($s + " does not answer brightness control"),
+         group: "Brightness", view: "list", score: 90000, actions: [] }'
+  fi
+  exit 0
+fi
+
+jq -cn --arg s "${monitor:-Display}" --argjson v "$level" --arg a "${level}%" \
+  '{ id: "brightness", title: "Screen Brightness", subtitle: $s, accessory: $a,
+     group: "Brightness", view: "slider",
+     value: $v, min: 1, max: 100, step: 5,
+     setExec: "brightness-display {value}%",
+     exec: "brightness-display 100%",
+     score: 90000,
+     actions: [
+       { title: "Set to 100%", shortcut: "↵", exec: "brightness-display 100%" },
+       { title: "Set to 50%", exec: "brightness-display 50%" },
+       { title: "Set to 10%", exec: "brightness-display 10%" },
+       { title: "Turn Display Off", exec: "brightness-display off" }
+     ] }'
+
+exit 0

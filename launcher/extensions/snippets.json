@@ -1,0 +1,19 @@
+{
+  "id": "snip",
+  "title": "Snippets",
+  "keyword": "snip",
+  "aliases": [
+    "snippet",
+    "snippets",
+    "text",
+    "expand"
+  ],
+  "subtitle": "Snippet",
+  "glyph": "󰅩",
+  "search": "omacast-snippet {query}",
+  "minChars": 0,
+  "debounceMs": 80,
+  "maxRows": 20,
+  "tier": "substring",
+  "view": "snippets"
+}

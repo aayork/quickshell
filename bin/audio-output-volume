@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Step or mute the default output: audio-output-volume <raise|lower|mute-toggle>
+case "${1:-}" in
+raise) wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+lower) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+mute-toggle) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+*) echo "Usage: audio-output-volume <raise|lower|mute-toggle>" >&2; exit 1 ;;
+esac

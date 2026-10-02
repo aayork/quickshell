@@ -1,6 +1,6 @@
-/* Ghostty's GTK/libadwaita chrome, recoloured from the current Roseshell theme.
-   Generated into ~/.local/state/roseshell/current/theme/ghostty-gtk.css by
-   roseshell-theme-set-templates; loaded via ghostty's gtk-custom-css. */
+/* Ghostty's GTK/libadwaita chrome, recoloured from the current theme.
+   Generated into ~/.local/state/aayork-quickshell/current/theme/ghostty-gtk.css by
+   bin/theme-set-templates; loaded via ghostty's gtk-custom-css. */
 
 :root {
   --accent-color: {{ accent }};

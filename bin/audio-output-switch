@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Make the next sink the default, going round the ones there are.
+mapfile -t names < <(pactl list short sinks | awk '{print $2}' | grep -v '\.monitor$')
+(( ${#names[@]} > 1 )) || exit 0
+
+current=$(pactl get-default-sink)
+next=${names[0]}
+for i in "${!names[@]}"; do
+  [[ ${names[$i]} == "$current" ]] && next=${names[$(( (i + 1) % ${#names[@]} ))]}
+done
+pactl set-default-sink "$next"

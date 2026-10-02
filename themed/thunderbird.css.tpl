@@ -1,7 +1,7 @@
-/* Thunderbird, recoloured from the current Roseshell theme.
-   Generated into ~/.local/state/roseshell/current/theme/thunderbird.css by
-   roseshell-theme-set-templates; roseshell-theme-set-thunderbird copies it into
-   each Thunderbird profile as chrome/roseshell.css, imported by userChrome.css
+/* Thunderbird, recoloured from the current theme.
+   Generated into ~/.local/state/aayork-quickshell/current/theme/thunderbird.css by
+   bin/theme-set-templates; bin/theme-set-thunderbird copies it into
+   each Thunderbird profile as chrome/desktop-theme.css, imported by userChrome.css
    and userContent.css.
 
    Thunderbird paints nearly everything from a small set of tokens

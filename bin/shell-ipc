@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Talks to the running shell: shell-ipc [-q] <target> <method> [args...]
+#
+# The launcher's extension scripts were written against Omarchy's shell and
+# still ask for its panels by their old names; those requests are translated
+# here to what this shell has. Anything with no equivalent is quietly ignored.
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+
+[[ ${1:-} == "-q" ]] && shift
+
+call() { qs -p "$SHELL_ROOT" ipc call -- "$@" >/dev/null 2>&1 || true; }
+
+if [[ ${1:-} == "shell" && ( ${2:-} == "summon" || ${2:-} == "toggle" ) ]]; then
+  case "${3:-}" in
+  *.network | *.wifiqr) call settings open network ;;
+  *.bluetooth) call settings open bluetooth ;;
+  *.audio) call bar toggle control-center ;;
+  *.display | *.monitor) call launcher open "displays: " ;;
+  esac
+  exit 0
+fi
+
+case "${1:-}" in
+lock | launcher | settings | bar | session | wallpaper | notifications | nightlight | idle) call "$@" ;;
+esac
+exit 0

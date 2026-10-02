@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# The shell shows its own readout when the volume changes, so the scripts
+# that used to ask for one have nothing to ask for.
+exit 0

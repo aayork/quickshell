@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Launch the default editor from the saved default.
+
+# Where this shell lives, with its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$SHELL_ROOT/launcher/scripts:$PATH"
+
+default_editor="$HOME/.local/state/aayork-quickshell/defaults/editor"
+
+if [[ ${1:-} == "--inline" ]]; then
+  inline=true
+  shift
+else
+  inline=false
+fi
+
+if [[ -f $default_editor ]]; then
+  read -r editor <"$default_editor"
+else
+  editor="nvim"
+fi
+
+# sublime-text-4 ships `subl` on PATH, not `sublime_text`.
+[[ $editor == sublime_text ]] && editor=subl
+
+cmd-present "$editor" || editor="nvim"
+
+case "${editor##*/}" in
+nvim | vim | nano | micro | hx | helix | fresh)
+  if [[ $inline == "true" ]]; then
+    exec "$editor" -- "$@"
+  else
+    exec launch-tui "$editor" -- "$@"
+  fi
+  ;;
+*)
+  # uwsm-app exists only inside a UWSM session; elsewhere launch directly.
+  command -v uwsm-app >/dev/null 2>&1 || exec setsid "$editor" -- "$@"
+  exec setsid uwsm-app -- "$editor" -- "$@"
+  ;;
+esac

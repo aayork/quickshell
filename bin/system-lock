@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Lock the screen.
+exec "$(dirname "$(readlink -f "$0")")/shell-ipc" lock lock

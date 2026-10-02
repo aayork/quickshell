@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Launch the default browser as determined by xdg-settings.
+
+# Where this shell lives, with its own scripts first on the PATH.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$SHELL_ROOT/launcher/scripts:$PATH"
+
+default_browser=$(env -u BROWSER xdg-settings get default-web-browser)
+if [[ -z $default_browser ]]; then
+  default_browser=$(xdg-mime query default x-scheme-handler/https)
+fi
+browser_exec=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$default_browser 2>/dev/null | head -1)
+
+if $browser_exec --help 2>/dev/null | grep -q MOZ_LOG; then
+  private_flag="--private-window"
+elif [[ $browser_exec =~ edge ]]; then
+  private_flag="--inprivate"
+else
+  private_flag="--incognito"
+fi
+
+# uwsm-app exists only inside a UWSM session; elsewhere launch directly.
+app_launcher=()
+command -v uwsm-app >/dev/null 2>&1 && app_launcher=(uwsm-app --)
+systemd-run --user --quiet --collect --unit="aayork-browser-$(date +%s%N)" \
+  --property=StandardOutput=null --property=StandardError=null \
+  "${app_launcher[@]}" "$browser_exec" "${@/--private/$private_flag}"
+
+url=""
+for argument in "$@"; do
+  if [[ $argument != "--private" ]]; then
+    url=$argument
+    break
+  fi
+done
+
+if [[ -n $url && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+  hyprland-focus-app "^$(basename "$browser_exec" -stable).*$" || true
+fi

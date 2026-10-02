@@ -1,0 +1,23 @@
+{
+  "id": "spotify",
+  "title": "Now Playing",
+  "keyword": "playing",
+  "aliases": [
+    "np",
+    "music",
+    "song",
+    "track",
+    "spotify",
+    "play"
+  ],
+  "subtitle": "Whatever is playing, and Spotify search",
+  "glyph": "",
+  "search": "omacast-search-music {query}",
+  "when": "command -v spotify",
+  "minChars": 0,
+  "debounceMs": 60,
+  "maxRows": 9,
+  "tier": "substring",
+  "view": "player",
+  "timeoutMs": 8000
+}
