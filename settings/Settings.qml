@@ -1,9 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
-import Quickshell.Wayland
 import qs.services
 import qs.theme
 import qs.ui
@@ -109,11 +107,10 @@ Scope {
     matchProcess.running = true
   }
 
-  // The desktop's own file chooser. This overlay holds the keyboard, so it
-  // steps aside while the chooser is up and comes back afterwards.
+  // The desktop's own file chooser, opened in Pictures. It floats over this
+  // window and closes itself once a file is picked.
   function browseBackground() {
-    browseProcess.running = true
-    hide()
+    if (!browseProcess.running) browseProcess.running = true
   }
 
   // A chosen file is copied into the theme's own backgrounds folder, so it
@@ -245,7 +242,6 @@ Scope {
           importProcess.command = ["sh", "-c", root.importScript, "sh", path]
           importProcess.running = true
         }
-        root.show("appearance")
       }
     }
   }
@@ -380,32 +376,24 @@ Scope {
   }
 
   // ---------------------------------------------------------------- window
-  PanelWindow {
-    screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
+  // A real window, not a layer over the screen, so the desktop's file chooser
+  // can open on top of it. Hyprland floats, centres and dims around it by a
+  // rule in hyprland.lua that matches this title.
+  FloatingWindow {
+    title: "Settings"
     visible: root.open
-    anchors { top: true; bottom: true; left: true; right: true }
-    color: Theme.alpha(Theme.background, 0.35)
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.namespace: "aayork-settings"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    implicitWidth: 760
+    implicitHeight: 620
+    minimumSize: Qt.size(640, 420)
+    color: Theme.background
 
+    // Closed from outside (SUPER+W, say).
+    onClosed: root.open = false
     onVisibleChanged: if (visible) keys.forceActiveFocus()
 
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.hide()
-    }
-
-    Rectangle {
+    Item {
       id: card
-      width: 760
-      height: Math.min(620, parent.height - 80)
-      anchors.centerIn: parent
-      color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
+      anchors.fill: parent
 
       // Clicking empty space takes focus back from a text field.
       MouseArea {
@@ -416,7 +404,6 @@ Scope {
       FocusScope {
         id: keys
         anchors.fill: parent
-        anchors.margins: Theme.borderWidth
         focus: true
 
         Keys.onPressed: function(event) {
@@ -654,7 +641,7 @@ Scope {
 
               RowLayout {
                 spacing: 6
-                TextButton { text: "Choose file…"; icon: Icons.glyph(0xF024B); onClicked: root.browseBackground() }
+                TextButton { text: browseProcess.running ? "Choosing…" : "Choose file…"; icon: Icons.glyph(0xF024B); enabled: !browseProcess.running; onClicked: root.browseBackground() }
                 TextButton {
                   icon: Icons.glyph(0xF0E09)
                   text: matchProcess.running ? "Matching…" : "Match theme to background"
