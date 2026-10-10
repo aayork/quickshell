@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Tells the Spaces switcher on the bar what a coding agent is doing, so its
+# terminal gets a badge. Made for Claude Code hooks (the hook's JSON arrives
+# on stdin); after Spaces' claude-hook (github.com/tornikegomareli/omarchy-spaces, MIT).
+#   spaces-agent <working|waiting|done|end>
+DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+
+state="$1"
+session=$(jq -r '.session_id // empty' 2>/dev/null)
+[[ -n $session ]] || session="pid$PPID"
+
+# The agent and its ancestors; the bar finds the terminal window among them.
+pids=""
+pid=$PPID
+while [[ $pid -gt 1 && -r /proc/$pid/stat ]]; do
+  pids+="${pids:+,}$pid"
+  stat=$(</proc/$pid/stat)
+  stat=${stat##*) }
+  pid=$(cut -d' ' -f2 <<<"$stat")
+done
+
+quickshell ipc -p "$DIR" call spaces agent "$session" "$state" "$pids" >/dev/null 2>&1 &
+exit 0

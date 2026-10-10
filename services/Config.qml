@@ -15,6 +15,7 @@ Singleton {
   readonly property alias bar: adapter.bar
   readonly property alias windows: adapter.windows
   readonly property alias media: adapter.media
+  readonly property alias spaces: adapter.spaces
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -65,6 +66,25 @@ Singleton {
         property bool glass: true
         // How much of the theme background the bar keeps, 0 (clear) to 1.
         property real tint: 0
+      }
+
+      // The workspace switcher on the bar.
+      property JsonObject spaces: JsonObject {
+        // Workspaces 1 to this many always show, even empty.
+        property int persistent: 4
+        // Which pills open to show their app icons: "all", "active" or
+        // "hover" (the active one and whichever is under the pointer).
+        property string showApps: "hover"
+        // One icon per app, with a count, instead of one per window.
+        property bool groupApps: false
+        property int maxIcons: 8
+        // A live miniature of another workspace while hovering its pill.
+        property bool previews: true
+        // Badges on terminals running a coding agent (bin/spaces-agent).
+        property bool agentStatus: true
+        property bool scrollSwitch: true
+        // Middle-clicking an icon closes that window.
+        property bool middleClickClose: false
       }
 
       property JsonObject media: JsonObject {

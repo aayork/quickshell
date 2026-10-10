@@ -139,7 +139,7 @@ Scope {
           color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.tint)
         }
 
-        Workspaces {
+        Spaces {
           anchors.left: parent.left
           anchors.leftMargin: Theme.barPadding + 3
           foreground: bar.foreground

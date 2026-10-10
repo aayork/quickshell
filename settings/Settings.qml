@@ -20,7 +20,7 @@ Scope {
 
   readonly property var tabs: [
     { id: "appearance", label: "Appearance", glyph: 0xF03D8, about: "Theme, background, font, cursor and icons" },
-    { id: "shell", label: "Shell", glyph: 0xF0379, about: "Night light, the bar, the screensaver and the lock" },
+    { id: "shell", label: "Shell", glyph: 0xF0379, about: "Night light, the bar, workspaces, the screensaver and the lock" },
     { id: "windows", label: "Windows", glyph: 0xF05AF, about: "How Hyprland draws and spaces windows" },
     { id: "network", label: "Network", glyph: 0xF0928, about: "Wi-Fi networks in range" },
     { id: "bluetooth", label: "Bluetooth", glyph: 0xF00AF, about: "Paired devices and new ones nearby" },
@@ -823,6 +823,74 @@ Scope {
                   text: Config.clock.format
                   onAccepted: if (text.trim() !== "") Config.clock.format = text.trim()
                   onCancelled: text = Config.clock.format
+                }
+              }
+
+              }
+
+              Card {
+              title: "WORKSPACES"
+
+              Setting {
+                glyph: 0xF03A0
+                label: "Always show"
+                note: "Workspaces 1 to " + Config.spaces.persistent + ", even when empty"
+                Stepper {
+                  value: Config.spaces.persistent
+                  from: 0
+                  to: 10
+                  onMoved: function(value) { Config.spaces.persistent = value }
+                }
+              }
+
+              Setting {
+                glyph: 0xF003B
+                label: "App icons"
+                note: "Which workspaces open up to show their windows"
+                Segmented {
+                  options: [{ label: "Active", value: "active" }, { label: "Active + hovered", value: "hover" }, { label: "All", value: "all" }]
+                  current: Config.spaces.showApps
+                  onPicked: function(value) { Config.spaces.showApps = value }
+                }
+              }
+
+              Setting {
+                glyph: 0xF02C3
+                label: "Group by app"
+                note: "One icon per app, with a count, instead of one per window"
+                Toggle {
+                  checked: Config.spaces.groupApps
+                  onToggled: Config.spaces.groupApps = !Config.spaces.groupApps
+                }
+              }
+
+              Setting {
+                glyph: 0xF13B4
+                label: "Previews"
+                note: "Hover another workspace to see it live"
+                Toggle {
+                  checked: Config.spaces.previews
+                  onToggled: Config.spaces.previews = !Config.spaces.previews
+                }
+              }
+
+              Setting {
+                glyph: 0xF06A9
+                label: "Agent status"
+                note: "Badges on terminals running Claude Code (hooks call bin/spaces-agent)"
+                Toggle {
+                  checked: Config.spaces.agentStatus
+                  onToggled: Config.spaces.agentStatus = !Config.spaces.agentStatus
+                }
+              }
+
+              Setting {
+                glyph: 0xF0157
+                label: "Middle-click closes"
+                note: "Middle-clicking an app icon closes that window"
+                Toggle {
+                  checked: Config.spaces.middleClickClose
+                  onToggled: Config.spaces.middleClickClose = !Config.spaces.middleClickClose
                 }
               }
 
