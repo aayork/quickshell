@@ -796,7 +796,7 @@ Scope {
               Setting {
                 glyph: 0xF00B5
                 label: "Glass"
-                note: "Blur the wallpaper behind the bar"
+                note: Config.bar.glass ? "Blur the wallpaper behind the bar" : "Solid, a shade of the wallpaper behind it"
                 Toggle {
                   checked: Config.bar.glass
                   onToggled: Config.bar.glass = !Config.bar.glass
@@ -823,6 +823,21 @@ Scope {
                   text: Config.clock.format
                   onAccepted: if (text.trim() !== "") Config.clock.format = text.trim()
                   onCancelled: text = Config.clock.format
+                }
+              }
+
+              }
+
+              Card {
+              title: "MEDIA"
+
+              Setting {
+                glyph: 0xF0387
+                label: "One player at a time"
+                note: "Starting playback in one app pauses the others"
+                Toggle {
+                  checked: Config.media.exclusive
+                  onToggled: Config.media.exclusive = !Config.media.exclusive
                 }
               }
 

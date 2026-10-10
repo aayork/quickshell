@@ -5,27 +5,29 @@ import qs.theme
 import qs.ui
 
 // A tray item's menu, drawn by the shell so it matches everything else.
-// Submenus replace the list in place, with a row to step back out.
-Popup {
+// It takes the place of the tray list, and submenus replace it in turn, with
+// a row at the top to step back out.
+ColumnLayout {
   id: root
 
-  property Item target: null
-  // Menu handles from the item's root menu down to the one on screen.
+  // The item's root menu; null while no menu is showing.
+  property var handle: null
+  property string title: ""
+  // Submenus entered so far, below the root.
   property var path: []
 
-  function show(item, handle) {
-    target = item
-    path = [handle]
-    open = true
-  }
+  // Back was pressed at the root of the menu.
+  signal exited()
+  // An entry was triggered.
+  signal done()
 
-  anchorItem: target
-  contentWidth: 240
-  contentHeight: column.implicitHeight
+  onHandleChanged: path = []
+
+  spacing: 0
 
   QsMenuOpener {
     id: opener
-    menu: root.path.length > 0 ? root.path[root.path.length - 1] : null
+    menu: root.path.length > 0 ? root.path[root.path.length - 1] : root.handle
   }
 
   component Entry: Rectangle {
@@ -34,6 +36,7 @@ Popup {
     property string leading: ""
     property string trailing: ""
     property bool dimmed: false
+    property bool bold: false
     signal clicked()
 
     Layout.fillWidth: true
@@ -59,6 +62,7 @@ Popup {
       anchors.verticalCenter: parent.verticalCenter
       text: entry.label
       color: entry.dimmed ? Theme.dim : Theme.foreground
+      font.bold: entry.bold
     }
 
     Label {
@@ -80,50 +84,53 @@ Popup {
     }
   }
 
-  ColumnLayout {
-    id: column
-    width: parent.width
-    spacing: 0
-
-    Entry {
-      visible: root.path.length > 1
-      leading: Icons.chevronLeft
-      label: "Back"
-      onClicked: root.path = root.path.slice(0, -1)
+  Entry {
+    leading: Icons.chevronLeft
+    label: root.path.length > 0 ? "Back" : root.title
+    bold: root.path.length === 0
+    onClicked: {
+      if (root.path.length > 0) root.path = root.path.slice(0, -1)
+      else root.exited()
     }
+  }
 
-    Repeater {
-      model: opener.children
+  Item {
+    Layout.fillWidth: true
+    implicitHeight: 9
+    Separator { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
+  }
 
-      Loader {
-        id: row
-        required property var modelData
-        Layout.fillWidth: true
-        sourceComponent: modelData.isSeparator ? separator : item
+  Repeater {
+    model: opener.children
 
-        Component {
-          id: separator
-          Item {
-            implicitHeight: 9
-            Separator { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-          }
+    Loader {
+      id: row
+      required property var modelData
+      Layout.fillWidth: true
+      sourceComponent: modelData.isSeparator ? separator : item
+
+      Component {
+        id: separator
+        Item {
+          implicitHeight: 9
+          Separator { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
         }
+      }
 
-        Component {
-          id: item
-          Entry {
-            // Menus mark keyboard mnemonics with an underscore.
-            label: String(row.modelData.text || "").replace(/_/g, "")
-            leading: row.modelData.checkState === Qt.Checked ? Icons.check : ""
-            trailing: row.modelData.hasChildren ? Icons.chevronRight : ""
-            dimmed: !row.modelData.enabled
-            onClicked: {
-              if (row.modelData.hasChildren) {
-                root.path = root.path.concat([row.modelData])
-              } else {
-                row.modelData.triggered()
-                root.close()
-              }
+      Component {
+        id: item
+        Entry {
+          // Menus mark keyboard mnemonics with an underscore.
+          label: String(row.modelData.text || "").replace(/_/g, "")
+          leading: row.modelData.checkState === Qt.Checked ? Icons.check : ""
+          trailing: row.modelData.hasChildren ? Icons.chevronRight : ""
+          dimmed: !row.modelData.enabled
+          onClicked: {
+            if (row.modelData.hasChildren) {
+              root.path = root.path.concat([row.modelData])
+            } else {
+              row.modelData.triggered()
+              root.done()
             }
           }
         }

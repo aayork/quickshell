@@ -33,6 +33,7 @@ Singleton {
   readonly property string bluetoothConnected: glyph(0xF00B1)
 
   readonly property string music: glyph(0xF0387)
+  readonly property string spotify: glyph(0xF04C7)
   readonly property string previous: glyph(0xF04AE)
   readonly property string next: glyph(0xF04AD)
   readonly property string play: glyph(0xF040A)

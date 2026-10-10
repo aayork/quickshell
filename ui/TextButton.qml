@@ -9,6 +9,8 @@ Rectangle {
   property string text: ""
   property string icon: ""
   property bool selected: false
+  // Unselected, the glyph is accent-coloured unless dimmed.
+  property bool dimIcon: false
   signal clicked()
 
   readonly property color ink: selected ? Theme.background : Theme.foreground
@@ -30,7 +32,7 @@ Rectangle {
       visible: root.icon !== ""
       anchors.verticalCenter: parent.verticalCenter
       text: root.icon
-      color: root.selected ? root.ink : Theme.accent
+      color: root.selected ? root.ink : root.dimIcon ? Theme.dim : Theme.accent
       font.pixelSize: Theme.iconSize
       elide: Text.ElideNone
     }

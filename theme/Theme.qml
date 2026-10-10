@@ -39,6 +39,33 @@ Singleton {
   // Text on the bar while it is see-through. Set by the wallpaper layer from
   // the brightness of what sits behind the bar.
   property color barForeground: brightForeground
+  // Average colour of the wallpaper behind the bar, set by the same layer.
+  property color wallpaperTop: background
+  // The same strip in sections, left to right.
+  property var wallpaperStrip: []
+  // The solid bar when glass is off, the way macOS did it before Tahoe: the
+  // wallpaper right behind each part of it, smoothed and darkened a little.
+  // Measured off macOS screenshots: every channel at about 78%.
+  readonly property real barDarken: 0.78
+  readonly property color barSolid: barShade(wallpaperTop)
+
+  function barShade(color) {
+    return Qt.rgba(color.r * barDarken, color.g * barDarken, color.b * barDarken, 1)
+  }
+  // Whichever of the theme's dark and light text reads better on it.
+  readonly property color barSolidForeground: contrast(background, barSolid) > contrast(brightForeground, barSolid)
+    ? background : brightForeground
+
+  // WCAG relative luminance and contrast ratio of sRGB colours.
+  function luminance(c) {
+    function linear(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+    return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
+  }
+
+  function contrast(a, b) {
+    var la = luminance(a), lb = luminance(b)
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+  }
 
   readonly property color hover: alpha(foreground, 0.08)
   readonly property color pressed: alpha(foreground, 0.16)
