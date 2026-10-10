@@ -6,9 +6,9 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// Quick settings: session buttons, now playing, output and input volume, and
-// the Wi-Fi and Bluetooth switches. Scroll on the button changes the volume, right click
-// mutes.
+// Quick settings: session buttons, now playing (with a switch between players),
+// output, per-app and input volume, and the Wi-Fi and Bluetooth switches.
+// Scroll on the button changes the volume, right click mutes.
 BarButton {
   id: root
 
@@ -242,6 +242,34 @@ BarButton {
 
       SectionHeader { text: "NOW PLAYING" }
 
+      // One button per player with a track loaded, when there is more than
+      // one; the shown one is highlighted, paused ones have a dim icon.
+      Flow {
+        visible: Media.loaded.length > 1
+        Layout.fillWidth: true
+        Layout.topMargin: -4
+        spacing: 4
+
+        Repeater {
+          model: Media.loaded
+
+          TextButton {
+            required property var modelData
+            text: Media.name(modelData)
+            icon: Media.icon(modelData)
+            dimIcon: !modelData.isPlaying
+            selected: modelData === Media.player
+            onClicked: Media.select(modelData)
+          }
+        }
+
+        TextButton {
+          visible: Media.playingPlayers.length > 1
+          text: "Pause others"
+          onClicked: Media.pauseOthers()
+        }
+      }
+
       RowLayout {
         Layout.fillWidth: true
         spacing: 10
@@ -267,7 +295,7 @@ BarButton {
           Label {
             anchors.centerIn: parent
             visible: !art.visible
-            text: Icons.music
+            text: Media.icon(Media.player)
             color: Media.hasMedia ? Theme.foreground : Theme.dim
             font.pixelSize: Theme.iconLarge
           }
@@ -330,6 +358,57 @@ BarButton {
         node: Audio.sink
         devices: Audio.sinks
         onDevicePicked: function(node) { Audio.setDefaultSink(node) }
+      }
+
+      // Per-app levels, relative to the output volume.
+      ColumnLayout {
+        visible: Audio.apps.length > 0
+        Layout.fillWidth: true
+        spacing: 2
+
+        SectionHeader { text: "APPS" }
+
+        Repeater {
+          model: Audio.apps
+
+          RowLayout {
+            id: app
+            required property var modelData
+            readonly property bool muted: Audio.appMuted(modelData)
+            readonly property real level: Audio.appVolume(modelData)
+
+            Layout.fillWidth: true
+            spacing: Theme.spacing
+
+            IconButton {
+              icon: Icons.volume(app.level, app.muted)
+              foreground: app.muted ? Theme.dim : Theme.foreground
+              onClicked: Audio.toggleAppMute(app.modelData)
+            }
+
+            Label {
+              text: app.modelData.name
+              color: app.muted ? Theme.dim : Theme.foreground
+              font.pixelSize: Theme.fontSmall
+              Layout.preferredWidth: 90
+            }
+
+            Slider {
+              Layout.fillWidth: true
+              value: app.level
+              opacity: app.muted ? 0.5 : 1
+              onMoved: function(value) { Audio.setAppVolume(app.modelData, value) }
+            }
+
+            Label {
+              text: Math.round(app.level * 100) + "%"
+              color: app.muted ? Theme.dim : Theme.foreground
+              font.pixelSize: Theme.fontSmall
+              horizontalAlignment: Text.AlignRight
+              Layout.preferredWidth: 34
+            }
+          }
+        }
       }
 
       Volume {

@@ -1,63 +1,124 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Widgets
 import qs.theme
 import qs.ui
 
-Row {
+// The system tray, folded behind one button: the apps that put an icon there
+// (Steam, Discord, Spotify…) are listed in a dropdown. Click one to bring it
+// up, right-click for its menu, which takes the place of the list.
+BarButton {
   id: root
 
-  property color foreground: Theme.foreground
+  readonly property alias popup: popup
+  // The tray item whose menu is showing; null while the list is.
+  property var shown: null
 
-  height: Theme.barHeight
+  function name(item) {
+    return item.tooltipTitle || item.title || item.id
+  }
 
-  Repeater {
-    model: SystemTray.items
+  visible: SystemTray.items.values.length > 0
+  text: Icons.chevronDown
+  active: popup.open
+  onClicked: popup.toggle()
 
-    Item {
-      id: slot
-      required property var modelData
-
-      readonly property bool menuOpen: menu.open && menu.target === slot
-
-      width: 24
-      height: root.height
-
-      Rectangle {
-        anchors.fill: parent
-        anchors.topMargin: 3
-        anchors.bottomMargin: 3
-        radius: Theme.controlRadius
-        color: Theme.alpha(root.foreground, slot.menuOpen ? 0.16 : mouse.containsMouse ? 0.08 : 0)
-      }
-
-      IconImage {
-        anchors.centerIn: parent
-        implicitSize: 16
-        source: slot.modelData.icon
-      }
-
-      MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        onClicked: function(event) {
-          var item = slot.modelData
-          if (event.button === Qt.MiddleButton) {
-            item.secondaryActivate()
-          } else if (item.hasMenu && (event.button === Qt.RightButton || item.onlyMenu)) {
-            if (slot.menuOpen) menu.close()
-            else menu.show(slot, item.menu)
-          } else {
-            item.activate()
-          }
-        }
-        onWheel: function(event) { slot.modelData.scroll(event.angleDelta.y, false) }
-      }
+  // An app that quits takes its menu with it.
+  Connections {
+    target: SystemTray.items
+    function onValuesChanged() {
+      if (root.shown && SystemTray.items.values.indexOf(root.shown) < 0) root.shown = null
     }
   }
 
-  TrayMenu { id: menu }
+  Popup {
+    id: popup
+    anchorItem: root
+    contentWidth: 240
+    contentHeight: root.shown ? menu.implicitHeight : list.implicitHeight
+
+    onOpenChanged: if (open) root.shown = null
+
+    ColumnLayout {
+      id: list
+      visible: !root.shown
+      width: parent.width
+      spacing: 0
+
+      Repeater {
+        model: SystemTray.items
+
+        Rectangle {
+          id: slot
+          required property var modelData
+
+          Layout.fillWidth: true
+          implicitHeight: Theme.rowHeight
+          radius: Theme.controlRadius
+          color: mouse.containsMouse ? Theme.hover : "transparent"
+
+          IconImage {
+            id: icon
+            anchors.left: parent.left
+            anchors.leftMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            implicitSize: 16
+            source: slot.modelData.icon
+          }
+
+          Label {
+            anchors.left: icon.right
+            anchors.leftMargin: Theme.spacing
+            anchors.right: more.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.name(slot.modelData)
+          }
+
+          Label {
+            id: more
+            anchors.right: parent.right
+            anchors.rightMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            text: slot.modelData.hasMenu ? Icons.chevronRight : ""
+            color: Theme.dim
+            elide: Text.ElideNone
+          }
+
+          MouseArea {
+            id: mouse
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onClicked: function(event) {
+              var item = slot.modelData
+              // The chevron at the right end opens the menu on a plain click too.
+              var onChevron = event.x >= more.x - 6
+              if (event.button === Qt.MiddleButton) {
+                item.secondaryActivate()
+                popup.close()
+              } else if (item.hasMenu && (event.button === Qt.RightButton || item.onlyMenu || onChevron)) {
+                root.shown = item
+              } else {
+                item.activate()
+                popup.close()
+              }
+            }
+            onWheel: function(event) { slot.modelData.scroll(event.angleDelta.y, false) }
+          }
+        }
+      }
+    }
+
+    TrayMenu {
+      id: menu
+      visible: root.shown !== null
+      width: parent.width
+      handle: root.shown ? root.shown.menu : null
+      title: root.shown ? root.name(root.shown) : ""
+      onExited: root.shown = null
+      onDone: popup.close()
+    }
+  }
 }

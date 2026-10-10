@@ -14,6 +14,7 @@ Singleton {
   readonly property alias screensaver: adapter.screensaver
   readonly property alias bar: adapter.bar
   readonly property alias windows: adapter.windows
+  readonly property alias media: adapter.media
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -64,6 +65,11 @@ Singleton {
         property bool glass: true
         // How much of the theme background the bar keeps, 0 (clear) to 1.
         property real tint: 0
+      }
+
+      property JsonObject media: JsonObject {
+        // A player that starts playing pauses the others.
+        property bool exclusive: false
       }
 
       // Hyprland window look; applied by bin/window-style.

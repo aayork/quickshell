@@ -31,12 +31,12 @@ Scope {
       WlrLayershell.layer: WlrLayer.Background
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-      // Reads how bright the wallpaper is behind the bar so the bar can pick
-      // light or dark text. A canvas only paints while visible, so it sits
-      // here underneath the wallpaper where nobody sees it.
+      // Reads the wallpaper behind the bar so the bar can pick light or dark
+      // text, and colour itself when glass is off. A canvas only paints while
+      // visible, so it sits here underneath the wallpaper where nobody sees it.
       Canvas {
         id: probe
-        width: 32
+        width: 128
         height: 4
         enabled: panel.primary
 
@@ -61,6 +61,7 @@ Scope {
         onPaint: {
           if (!isImageLoaded(loaded) || image.implicitWidth <= 0) return
           var context = getContext("2d")
+          context.clearRect(0, 0, width * 4, height * 4)
           // Same crop the wallpaper uses, narrowed to the bar's strip.
           var scale = Math.max(panel.width / image.implicitWidth, panel.height / image.implicitHeight)
           var cropWidth = panel.width / scale
@@ -72,13 +73,37 @@ Scope {
           context.drawImage(loaded, left, top,
             Math.max(1, Math.floor(cropWidth) - 1), Math.max(1, Math.floor(Theme.barHeight / scale)),
             0, 0, width, height)
-          var pixels = context.getImageData(0, 0, width, height).data
+          // The canvas holds device pixels, so on a scaled screen a read of
+          // width x height covers only its top-left corner. Read well past
+          // it and count only what was drawn.
+          var stride = width * 4
+          var pixels = context.getImageData(0, 0, stride, height * 4).data
+          // How wide the drawn part is, in device pixels.
+          var drawn = 0
+          while (drawn < stride && pixels[drawn * 4 + 3] !== 0) drawn++
+          if (drawn === 0) return
+          // The whole strip, and the same in sections left to right for the
+          // solid bar's gradient.
+          var sections = 48
           var sum = [0, 0, 0]
-          for (var i = 0; i + 3 < pixels.length; i += 4)
-            for (var c = 0; c < 3; c++) sum[c] += pixels[i + c]
-          var count = pixels.length / 4
+          var count = 0
+          var parts = []
+          for (var n = 0; n < sections; n++) parts.push([0, 0, 0, 0])
+          for (var i = 0; i + 3 < pixels.length; i += 4) {
+            if (pixels[i + 3] === 0) continue
+            var part = parts[Math.min(sections - 1, Math.floor(((i / 4) % stride) / drawn * sections))]
+            for (var c = 0; c < 3; c++) {
+              sum[c] += pixels[i + c]
+              part[c] += pixels[i + c]
+            }
+            part[3]++
+            count++
+          }
           // Nothing was drawn; keep the last answer over guessing from black.
           if (sum[0] + sum[1] + sum[2] === 0) return
+          Theme.wallpaperTop = Qt.rgba(sum[0] / count / 255, sum[1] / count / 255, sum[2] / count / 255, 1)
+          Theme.wallpaperStrip = parts.filter(p => p[3] > 0)
+            .map(p => Qt.rgba(p[0] / p[3] / 255, p[1] / p[3] / 255, p[2] / p[3] / 255, 1))
           var behind = probe.luminance(sum[0] / count / 255, sum[1] / count / 255, sum[2] / count / 255)
           // Whichever of the theme's dark and light reads better against it.
           var dark = Theme.background

@@ -38,8 +38,10 @@ Scope {
       readonly property bool tucked: fullscreen && !peeking
       readonly property bool peekHeld: slideHover.hovered || edgeHover.hovered || PopupState.active !== null
 
-      // See-through over the wallpaper, solid when it peeks over a window.
-      readonly property color foreground: fullscreen ? Theme.foreground : Theme.barForeground
+      // See-through over the wallpaper, solid when it peeks over a window or
+      // when glass is off (the bar is then a shade of the wallpaper behind it).
+      readonly property color foreground: fullscreen ? Theme.foreground
+        : Services.Config.bar.glass ? Theme.barForeground : Theme.barSolidForeground
 
       screen: modelData
       anchors { top: true; left: true; right: true }
@@ -62,7 +64,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -105,6 +107,31 @@ Scope {
 
         HoverHandler { id: slideHover; enabled: bar.fullscreen }
 
+        // Without glass: the wallpaper right behind it, averaged top to
+        // bottom, smoothed left to right and darkened a little.
+        Canvas {
+          anchors.fill: parent
+          visible: !Services.Config.bar.glass && !bar.fullscreen
+          readonly property var strip: Theme.wallpaperStrip
+          onStripChanged: requestPaint()
+          onWidthChanged: requestPaint()
+          onVisibleChanged: if (visible) requestPaint()
+          onPaint: {
+            var context = getContext("2d")
+            context.clearRect(0, 0, width, height)
+            if (strip.length === 0) {
+              context.fillStyle = Theme.barSolid
+            } else {
+              // Each section's colour at its middle, blended in between.
+              var gradient = context.createLinearGradient(0, 0, width, 0)
+              for (var i = 0; i < strip.length; i++)
+                gradient.addColorStop((i + 0.5) / strip.length, Theme.barShade(strip[i]))
+              context.fillStyle = gradient
+            }
+            context.fillRect(0, 0, width, height)
+          }
+        }
+
         // Solid over a fullscreen window; otherwise as much of the theme
         // background as the tint setting asks for.
         Rectangle {
@@ -124,7 +151,7 @@ Scope {
           height: parent.height
           spacing: 0
 
-          Tray { foreground: bar.foreground }
+          Tray { id: tray; foreground: bar.foreground }
           Bose { id: bose; foreground: bar.foreground }
           Things { id: things; foreground: bar.foreground }
           Tailscale { id: tailscale; foreground: bar.foreground }
