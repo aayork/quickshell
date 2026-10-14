@@ -43,18 +43,25 @@ Singleton {
   property color wallpaperTop: background
   // The same strip in sections, left to right.
   property var wallpaperStrip: []
-  // The solid bar when glass is off, the way macOS did it before Tahoe: the
-  // wallpaper right behind each part of it, smoothed and darkened a little.
-  // Measured off macOS screenshots: every channel at about 78%.
-  readonly property real barDarken: 0.78
-  readonly property color barSolid: barShade(wallpaperTop)
-
-  function barShade(color) {
-    return Qt.rgba(color.r * barDarken, color.g * barDarken, color.b * barDarken, 1)
+  // Text for the part of the bar between two points (0 to 1 across it), from
+  // the wallpaper sections behind that part, so a widget over a dark corner
+  // of a light wallpaper still gets light text. The bar lays the tint over
+  // the wallpaper, blurred or not.
+  function barForegroundOver(from, to, tint) {
+    var strip = wallpaperStrip
+    if (strip.length === 0) return barForeground
+    var first = Math.max(0, Math.min(strip.length - 1, Math.floor(from * strip.length)))
+    var last = Math.max(first, Math.min(strip.length - 1, Math.floor(to * strip.length)))
+    var r = 0, g = 0, b = 0
+    for (var i = first; i <= last; i++) {
+      r += strip[i].r; g += strip[i].g; b += strip[i].b
+    }
+    var n = last - first + 1
+    var behind = Qt.rgba(r / n, g / n, b / n, 1)
+    behind = Qt.rgba(behind.r + (background.r - behind.r) * tint, behind.g + (background.g - behind.g) * tint,
+      behind.b + (background.b - behind.b) * tint, 1)
+    return contrast(background, behind) > contrast(brightForeground, behind) ? background : brightForeground
   }
-  // Whichever of the theme's dark and light text reads better on it.
-  readonly property color barSolidForeground: contrast(background, barSolid) > contrast(brightForeground, barSolid)
-    ? background : brightForeground
 
   // WCAG relative luminance and contrast ratio of sRGB colours.
   function luminance(c) {

@@ -38,10 +38,17 @@ Scope {
       readonly property bool tucked: fullscreen && !peeking
       readonly property bool peekHeld: slideHover.hovered || edgeHover.hovered || PopupState.active !== null
 
-      // See-through over the wallpaper, solid when it peeks over a window or
-      // when glass is off (the bar is then a shade of the wallpaper behind it).
-      readonly property color foreground: fullscreen ? Theme.foreground
-        : Services.Config.bar.glass ? Theme.barForeground : Theme.barSolidForeground
+      // See-through over the wallpaper, solid when it peeks over a window.
+      readonly property color foreground: fullscreen ? Theme.foreground : Theme.barForeground
+
+      // Text for a widget from the wallpaper right behind it, widened a
+      // little since the glass blur spreads colour from either side.
+      function foregroundOver(x, w) {
+        if (fullscreen || width <= 0) return foreground
+        var spread = Services.Config.bar.glass ? 32 : 0
+        return Theme.barForegroundOver((x - spread) / width, (x + w + spread) / width,
+          Services.Config.bar.glass ? Services.Config.bar.tint : 0)
+      }
 
       screen: modelData
       anchors { top: true; left: true; right: true }
@@ -107,57 +114,35 @@ Scope {
 
         HoverHandler { id: slideHover; enabled: bar.fullscreen }
 
-        // Without glass: the wallpaper right behind it, averaged top to
-        // bottom, smoothed left to right and darkened a little.
-        Canvas {
-          anchors.fill: parent
-          visible: !Services.Config.bar.glass && !bar.fullscreen
-          readonly property var strip: Theme.wallpaperStrip
-          onStripChanged: requestPaint()
-          onWidthChanged: requestPaint()
-          onVisibleChanged: if (visible) requestPaint()
-          onPaint: {
-            var context = getContext("2d")
-            context.clearRect(0, 0, width, height)
-            if (strip.length === 0) {
-              context.fillStyle = Theme.barSolid
-            } else {
-              // Each section's colour at its middle, blended in between.
-              var gradient = context.createLinearGradient(0, 0, width, 0)
-              for (var i = 0; i < strip.length; i++)
-                gradient.addColorStop((i + 0.5) / strip.length, Theme.barShade(strip[i]))
-              context.fillStyle = gradient
-            }
-            context.fillRect(0, 0, width, height)
-          }
-        }
-
         // Solid over a fullscreen window; otherwise as much of the theme
-        // background as the tint setting asks for.
+        // background as the tint setting asks for, and nothing at all with
+        // background effects off.
         Rectangle {
           anchors.fill: parent
-          color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.tint)
+          color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.glass ? Services.Config.bar.tint : 0)
         }
 
         Workspaces {
+          id: workspaces
           anchors.left: parent.left
           anchors.leftMargin: Theme.barPadding + 3
-          foreground: bar.foreground
+          foreground: bar.foregroundOver(workspaces.x, workspaces.width)
         }
 
         RowLayout {
+          id: row
           anchors.right: parent.right
           anchors.rightMargin: Theme.barPadding + 3
           height: parent.height
           spacing: 0
 
-          Tray { id: tray; foreground: bar.foreground }
-          Bose { id: bose; foreground: bar.foreground }
-          Things { id: things; foreground: bar.foreground }
-          Tailscale { id: tailscale; foreground: bar.foreground }
-          Network { id: network; foreground: bar.foreground }
-          ControlCenter { id: controlCenter; foreground: bar.foreground }
-          Clock { id: clock; foreground: bar.foreground }
+          Tray { id: tray; foreground: bar.foregroundOver(row.x + tray.x, tray.width) }
+          Bose { id: bose; foreground: bar.foregroundOver(row.x + bose.x, bose.width) }
+          Things { id: things; foreground: bar.foregroundOver(row.x + things.x, things.width) }
+          Tailscale { id: tailscale; foreground: bar.foregroundOver(row.x + tailscale.x, tailscale.width) }
+          Network { id: network; foreground: bar.foregroundOver(row.x + network.x, network.width) }
+          ControlCenter { id: controlCenter; foreground: bar.foregroundOver(row.x + controlCenter.x, controlCenter.width) }
+          Clock { id: clock; foreground: bar.foregroundOver(row.x + clock.x, clock.width) }
         }
       }
     }

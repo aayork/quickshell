@@ -795,8 +795,8 @@ Scope {
 
               Setting {
                 glyph: 0xF00B5
-                label: "Glass"
-                note: Config.bar.glass ? "Blur the wallpaper behind the bar" : "Solid, a shade of the wallpaper behind it"
+                label: "Background effects"
+                note: Config.bar.glass ? "Blur the wallpaper behind the bar" : "None, the bar is clear"
                 Toggle {
                   checked: Config.bar.glass
                   onToggled: Config.bar.glass = !Config.bar.glass
@@ -804,6 +804,7 @@ Scope {
               }
 
               Setting {
+                visible: Config.bar.glass
                 glyph: 0xF05CC
                 label: "Tint"
                 note: Math.round(Config.bar.tint * 100) + "% of the theme background"

@@ -32,7 +32,7 @@ Scope {
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
       // Reads the wallpaper behind the bar so the bar can pick light or dark
-      // text, and colour itself when glass is off. A canvas only paints while
+      // text. A canvas only paints while
       // visible, so it sits here underneath the wallpaper where nobody sees it.
       Canvas {
         id: probe
