@@ -7,8 +7,8 @@ import qs.theme
 import qs.ui
 
 // The system tray, folded behind one button: the apps that put an icon there
-// (Steam, Discord, Spotify…) are listed in a dropdown. Click one to bring it
-// up, right-click for its menu, which takes the place of the list.
+// (Steam, Discord, Spotify…) are listed in a dropdown. Click one to bring
+// up its menu, which takes the place of the list; right-click activates it.
 BarButton {
   id: root
 
@@ -93,12 +93,12 @@ BarButton {
             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             onClicked: function(event) {
               var item = slot.modelData
-              // The chevron at the right end opens the menu on a plain click too.
-              var onChevron = event.x >= more.x - 6
+              // Left click opens the menu: many apps (Steam, Discord, Electron)
+              // ignore activate, so a click that only activated did nothing.
               if (event.button === Qt.MiddleButton) {
                 item.secondaryActivate()
                 popup.close()
-              } else if (item.hasMenu && (event.button === Qt.RightButton || item.onlyMenu || onChevron)) {
+              } else if (item.hasMenu && event.button === Qt.LeftButton) {
                 root.shown = item
               } else {
                 item.activate()
