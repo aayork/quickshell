@@ -7,7 +7,8 @@ import qs.theme
 import qs.ui
 
 // Quick settings: session buttons, now playing (with a switch between players),
-// output, per-app and input volume, and the Wi-Fi and Bluetooth switches.
+// output, per-app and input volume, the Razer mouse, and the Wi-Fi and
+// Bluetooth switches.
 // Scroll on the button changes the volume, right click mutes.
 BarButton {
   id: root
@@ -158,6 +159,7 @@ BarButton {
 
     onOpenChanged: {
       root.armed = ""
+      Mouse.watching = open
       if (open) Media.refreshPosition()
       else root.showDevices = false
     }
@@ -418,6 +420,10 @@ BarButton {
         devices: Audio.sources
         onDevicePicked: function(node) { Audio.setDefaultSource(node) }
       }
+
+      Separator { Layout.fillWidth: true; visible: Mouse.present }
+
+      MouseSettings { Layout.fillWidth: true; visible: Mouse.present }
 
       Separator { Layout.fillWidth: true }
 

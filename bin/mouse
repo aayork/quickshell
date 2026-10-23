@@ -1,0 +1,360 @@
+#!/usr/bin/python3 -I
+# Razer mouse settings for the control center.
+#
+#   mouse status            JSON: name, battery, dpi, stages, poll rate, accel, sensitivity
+#   mouse dpi <n>           DPI (same on both axes)
+#   mouse poll <hz>         polling rate
+#   mouse accel <flat|adaptive>
+#   mouse sensitivity <-1..1>
+#   mouse restore           put the saved DPI and polling rate back
+#   mouse watch             runs with the shell: prints "dpi <n>" when the DPI
+#                           changes, saves button changes, restores after resets
+#
+# DPI and polling rate go to the mouse through the OpenRazer daemon. They are
+# saved in mouse.json in the shell's state folder rather than trusting the
+# daemon's own memory: that is keyed by serial number, and the daemon makes
+# one up when the mouse is asleep as it starts, so it restores the wrong
+# thing. The daemon never hears about the DPI button on the mouse either,
+# which is why `watch` reads the DPI from the driver every second.
+# Acceleration and sensitivity are Hyprland settings: applied live with
+# `hyprctl eval`, and saved to mouse.lua in the shell's state folder, which
+# hyprland.lua loads after its input section so they survive a reload.
+
+import glob
+import json
+import os
+import select
+import subprocess
+import sys
+import time
+
+STATE_DIR = os.path.expanduser("~/.local/state/aayork-quickshell")
+LUA_FILE = os.path.join(STATE_DIR, "mouse.lua")
+SAVED_FILE = os.path.join(STATE_DIR, "mouse.json")
+POLL_RATES = [125, 500, 1000]
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def mouse():
+    try:
+        from openrazer.client import DeviceManager
+        devices = [d for d in DeviceManager().devices if d.type == "mouse"]
+    except Exception:
+        fail("The OpenRazer daemon is not running")
+    if not devices:
+        fail("No Razer mouse found")
+    return devices[0]
+
+
+def load_saved():
+    try:
+        with open(SAVED_FILE) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save(**values):
+    data = load_saved()
+    data.update(values)
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(SAVED_FILE + ".tmp", "w") as f:
+        json.dump(data, f)
+    os.replace(SAVED_FILE + ".tmp", SAVED_FILE)
+
+
+def stages(d):
+    # The DPI button cycles through these; None if the mouse has no stages.
+    try:
+        return d.dpi_stages
+    except Exception:
+        return None
+
+
+def set_dpi(d, value):
+    # A value that is one of the button's stages moves the stage too, so the
+    # next press carries on from there. The direct write after it also keeps
+    # the daemon's own record in step.
+    current = stages(d)
+    if current:
+        values = [x for x, _ in current[1]]
+        if value in values:
+            d.dpi_stages = (values.index(value) + 1, current[1])
+    d.dpi = (value, value)
+
+
+def restore(d):
+    data = load_saved()
+    dpi = data.get("dpi")
+    if isinstance(dpi, int) and 100 <= dpi <= d.max_dpi:
+        try:
+            current = stages(d)
+            on_stage = not current or current[1][current[0] - 1][0] == dpi \
+                or dpi not in [x for x, _ in current[1]]
+            if d.dpi[0] != dpi or not on_stage:
+                set_dpi(d, dpi)
+        except Exception:
+            pass
+    elif read_ok(lambda: d.dpi[0]):
+        # Nothing saved yet: start from what the mouse has now.
+        save(dpi=d.dpi[0])
+    poll = data.get("poll")
+    if poll in POLL_RATES:
+        try:
+            if d.poll_rate != poll:
+                d.poll_rate = poll
+        except Exception:
+            pass
+    elif read_ok(lambda: d.poll_rate) in POLL_RATES:
+        save(poll=d.poll_rate)
+
+
+def read_ok(get):
+    try:
+        return get()
+    except Exception:
+        return None
+
+
+def driver_dpi_files():
+    return glob.glob("/sys/bus/hid/drivers/razermouse/*/dpi")
+
+
+def read_dpi(path):
+    try:
+        with open(path) as f:
+            x = int(f.read().strip().split(":")[0])
+        return x if x > 0 else None
+    except Exception:
+        return None
+
+
+def bus_owner():
+    try:
+        import dbus
+        return dbus.SessionBus().get_name_owner("org.razer")
+    except Exception:
+        return None
+
+
+def emit(line):
+    try:
+        print(line, flush=True)
+    except BrokenPipeError:
+        sys.exit(0)
+
+
+POLL_SECONDS = 0.5
+
+
+def open_button_events():
+    # The driver passes the DPI button on as F13/F14 key presses on the
+    # mouse's keyboard interface. Waiting on those catches a press at once;
+    # the regular read is the fallback if none arrive.
+    fds = []
+    for name in glob.glob("/dev/input/by-id/*Razer*-event-kbd"):
+        try:
+            fds.append(os.open(name, os.O_RDONLY | os.O_NONBLOCK))
+        except OSError:
+            pass
+    return fds
+
+
+def close_all(fds):
+    for fd in fds:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def wait_for_press(fds, timeout):
+    # True when an input event came in before the timeout.
+    if not fds:
+        time.sleep(timeout)
+        return False
+    try:
+        ready, _, _ = select.select(fds, [], [], timeout)
+    except (OSError, ValueError):
+        time.sleep(timeout)
+        return False
+    pressed = False
+    for fd in ready:
+        try:
+            while os.read(fd, 4096):
+                pressed = True
+        except BlockingIOError:
+            pass
+        except OSError:
+            fds.remove(fd)
+    return pressed
+
+
+def read_after_press(path, last):
+    # The mouse can report the press a moment before its DPI moves.
+    value = read_dpi(path)
+    for delay in (0.02, 0.05, 0.1, 0.2):
+        if value != last:
+            break
+        time.sleep(delay)
+        value = read_dpi(path)
+    return value
+
+
+def watch():
+    # A change between two good reads is the DPI button, so it is saved. A change after the mouse went quiet, or a daemon that
+    # restarted (it puts back its own idea of the DPI), is a reset, so the
+    # saved DPI goes back on instead.
+    device = owner = path = last = None
+    fds = []
+    while True:
+        if device is None:
+            close_all(fds)
+            fds = []
+            try:
+                from openrazer.client import DeviceManager
+                found = [d for d in DeviceManager().devices if d.type == "mouse"]
+            except Exception:
+                found = []
+            if found:
+                device, owner = found[0], bus_owner()
+                files = [f for f in driver_dpi_files() if read_dpi(f) is not None]
+                path = files[0] if files else None
+                fds = open_button_events()
+                restore(device)
+                last = read_dpi(path) if path else None
+                if last:
+                    emit("dpi %d" % last)
+            else:
+                time.sleep(5)
+                continue
+
+        pressed = wait_for_press(fds, POLL_SECONDS)
+        if not path:
+            value = None
+        elif pressed and last is not None:
+            value = read_after_press(path, last)
+        else:
+            value = read_dpi(path)
+        if bus_owner() != owner or path is None or not os.path.exists(path):
+            device = None
+            continue
+        if value is None:
+            last = None
+            continue
+        if last is None:
+            # Back from being unreachable: whatever it says now was not chosen.
+            restore(device)
+            value = read_dpi(path) or value
+        elif value != last:
+            save(dpi=value)
+            try:
+                device.dpi = (value, value)
+            except Exception:
+                pass
+        if value != last:
+            emit("dpi %d" % value)
+        last = value
+
+
+def hypr_option(name):
+    try:
+        out = subprocess.run(["hyprctl", "-j", "getoption", "input:" + name],
+                             capture_output=True, text=True, timeout=3).stdout
+        return json.loads(out)
+    except Exception:
+        return {}
+
+
+def saved():
+    # The values mouse.lua holds, else what Hyprland is running with.
+    accel = hypr_option("accel_profile").get("str") or "adaptive"
+    if accel == "[[EMPTY]]":
+        accel = "adaptive"
+    sensitivity = hypr_option("sensitivity").get("float", 0.0)
+    return accel, round(float(sensitivity), 2)
+
+
+def apply_hyprland(accel, sensitivity):
+    snippet = 'hl.config({ input = { accel_profile = "%s", sensitivity = %s } })' % (accel, sensitivity)
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(LUA_FILE + ".tmp", "w") as f:
+        f.write("-- Written by bin/mouse (the bar's mouse widget).\n" + snippet + "\n")
+    os.replace(LUA_FILE + ".tmp", LUA_FILE)
+    result = subprocess.run(["hyprctl", "eval", snippet], capture_output=True, text=True)
+    if result.returncode != 0 or "error" in result.stdout.lower():
+        fail("Hyprland refused that: " + (result.stdout or result.stderr).strip())
+
+
+def status():
+    d = mouse()
+    accel, sensitivity = saved()
+    info = {
+        "name": d.name.replace(" (Wireless)", ""),
+        "accel": accel,
+        "sensitivity": sensitivity,
+        "pollRates": POLL_RATES,
+    }
+    try:
+        info["dpi"] = d.dpi[0]
+        info["maxDpi"] = d.max_dpi
+        current = stages(d)
+        info["stages"] = [x for x, _ in current[1]] if current else []
+    except Exception:
+        info["dpi"] = -1
+        info["maxDpi"] = 0
+        info["stages"] = []
+    try:
+        info["poll"] = d.poll_rate
+    except Exception:
+        info["poll"] = -1
+    if d.has("battery"):
+        try:
+            info["battery"] = d.battery_level
+            info["charging"] = bool(d.is_charging)
+        except Exception:
+            info["battery"] = -1
+    print(json.dumps(info))
+
+
+def main(args):
+    if not args:
+        fail("Usage: mouse status|dpi <n>|poll <hz>|accel <flat|adaptive>|sensitivity <x>|restore|watch")
+    command, rest = args[0], args[1:]
+
+    if command == "status":
+        status()
+    elif command == "dpi" and len(rest) == 1:
+        d = mouse()
+        value = int(rest[0])
+        if not 100 <= value <= d.max_dpi:
+            fail("DPI must be between 100 and %d" % d.max_dpi)
+        set_dpi(d, value)
+        save(dpi=value)
+    elif command == "poll" and len(rest) == 1:
+        value = int(rest[0])
+        if value not in POLL_RATES:
+            fail("Polling rate must be one of " + ", ".join(map(str, POLL_RATES)))
+        mouse().poll_rate = value
+        save(poll=value)
+    elif command == "restore":
+        restore(mouse())
+    elif command == "watch":
+        watch()
+    elif command == "accel" and len(rest) == 1 and rest[0] in ("flat", "adaptive"):
+        _, sensitivity = saved()
+        apply_hyprland(rest[0], sensitivity)
+    elif command == "sensitivity" and len(rest) == 1:
+        value = round(max(-1.0, min(1.0, float(rest[0]))), 2)
+        accel, _ = saved()
+        apply_hyprland(accel, value)
+    else:
+        fail("Usage: mouse status|dpi <n>|poll <hz>|accel <flat|adaptive>|sensitivity <x>|restore|watch")
+
+
+main(sys.argv[1:])
