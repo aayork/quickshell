@@ -11,7 +11,12 @@ ColumnLayout {
   // The mouse's own button stages, so a stage lights up whichever way the
   // DPI was picked.
   readonly property var stages: Mouse.stages.length > 0 ? Mouse.stages : [400, 800, 1600, 3200, 6400]
-  readonly property bool low: Mouse.battery >= 0 && Mouse.battery <= 15 && !Mouse.charging
+  // The colour the mouse's indicator LED flashes for each stage slot, from
+  // Razer's guide (red, green, blue, cyan, yellow); the firmware fixes it.
+  // Saturated like the LED itself rather than the theme's softer palette.
+  readonly property var stageColors: ["#ff2a2a", "#22e04a", "#2346ff", "#1fd8f0", "#ffd81f"]
+  readonly property int stage: stages.indexOf(Mouse.dpi)
+  readonly property color stageColor: stage >= 0 && stage < stageColors.length ? stageColors[stage] : Theme.dim
 
   spacing: 8
 
@@ -20,6 +25,8 @@ ColumnLayout {
     id: choices
     property var options: []
     property var current: null
+    // Optional colour per option, shown as a dot beside its label.
+    property var colors: []
     signal picked(var value)
 
     implicitHeight: Theme.rowHeight
@@ -38,20 +45,35 @@ ColumnLayout {
         Rectangle {
           id: cell
           required property var modelData
+          required property int index
           readonly property bool chosen: modelData.value === choices.current
+          readonly property var tint: index < choices.colors.length ? choices.colors[index] : null
 
           Layout.fillWidth: true
           Layout.fillHeight: true
           radius: Math.max(0, Theme.controlRadius - 1)
-          color: chosen ? Theme.alpha(Theme.foreground, 0.14) : cellMouse.pressed ? Theme.pressed : cellMouse.containsMouse ? Theme.hover : "transparent"
+          color: chosen ? (tint ? Theme.alpha(tint, 0.16) : Theme.alpha(Theme.foreground, 0.14)) : cellMouse.pressed ? Theme.pressed : cellMouse.containsMouse ? Theme.hover : "transparent"
           Behavior on color { ColorAnimation { duration: 120 } }
 
-          Label {
+          Row {
             anchors.centerIn: parent
-            text: cell.modelData.label
-            color: cell.chosen ? Theme.foreground : Theme.dim
-            font.pixelSize: Theme.fontSmall
-            elide: Text.ElideNone
+            spacing: 5
+
+            Rectangle {
+              visible: cell.tint !== null
+              anchors.verticalCenter: parent.verticalCenter
+              width: 6
+              height: 6
+              radius: 3
+              color: cell.tint || "transparent"
+              opacity: cell.chosen ? 1 : 0.45
+            }
+            Label {
+              text: cell.modelData.label
+              color: cell.chosen ? Theme.foreground : Theme.dim
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
           }
 
           MouseArea {
@@ -72,52 +94,11 @@ ColumnLayout {
 
     SectionHeader { text: "MOUSE"; Layout.fillWidth: true }
 
-    Label {
+    BatteryGauge {
       visible: Mouse.battery >= 0
-      text: Mouse.charging ? "Charging" : ""
-      color: Theme.dim
-      font.pixelSize: Theme.fontSmall
-      elide: Text.ElideNone
-    }
-
-    // A small drawn battery, filled to the charge.
-    Row {
-      visible: Mouse.battery >= 0
-      spacing: 1
       Layout.alignment: Qt.AlignVCenter
-
-      Rectangle {
-        width: 20
-        height: 10
-        radius: Theme.controlRadius
-        color: "transparent"
-        border.width: 1
-        border.color: root.low ? Theme.red : Theme.alpha(Theme.foreground, 0.5)
-
-        Rectangle {
-          x: 2
-          y: 2
-          height: parent.height - 4
-          width: Math.max(1, (parent.width - 4) * Math.max(0, Math.min(100, Mouse.battery)) / 100)
-          radius: Math.max(0, Theme.controlRadius - 1)
-          color: root.low ? Theme.red : Theme.alpha(Theme.foreground, 0.7)
-          Behavior on width { NumberAnimation { duration: 250 } }
-        }
-      }
-      Rectangle {
-        anchors.verticalCenter: parent.verticalCenter
-        width: 2
-        height: 4
-        color: root.low ? Theme.red : Theme.alpha(Theme.foreground, 0.5)
-      }
-    }
-
-    Label {
-      visible: Mouse.battery >= 0
-      text: Mouse.battery + "%"
-      color: root.low ? Theme.red : Theme.dim
-      font.pixelSize: Theme.fontSmall
-      elide: Text.ElideNone
+      level: Mouse.battery
+      charging: Mouse.charging
     }
   }
 
@@ -133,6 +114,14 @@ ColumnLayout {
     Label {
       text: Mouse.name.replace(/^Razer\s+/, "")
       Layout.fillWidth: true
+    }
+    Rectangle {
+      visible: root.stage >= 0
+      Layout.alignment: Qt.AlignVCenter
+      implicitWidth: 6
+      implicitHeight: 6
+      radius: 3
+      color: root.stageColor
     }
     Label {
       text: Mouse.dpi + " DPI"
@@ -167,6 +156,7 @@ ColumnLayout {
     Layout.fillWidth: true
     options: root.stages.map(s => ({ label: s, value: s }))
     current: Mouse.dpi
+    colors: root.stageColors
     onPicked: function(value) { Mouse.setDpi(value) }
   }
 

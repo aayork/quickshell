@@ -421,9 +421,10 @@ BarButton {
         onDevicePicked: function(node) { Audio.setDefaultSource(node) }
       }
 
-      Separator { Layout.fillWidth: true; visible: Mouse.present }
+      // Only while the mouse is on, like the Bose widget.
+      Separator { Layout.fillWidth: true; visible: Mouse.connected }
 
-      MouseSettings { Layout.fillWidth: true; visible: Mouse.present }
+      MouseSettings { Layout.fillWidth: true; visible: Mouse.connected }
 
       Separator { Layout.fillWidth: true }
 

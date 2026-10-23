@@ -8,7 +8,9 @@
 #   mouse sensitivity <-1..1>
 #   mouse restore           put the saved DPI and polling rate back
 #   mouse watch             runs with the shell: prints "dpi <n>" when the DPI
-#                           changes, saves button changes, restores after resets
+#                           changes and "online"/"offline" when the mouse can or
+#                           cannot be reached, saves button changes, restores
+#                           after resets
 #
 # DPI and polling rate go to the mouse through the OpenRazer daemon. They are
 # saved in mouse.json in the shell's state folder rather than trusting the
@@ -150,6 +152,9 @@ def emit(line):
 
 
 POLL_SECONDS = 0.5
+# Failed reads in a row before the mouse counts as off, so one dropped read
+# does not make the control center flicker.
+OFFLINE_AFTER = 3
 
 
 def open_button_events():
@@ -212,6 +217,15 @@ def watch():
     # saved DPI goes back on instead.
     device = owner = path = last = None
     fds = []
+    online = None
+    misses = 0
+
+    def set_online(now):
+        nonlocal online
+        if now != online:
+            online = now
+            emit("online" if now else "offline")
+
     while True:
         if device is None:
             close_all(fds)
@@ -231,6 +245,7 @@ def watch():
                 if last:
                     emit("dpi %d" % last)
             else:
+                set_online(False)
                 time.sleep(5)
                 continue
 
@@ -245,8 +260,15 @@ def watch():
             device = None
             continue
         if value is None:
+            # The dongle stays plugged in, so a mouse that is off or asleep
+            # shows up as reads failing rather than the device going away.
             last = None
+            misses += 1
+            if misses >= OFFLINE_AFTER:
+                set_online(False)
             continue
+        misses = 0
+        set_online(True)
         if last is None:
             # Back from being unreachable: whatever it says now was not chosen.
             restore(device)

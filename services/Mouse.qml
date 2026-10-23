@@ -20,6 +20,10 @@ Singleton {
   readonly property bool busy: statusProcess.running || actionProcess.running
 
   readonly property bool present: state !== null
+  // The mouse itself answering, not just its dongle being plugged in; from
+  // the watcher, which reads the mouse every half second.
+  property bool online: false
+  readonly property bool connected: present && online
   readonly property string name: state ? state.name : ""
   readonly property int battery: state && state.battery !== undefined ? state.battery : -1
   readonly property bool charging: state ? state.charging === true : false
@@ -121,13 +125,22 @@ Singleton {
     stdout: SplitParser {
       onRead: function(line) {
         var parts = line.split(" ")
+        if (parts[0] === "online" || parts[0] === "offline") {
+          root.online = parts[0] === "online"
+          // Fresh battery and settings as it comes back.
+          if (root.online) root.refresh()
+          return
+        }
         if (parts[0] !== "dpi" || !root.state) return
         var value = parseInt(parts[1])
         if (value > 0 && value !== root.state.dpi && !root.queued.dpi)
           root.state = Object.assign({}, root.state, { dpi: value })
       }
     }
-    onExited: watchRestart.start()
+    onExited: {
+      root.online = false
+      watchRestart.start()
+    }
   }
 
   Timer {
