@@ -101,7 +101,18 @@ Scope {
       previewReset.start()
       return
     }
-    Greetd.launch(command, env, true)
+    // Let the screen fade to black first (Surface.qml); greetd only starts
+    // the session once this exits, and the desktop fades in from black.
+    launchArgs = [command, env]
+    launchTimer.start()
+  }
+
+  property var launchArgs: null
+  readonly property int fadeOut: 350
+  Timer {
+    id: launchTimer
+    interval: root.fadeOut
+    onTriggered: Greetd.launch(root.launchArgs[0], root.launchArgs[1], true)
   }
 
   Connections {

@@ -179,6 +179,27 @@ Scope {
           maskSpreadAtMin: 1
         }
       }
+
+      // At login the wallpaper fades in from black, carrying on from the
+      // login screen's fade-out. Only the first load: later wallpaper changes
+      // swap as before.
+      Rectangle {
+        id: cover
+        anchors.fill: parent
+        color: "black"
+        property bool revealed: image.status === Image.Ready || image.status === Image.Error || coverTimeout.triggeredOnce
+        onRevealedChanged: if (revealed) opacity = 0
+        Behavior on opacity { NumberAnimation { duration: 700; easing.type: Easing.OutCubic } }
+        visible: opacity > 0
+        // No wallpaper (or a slow one): don't stay black.
+        Timer {
+          id: coverTimeout
+          property bool triggeredOnce: false
+          interval: 2500
+          running: true
+          onTriggered: triggeredOnce = true
+        }
+      }
     }
   }
 }

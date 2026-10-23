@@ -16,7 +16,8 @@ done
 [ -e "$CACHE/ready" ] || kill $qs 2>/dev/null
 
 wait $qs && [ -e "$CACHE/ready" ] && touch "$CACHE/ok"
-hyprctl dispatch exit >/dev/null 2>&1
+# Lua-config Hyprland: plain `dispatch exit` is an error and left this to the kill below.
+hyprctl dispatch 'hl.dsp.exit()' >/dev/null 2>&1
 sleep 2
 # Still up: stop the compositor greeter/start launched (never any other).
 pid=$(cat "$CACHE/hyprland.pid" 2>/dev/null)

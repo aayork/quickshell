@@ -15,6 +15,10 @@ Item {
   required property var greeter
   property bool primary: true
 
+  // Fade to black while the session starts (the window behind is black).
+  opacity: greeter.status === "launching" ? 0 : 1
+  Behavior on opacity { NumberAnimation { duration: root.greeter.fadeOut; easing.type: Easing.InOutQuad } }
+
   Rectangle {
     anchors.fill: parent
     color: Theme.base
