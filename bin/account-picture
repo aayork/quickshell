@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Set the account picture shown on the login screen (and anything else that
+# reads AccountsService, such as GNOME). The image is cropped to a centred
+# square first. Changing your own picture needs no password.
+#
+#   account-picture <image>    set it
+#   account-picture --path     print the current picture's path
+
+set -euo pipefail
+
+USER_PATH=$(busctl --system call org.freedesktop.Accounts /org/freedesktop/Accounts \
+  org.freedesktop.Accounts FindUserById x "$(id -u)" | awk '{ gsub(/"/, "", $2); print $2 }')
+
+if [[ ${1:-} == --path ]]; then
+  busctl --system get-property org.freedesktop.Accounts "$USER_PATH" \
+    org.freedesktop.Accounts.User IconFile | awk '{ gsub(/"/, "", $2); print $2 }'
+  exit 0
+fi
+
+if [[ -z ${1:-} || ! -f $1 ]]; then
+  echo "Usage: account-picture <image> | --path" >&2
+  exit 1
+fi
+
+# accounts-daemon copies the file into /var/lib/AccountsService/icons, so a
+# scratch copy is enough. It refuses files over 1 MB, hence the PNG at 512.
+tmp=$(mktemp --suffix=.png)
+trap 'rm -f "$tmp"' EXIT
+magick "$1[0]" -auto-orient -gravity center \
+  -resize '512x512^' -extent 512x512 -strip "$tmp"
+chmod 644 "$tmp"
+
+busctl --system call org.freedesktop.Accounts "$USER_PATH" \
+  org.freedesktop.Accounts.User SetIconFile s "$tmp"

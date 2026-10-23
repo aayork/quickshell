@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -250,6 +251,26 @@ Scope {
   Process {
     id: importProcess
     onExited: settle.restart()
+  }
+
+  // Account picture (login screen), via bin/account-picture.
+  property int pictureRevision: 0
+  Process {
+    id: pictureBrowse
+    command: [root.bin + "pick-file", "--images", "--title", "Choose a picture", "--folder", Quickshell.env("HOME") + "/Pictures"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var path = text.trim()
+        if (path !== "") {
+          pictureSet.command = [root.bin + "account-picture", path]
+          pictureSet.running = true
+        }
+      }
+    }
+  }
+  Process {
+    id: pictureSet
+    onExited: root.pictureRevision++
   }
 
   // After a theme or background change, once the scripts have finished.
@@ -715,6 +736,61 @@ Scope {
                   options: root.iconThemes
                   current: root.iconTheme
                   onPicked: function(value) { root.applyIconTheme(value) }
+                }
+              }
+              }
+
+              Card {
+              title: "LOGIN SCREEN"
+
+              Setting {
+                glyph: 0xF0009
+                label: "Picture"
+                note: "Shown when you log in"
+
+                Item {
+                  implicitWidth: 40
+                  implicitHeight: 40
+
+                  Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: Theme.alpha(Theme.accent, 0.18)
+                    border.width: 1
+                    border.color: Theme.accent
+                  }
+                  Image {
+                    id: accountFace
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    // The query string makes the image reload after a change.
+                    source: "file:///var/lib/AccountsService/icons/" + Quickshell.env("USER") + "?" + root.pictureRevision
+                    sourceSize: Qt.size(80, 80)
+                    fillMode: Image.PreserveAspectCrop
+                    cache: false
+                    visible: false
+                  }
+                  MultiEffect {
+                    anchors.fill: accountFace
+                    source: accountFace
+                    visible: accountFace.status === Image.Ready
+                    maskEnabled: true
+                    maskSource: accountFaceMask
+                  }
+                  Item {
+                    id: accountFaceMask
+                    anchors.fill: accountFace
+                    layer.enabled: true
+                    visible: false
+                    Rectangle { anchors.fill: parent; radius: width / 2 }
+                  }
+                }
+
+                TextButton {
+                  text: pictureBrowse.running ? "Choosing…" : pictureSet.running ? "Saving…" : "Choose picture…"
+                  icon: Icons.glyph(0xF024B)
+                  enabled: !pictureBrowse.running && !pictureSet.running
+                  onClicked: pictureBrowse.running = true
                 }
               }
               }

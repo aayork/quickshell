@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Copy what the login screen needs to look like the desktop into
+# /var/lib/aayork-greeter, which bin/greeter-install made yours. The greeter
+# runs as its own user and cannot read your home, so it reads this copy.
+# theme-set, theme-bg-set, cursor-set and font-set call this with --quiet.
+#
+#   greeter-sync [--quiet] [--dir <dir>]
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+quiet=false
+DATA=/var/lib/aayork-greeter
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --quiet) quiet=true ;;
+    --dir) DATA=$2; shift ;;
+    *) echo "Usage: greeter-sync [--quiet] [--dir <dir>]" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+if [[ ! -w $DATA ]]; then
+  $quiet && exit 0
+  echo "greeter-sync: $DATA is missing or not writable; run 'sudo bin/greeter-install' first" >&2
+  exit 1
+fi
+
+# One sync at a time, in order; a theme change also changes the background.
+exec 9>"$DATA/.lock"
+flock -w 60 9 || exit 0
+
+STATE="$HOME/.local/state/aayork-quickshell"
+umask 022
+
+# Colours.
+cp -f "$STATE/current/theme/colors.toml" "$DATA/colors.toml.new" && mv -f "$DATA/colors.toml.new" "$DATA/colors.toml"
+
+# Wallpaper. It is drawn blurred, so a smaller copy loads faster and looks the
+# same. A video background has no still to use; the theme colour shows instead.
+bg=$(readlink -f "$STATE/current/background")
+if [[ -f $bg ]] && [[ $(file -bL --mime-type "$bg") == image/* ]]; then
+  name="background-$(date +%s).jpg"
+  if magick "$bg[0]" -auto-orient -resize '2560x2560>' -quality 90 "$DATA/$name"; then
+    echo "$name" >"$DATA/background.name"
+    find "$DATA" -maxdepth 1 -name 'background-*.jpg' ! -name "$name" -delete
+  fi
+else
+  rm -f "$DATA/background.name"
+fi
+
+# Font: the family name, and its files when they live in your home.
+family=$(font-current)
+echo "$family" >"$DATA/font"
+mkdir -p "$DATA/data/fonts"
+rm -rf "$DATA/data/fonts/"*
+fc-list ":family=$family" file | cut -d: -f1 | while read -r f; do
+  case $f in "$HOME"/*) cp -f "$f" "$DATA/data/fonts/" ;; esac
+done
+
+# Cursor: theme and size from the line cursor-set writes, and the theme's
+# files when it is installed only in your home.
+cursor_theme=$(sed -n 's/.*XCURSOR_THEME", "\([^"]*\)".*/\1/p' "$STATE/cursor.lua" 2>/dev/null)
+cursor_size=$(sed -n 's/.*XCURSOR_SIZE", "\([^"]*\)".*/\1/p' "$STATE/cursor.lua" 2>/dev/null)
+printf '%s\n%s\n' "${cursor_theme:-Adwaita}" "${cursor_size:-24}" >"$DATA/cursor"
+mkdir -p "$DATA/data/icons"
+rm -rf "$DATA/data/icons/"*
+if [[ -n $cursor_theme && ! -d /usr/share/icons/$cursor_theme && -d $HOME/.local/share/icons/$cursor_theme ]]; then
+  cp -rL "$HOME/.local/share/icons/$cursor_theme" "$DATA/data/icons/"
+fi
+
+# Monitors: the hl.monitor blocks of the applied hyprmoncfg profile (or of
+# hyprland.lua), so the login screen gets the same mode and scale.
+monitors="$HOME/.config/hypr/hyprmoncfg-monitors.lua"
+[[ -f $monitors ]] || monitors="$HOME/.config/hypr/hyprland.lua"
+awk '/^hl\.monitor\(\{/ { on = 1 } on { print } on && /^\}\)/ { on = 0 }' "$monitors" >"$DATA/monitors.lua"
+
+chmod -R a+rX "$DATA"
+$quiet || echo "Login screen synced to $DATA"
+exit 0

@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Put the Quickshell login screen (greeter/) in place of tuigreet. Run with
+# sudo. It takes effect at the next logout or reboot; nothing is restarted.
+#
+#   sudo greeter-install            install, or update after editing greeter/
+#   sudo greeter-install --remove   go back to tuigreet
+#
+# What it does:
+#   /etc/greetd/aayork-greeter     a root-owned copy of greeter/ (your home is
+#                                  private, so greetd cannot run it from there)
+#   /var/lib/aayork-greeter        yours; bin/greeter-sync fills it with the
+#                                  theme, wallpaper, font, cursor and monitors
+#   /var/cache/aayork-greeter      the greeter user's scratch space and logs
+#   /etc/greetd/config.toml        points at the new start script; the old file
+#                                  is kept as config.toml.pre-aayork-greeter
+# If the login screen ever fails to start, start falls back to tuigreet.
+
+set -euo pipefail
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+APP=/etc/greetd/aayork-greeter
+DATA=/var/lib/aayork-greeter
+CACHE=/var/cache/aayork-greeter
+CONFIG=/etc/greetd/config.toml
+BACKUP=$CONFIG.pre-aayork-greeter
+
+if [[ $EUID -ne 0 || -z ${SUDO_USER:-} ]]; then
+  echo "Run this with sudo from your own account: sudo $0 ${*:-}" >&2
+  exit 1
+fi
+
+if [[ ${1:-} == --remove ]]; then
+  if [[ -f $BACKUP ]]; then
+    cp -f "$BACKUP" "$CONFIG"
+    echo "greetd is back on its previous greeter (from $BACKUP)."
+  else
+    echo "No $BACKUP to restore; $CONFIG left alone." >&2
+  fi
+  echo "$APP, $DATA and $CACHE were kept; delete them by hand if you like."
+  exit 0
+fi
+
+for cmd in quickshell Hyprland hyprctl tuigreet; do
+  command -v "$cmd" >/dev/null || { echo "Missing $cmd" >&2; exit 1; }
+done
+id greeter >/dev/null
+
+# The app: a fresh copy each time.
+rm -rf "$APP.new"
+cp -r "$SHELL_ROOT/greeter" "$APP.new"
+chown -R root:root "$APP.new"
+chmod -R u=rwX,go=rX "$APP.new"
+chmod 755 "$APP.new/start" "$APP.new/run-shell"
+rm -rf "$APP"
+mv "$APP.new" "$APP"
+
+install -d -m 755 -o "$SUDO_USER" -g "$(id -gn "$SUDO_USER")" "$DATA"
+install -d -m 700 -o greeter -g greeter "$CACHE"
+
+# greetd: run the new start script. Keep the first backup ever made.
+[[ -f $BACKUP ]] || cp -p "$CONFIG" "$BACKUP"
+cat >"$CONFIG" <<EOF
+[terminal]
+vt = 1
+
+[default_session]
+# The Quickshell login screen from aayork-quickshell (bin/greeter-install).
+# It falls back to tuigreet by itself; the previous config is in
+# $BACKUP.
+command = "$APP/start"
+user = "greeter"
+EOF
+
+sudo -u "$SUDO_USER" -H "$SHELL_ROOT/bin/greeter-sync"
+
+echo "Installed. The new login screen shows at your next logout or reboot."

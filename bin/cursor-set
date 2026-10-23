@@ -330,4 +330,8 @@ if display:
 EOF
 fi
 
+
+# Keep the login screen in step (no-op until bin/greeter-install has run).
+"$(dirname "$(readlink -f "$0")")/greeter-sync" --quiet >/dev/null 2>&1 &
+
 exit 0

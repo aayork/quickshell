@@ -1,0 +1,30 @@
+#!/bin/sh
+# Run by greetd as the greeter user (see /etc/greetd/config.toml). Starts a
+# bare Hyprland whose only client is the Quickshell login screen. If the login
+# screen cannot start, falls back to tuigreet so logging in still works.
+
+DIR="$(dirname "$(readlink -f "$0")")"
+CACHE="${AAYORK_GREETER_CACHE:-/var/cache/aayork-greeter}"
+export AAYORK_GREETER_CACHE="$CACHE"
+
+# The greeter user's home is /, which nothing can write to.
+export HOME="$CACHE"
+export XDG_CACHE_HOME="$CACHE/cache"
+export XDG_CONFIG_HOME="$CACHE/config"
+export XDG_STATE_HOME="$CACHE/state"
+export XDG_DATA_HOME=/var/lib/aayork-greeter/data   # fonts copied by bin/greeter-sync
+export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
+export AAYORK_GREETER_DIR="$DIR"
+export AAYORK_GREETER_DATA=/var/lib/aayork-greeter
+mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME"
+rm -f "$CACHE/ok"
+
+Hyprland -c "$DIR/hyprland.lua" >"$CACHE/hyprland.log" 2>&1 &
+echo $! >"$CACHE/hyprland.pid"   # run-shell stops this one, and only this one
+wait $!
+
+# Anything but a clean handover (Hyprland or the login screen falling over).
+if [ ! -e "$CACHE/ok" ]; then
+  exec tuigreet --time --remember --remember-session --asterisks \
+    --sessions /usr/share/wayland-sessions --session-wrapper /usr/local/bin/greetd-session-wrapper
+fi

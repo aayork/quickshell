@@ -24,3 +24,6 @@ ln -nsf "$BACKGROUND" "$CURRENT_BACKGROUND_LINK"
 
 # The shell checks this link every few seconds; asking it saves the wait.
 qs -p "$SHELL_ROOT" ipc call wallpaper refresh >/dev/null 2>&1 || true
+
+# Keep the login screen in step (no-op until bin/greeter-install has run).
+"$(dirname "$(readlink -f "$0")")/greeter-sync" --quiet >/dev/null 2>&1 &

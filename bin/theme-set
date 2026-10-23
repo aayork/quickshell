@@ -153,3 +153,6 @@ run_parallel \
   theme-set-obsidian \
   theme-set-termusic \
   theme-set-rmpc
+
+# Keep the login screen in step (no-op until bin/greeter-install has run).
+"$(dirname "$(readlink -f "$0")")/greeter-sync" --quiet >/dev/null 2>&1 &
