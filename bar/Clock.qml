@@ -613,14 +613,14 @@ BarButton {
         id: list
         visible: Notifs.history.length > 0
         Layout.fillWidth: true
-        implicitHeight: Math.min(entries.implicitHeight, 220)
+        implicitHeight: Math.min(entries.implicitHeight, 170)
         contentHeight: entries.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
         ColumnLayout {
           id: entries
-          width: list.width
+          width: list.width - (notifScroll.needed ? notifScroll.width + 4 : 0)
           spacing: 2
 
           Repeater {
@@ -671,6 +671,15 @@ BarButton {
               }
             }
           }
+        }
+
+        Scrollbar {
+          id: notifScroll
+          flickable: list
+          parent: list
+          anchors.right: parent.right
+          height: list.height
+          z: 2
         }
       }
     }
