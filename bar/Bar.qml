@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
-// Qualified: the Bose, Tailscale and Things widgets here share names with services.
+// Qualified: the Bose, Mouse, Tailscale and Things widgets here share names with services.
 import qs.services as Services
 import qs.theme
 import qs.ui
@@ -71,7 +71,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "mouse": controlCenter.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "mouse": mouse.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -138,6 +138,7 @@ Scope {
 
           Tray { id: tray; foreground: bar.foregroundOver(row.x + tray.x, tray.width) }
           Bose { id: bose; foreground: bar.foregroundOver(row.x + bose.x, bose.width) }
+          Mouse { id: mouse; foreground: bar.foregroundOver(row.x + mouse.x, mouse.width) }
           Things { id: things; foreground: bar.foregroundOver(row.x + things.x, things.width) }
           Tailscale { id: tailscale; foreground: bar.foregroundOver(row.x + tailscale.x, tailscale.width) }
           Network { id: network; foreground: bar.foregroundOver(row.x + network.x, network.width) }
