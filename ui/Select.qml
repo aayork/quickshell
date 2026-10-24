@@ -84,9 +84,12 @@ ColumnLayout {
         Option {
           required property var modelData
           label: modelData.label
+          // Report the pick before folding up: folding empties the model and
+          // destroys this row, and nothing after that would run.
           onClicked: {
+            var value = modelData.value
+            root.picked(value)
             root.expanded = false
-            root.picked(modelData.value)
           }
         }
       }
