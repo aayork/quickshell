@@ -6,9 +6,10 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import qs.theme
 
-// Every MPRIS player, and the one the shell talks about: the one picked by
-// hand or, failing that, the last one to start playing. With
-// Config.media.exclusive set, a player that starts playing pauses the rest.
+// Every MPRIS player, and the one the shell talks about: one picked by hand,
+// else the most recent to start among those playing now, else the one that
+// played last. The media keys (IPC target "media") act on that same player.
+// With Config.media.exclusive set, a player that starts playing pauses the rest.
 Singleton {
   id: root
 
@@ -66,13 +67,21 @@ Singleton {
       }
     }
   }
-  // dbusName of the player picked by hand or the last one to start playing.
-  property string current: ""
+  // dbusName of a player picked by hand; cleared when any player starts playing.
+  property string picked: ""
+  // dbusNames of players in the order they last started playing, newest first.
+  property var recent: []
   // Players with a track loaded, paused or not; the ones the switcher offers.
   readonly property var loaded: players.filter(p => (p.trackTitle || "") !== "")
-  readonly property MprisPlayer player: players.find(p => p.dbusName === current)
-    ?? players.find(p => p.isPlaying) ?? loaded[0] ?? players[0] ?? null
   readonly property var playingPlayers: players.filter(p => p.isPlaying)
+  readonly property MprisPlayer player: players.find(p => p.dbusName === picked)
+    ?? newest(playingPlayers) ?? newest(players.filter(p => recent.includes(p.dbusName)))
+    ?? loaded[0] ?? players[0] ?? null
+
+  function newest(list) {
+    var rank = p => { var i = recent.indexOf(p.dbusName); return i < 0 ? recent.length : i }
+    return list.slice().sort((a, b) => rank(a) - rank(b))[0] ?? null
+  }
 
   readonly property bool hasMedia: player !== null && (player.trackTitle || "") !== ""
   readonly property string title: player ? (player.trackTitle || player.identity || "") : ""
@@ -99,7 +108,8 @@ Singleton {
 
       function onIsPlayingChanged() {
         if (!modelData.isPlaying || modelData.dbusName.includes("playerctld")) return
-        root.current = modelData.dbusName
+        root.recent = [modelData.dbusName].concat(root.recent.filter(n => n !== modelData.dbusName))
+        root.picked = ""
         if (Config.media.exclusive) root.pauseOthers(modelData)
       }
     }
@@ -119,7 +129,7 @@ Singleton {
   }
 
   function select(p) {
-    if (p) current = p.dbusName
+    if (p) picked = p.dbusName
   }
 
   // Pause every player but `keep` (the shown one by default).
@@ -139,6 +149,14 @@ Singleton {
 
   function next() {
     if (player && player.canGoNext) player.next()
+  }
+
+  IpcHandler {
+    target: "media"
+    function toggle(): void { root.toggle() }
+    function next(): void { root.next() }
+    function previous(): void { root.previous() }
+    function current(): string { return root.player ? root.name(root.player) : "" }
   }
 
   // MPRIS does not push position updates; whoever shows progress calls this.
