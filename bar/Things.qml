@@ -20,6 +20,25 @@ BarButton {
 
   readonly property var rows: Things.lists[view] || []
 
+  // Each list's icon and colour, like the Things sidebar, from the theme.
+  readonly property var looks: ({
+    inbox: { glyph: 0xF0687, color: Theme.pick("blue", Theme.accent) },
+    today: { glyph: 0xF04CE, color: Theme.yellow },
+    upcoming: { glyph: 0xF00ED, color: Theme.red },
+    anytime: { glyph: 0xF0328, color: Theme.pick("cyan", Theme.accent) },
+    someday: { glyph: 0xF003C, color: Theme.pick("dark_foreground", Theme.dim) }
+  })
+  readonly property var look: looks[view]
+  readonly property string viewLabel: Things.views.find(v => v.id === view).label
+
+  // What a row is grouped under: the day in Upcoming, the project or area in
+  // Anytime and Someday, nothing in Today and Inbox, as Things does it.
+  function groupOf(todo) {
+    if (view === "upcoming") return todo.date
+    if (view === "anytime" || view === "someday") return todo.context
+    return ""
+  }
+
   function dayLabel(key) {
     if (key === "") return ""
     if (key === Things.dateKey(0)) return "Today"
@@ -32,23 +51,57 @@ BarButton {
   active: popup.open
   onClicked: popup.toggle()
 
-  // One to-do. The circle completes it; a click on the rest opens its details.
+  // One to-do. The box completes it; a click on the rest opens its details.
+  // The first of a group carries the group's heading above it.
   component Todo: ColumnLayout {
     id: todo
     required property var modelData
+    required property int index
 
     readonly property bool open: root.expanded === modelData.uuid
     readonly property var items: Things.loaded ? Things.checklist(modelData.uuid) : []
     readonly property int done: items.filter(i => i.done).length
+    readonly property string group: root.groupOf(modelData)
+    readonly property bool startsGroup: group !== "" && (index === 0 || root.groupOf(root.rows[index - 1]) !== group)
+    // Today and Inbox show where a to-do lives under its title.
+    readonly property string where: root.view === "today" || root.view === "inbox" ? modelData.context : ""
 
     Layout.fillWidth: true
     spacing: 0
     opacity: modelData.pending ? 0.5 : 1
 
+    // Group heading: a day as a big number and its name, or a project.
+    ColumnLayout {
+      visible: todo.startsGroup
+      Layout.fillWidth: true
+      Layout.topMargin: todo.index === 0 ? 2 : 14
+      Layout.bottomMargin: 4
+      spacing: 3
+
+      RowLayout {
+        Layout.leftMargin: 4
+        spacing: 8
+        Label {
+          visible: root.view === "upcoming"
+          text: todo.group !== "" ? String(Number(todo.group.slice(8, 10))) : ""
+          font.pixelSize: Theme.fontLarge + 4
+          font.bold: true
+          elide: Text.ElideNone
+        }
+        Label {
+          text: root.view === "upcoming" ? root.dayLabel(todo.group) : todo.group
+          color: root.view === "upcoming" ? Theme.dim : Theme.foreground
+          font.bold: root.view !== "upcoming"
+          Layout.alignment: Qt.AlignBaseline
+        }
+      }
+      Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.separator }
+    }
+
     Rectangle {
       Layout.fillWidth: true
-      implicitHeight: Theme.rowHeight
-      radius: Theme.controlRadius
+      implicitHeight: todo.where !== "" ? Theme.rowHeight + 12 : Theme.rowHeight
+      radius: Theme.controlRadius + 2
       color: todo.open ? Theme.selection : hover.hovered ? Theme.hover : "transparent"
 
       HoverHandler { id: hover }
@@ -63,28 +116,60 @@ BarButton {
 
       RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 4
-        anchors.rightMargin: 6
-        spacing: 6
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        spacing: 10
 
-        Label {
-          text: Icons.glyph(tick.containsMouse ? 0xF0134 : 0xF0130)
-          color: tick.containsMouse ? Theme.accent : Theme.dim
-          font.pixelSize: Theme.iconLarge
-          elide: Text.ElideNone
+        // The checkbox: a small rounded square, as in Things.
+        Rectangle {
+          implicitWidth: 14
+          implicitHeight: 14
+          Layout.alignment: todo.where !== "" ? Qt.AlignTop : Qt.AlignVCenter
+          Layout.topMargin: todo.where !== "" ? 7 : 0
+          radius: 3
+          color: tick.containsMouse ? Theme.alpha(Theme.accent, 0.15) : "transparent"
+          border.width: 1.5
+          border.color: tick.containsMouse ? Theme.accent : Theme.dim
+
+          Label {
+            anchors.centerIn: parent
+            visible: tick.containsMouse
+            text: Icons.glyph(0xF012C)
+            color: Theme.accent
+            font.pixelSize: 11
+            elide: Text.ElideNone
+          }
 
           MouseArea {
             id: tick
             anchors.fill: parent
-            anchors.margins: -4
+            anchors.margins: -5
             hoverEnabled: true
             onClicked: Things.complete(todo.modelData)
           }
         }
 
-        Label { text: todo.modelData.title; Layout.fillWidth: true }
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 1
+          Label { text: todo.modelData.title; Layout.fillWidth: true }
+          Label {
+            visible: todo.where !== ""
+            text: todo.where
+            color: Theme.dim
+            font.pixelSize: Theme.fontSmall
+            Layout.fillWidth: true
+          }
+        }
 
-        // Checklist progress, when it has one.
+        // Note and checklist markers, as small dim glyphs.
+        Label {
+          visible: todo.modelData.note !== ""
+          text: Icons.glyph(0xF09ED)
+          color: Theme.muted
+          font.pixelSize: Theme.fontSmall
+          elide: Text.ElideNone
+        }
         Label {
           visible: todo.items.length > 0
           text: Icons.glyph(0xF0E1E) + " " + todo.done + "/" + todo.items.length
@@ -93,20 +178,13 @@ BarButton {
           elide: Text.ElideNone
         }
 
+        // Deadline with a flag; red once it is due.
         Label {
           visible: todo.modelData.deadline !== ""
-          text: "Due " + root.dayLabel(todo.modelData.deadline)
-          color: todo.modelData.deadline <= Things.dateKey(0) ? Theme.red : Theme.yellow
+          text: Icons.glyph(0xF023B) + " " + root.dayLabel(todo.modelData.deadline)
+          color: todo.modelData.deadline <= Things.dateKey(0) ? Theme.red : Theme.dim
           font.pixelSize: Theme.fontSmall
           elide: Text.ElideNone
-        }
-
-        Label {
-          visible: text !== ""
-          text: root.view === "upcoming" ? root.dayLabel(todo.modelData.date) : todo.modelData.context
-          color: Theme.dim
-          font.pixelSize: Theme.fontSmall
-          Layout.maximumWidth: 110
         }
       }
     }
@@ -115,10 +193,10 @@ BarButton {
     ColumnLayout {
       visible: todo.open
       Layout.fillWidth: true
-      Layout.leftMargin: 30
-      Layout.rightMargin: 6
+      Layout.leftMargin: 32
+      Layout.rightMargin: 8
       Layout.topMargin: 4
-      Layout.bottomMargin: 8
+      Layout.bottomMargin: 10
       spacing: 6
 
       Label {
@@ -137,18 +215,21 @@ BarButton {
         RowLayout {
           required property var modelData
           Layout.fillWidth: true
-          spacing: 6
+          spacing: 8
 
-          Label {
-            text: Icons.glyph(modelData.done ? 0xF0134 : 0xF0130)
-            color: modelData.done ? Theme.accent : Theme.muted
-            font.pixelSize: Theme.iconSize
-            elide: Text.ElideNone
+          Rectangle {
+            implicitWidth: 10
+            implicitHeight: 10
+            radius: 5
+            color: modelData.done ? Theme.alpha(Theme.dim, 0.5) : "transparent"
+            border.width: 1
+            border.color: Theme.dim
           }
           Label {
             text: modelData.title
             color: modelData.done ? Theme.dim : Theme.foreground
             font.strikeout: modelData.done
+            font.pixelSize: Theme.fontSmall
             Layout.fillWidth: true
           }
         }
@@ -166,20 +247,14 @@ BarButton {
         spacing: 6
 
         Repeater {
-          model: [
-            { id: "today", label: "Today", glyph: 0xF04CE },
-            { id: "tomorrow", label: "Tomorrow", glyph: 0xF00F6 },
-            { id: "anytime", label: "Anytime", glyph: 0xF0328 },
-            { id: "someday", label: "Someday", glyph: 0xF003C },
-            { id: "inbox", label: "Inbox", glyph: 0xF0687 }
-          ].filter(o => o.id !== root.view)
+          model: ["today", "tomorrow", "anytime", "someday", "inbox"].filter(id => id !== root.view)
 
           TextButton {
-            required property var modelData
-            text: modelData.label
-            icon: Icons.glyph(modelData.glyph)
+            required property string modelData
+            text: modelData === "tomorrow" ? "Tomorrow" : Things.views.find(v => v.id === modelData).label
+            icon: Icons.glyph(modelData === "tomorrow" ? root.looks.upcoming.glyph : root.looks[modelData].glyph)
             onClicked: {
-              Things.move(todo.modelData, modelData.id)
+              Things.move(todo.modelData, modelData)
               root.expanded = ""
             }
           }
@@ -213,7 +288,7 @@ BarButton {
       Things.watching = open
       root.expanded = ""
       root.trashing = ""
-      if (open && Things.ready) entry.focusInput()
+      if (open && Things.ready) entry.forceActiveFocus()
     }
 
     ColumnLayout {
@@ -221,30 +296,10 @@ BarButton {
       width: parent.width
       spacing: Theme.spacing
 
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Theme.spacing
-
-        Label { text: "Things"; font.bold: true }
-        Label {
-          text: !Things.ready ? "" : Things.busy ? "Syncing…" : Things.loaded ? Things.todayCount + " left today" : ""
-          color: Theme.dim
-          Layout.fillWidth: true
-        }
-        Label {
-          visible: Things.ready
-          text: Icons.glyph(0xF0450)
-          color: refreshMouse.containsMouse ? Theme.foreground : Theme.dim
-          font.pixelSize: Theme.iconSize
-          elide: Text.ElideNone
-          MouseArea {
-            id: refreshMouse
-            anchors.fill: parent
-            anchors.margins: -4
-            hoverEnabled: true
-            onClicked: Things.refresh()
-          }
-        }
+      Label {
+        visible: !Things.ready
+        text: "Things"
+        font.bold: true
       }
 
       // ---- not set up yet
@@ -301,11 +356,11 @@ BarButton {
       }
 
       // ---- ready
-      // The lists, each with how many open to-dos it holds.
+      // The lists as a row of icons, like Things' sidebar folded sideways.
       RowLayout {
         visible: Things.ready
         Layout.fillWidth: true
-        spacing: 4
+        spacing: 2
 
         Repeater {
           model: Things.views
@@ -316,25 +371,30 @@ BarButton {
 
             readonly property bool current: root.view === modelData.id
             readonly property int count: (Things.lists[modelData.id] || []).length
+            readonly property var look: root.looks[modelData.id]
 
             Layout.fillWidth: true
-            implicitHeight: 38
-            radius: Theme.controlRadius
-            color: current ? Theme.accent : tabMouse.containsMouse ? Theme.hover : Theme.alpha(Theme.foreground, 0.04)
+            implicitHeight: 30
+            radius: Theme.controlRadius + 2
+            color: current ? Theme.selection : tabMouse.containsMouse ? Theme.hover : "transparent"
 
-            Column {
+            Row {
               anchors.centerIn: parent
+              spacing: 5
               Label {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: tab.count
-                color: tab.current ? Theme.background : Theme.foreground
-                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+                text: Icons.glyph(tab.look.glyph)
+                color: tab.look.color
+                font.pixelSize: Theme.iconSize + 1
+                elide: Text.ElideNone
               }
               Label {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: tab.modelData.label
-                color: tab.current ? Theme.background : Theme.dim
-                font.pixelSize: Theme.fontSmall - 1
+                anchors.verticalCenter: parent.verticalCenter
+                visible: tab.count > 0
+                text: tab.count
+                color: tab.current ? Theme.foreground : Theme.dim
+                font.pixelSize: Theme.fontSmall
+                elide: Text.ElideNone
               }
             }
 
@@ -345,30 +405,62 @@ BarButton {
               onClicked: {
                 root.view = tab.modelData.id
                 root.expanded = ""
-                entry.focusInput()
+                entry.forceActiveFocus()
               }
             }
           }
         }
+
+        // Sync, at the end of the row.
+        Label {
+          text: Icons.glyph(0xF0450)
+          color: Things.busy ? Theme.accent : refreshMouse.containsMouse ? Theme.foreground : Theme.muted
+          font.pixelSize: Theme.iconSize
+          elide: Text.ElideNone
+          Layout.leftMargin: 6
+          MouseArea {
+            id: refreshMouse
+            anchors.fill: parent
+            anchors.margins: -4
+            hoverEnabled: true
+            onClicked: Things.refresh()
+          }
+        }
       }
 
-      Field {
-        id: entry
+      // The list's name, big, with its coloured icon.
+      RowLayout {
         visible: Things.ready
         Layout.fillWidth: true
-        placeholder: root.view === "upcoming" ? "New to-do for tomorrow"
-          : "New to-do in " + Things.views.find(v => v.id === root.view).label
-        onAccepted: {
-          Things.add(text, root.view)
-          text = ""
+        Layout.topMargin: 6
+        Layout.leftMargin: 4
+        spacing: 8
+
+        Label {
+          text: Icons.glyph(root.look.glyph)
+          color: root.look.color
+          font.pixelSize: Theme.iconLarge + 4
+          elide: Text.ElideNone
         }
-        onCancelled: popup.close()
+        Label {
+          text: root.viewLabel
+          font.pixelSize: Theme.fontLarge + 6
+          font.bold: true
+          Layout.fillWidth: true
+        }
+        Label {
+          text: Things.busy ? "Syncing…" : ""
+          color: Theme.dim
+          font.pixelSize: Theme.fontSmall
+          elide: Text.ElideNone
+        }
       }
 
       Label {
         visible: Things.ready && root.rows.length === 0
         text: !Things.loaded ? "Loading…" : root.view === "today" ? "Nothing left for today" : "Nothing here"
         color: Theme.dim
+        Layout.leftMargin: 8
       }
 
       Flickable {
@@ -400,6 +492,50 @@ BarButton {
           z: 2
         }
       }
+
+      // New to-do, at the end of the list as in Things.
+      RowLayout {
+        visible: Things.ready
+        Layout.fillWidth: true
+        Layout.leftMargin: 8
+        Layout.rightMargin: 8
+        implicitHeight: Theme.rowHeight
+        spacing: 10
+
+        Label {
+          text: Icons.glyph(0xF0415)
+          color: root.look.color
+          font.pixelSize: Theme.iconSize
+          elide: Text.ElideNone
+          Layout.preferredWidth: 14
+          horizontalAlignment: Text.AlignHCenter
+        }
+
+        TextInput {
+          id: entry
+          Layout.fillWidth: true
+          color: Theme.foreground
+          selectionColor: Theme.selection
+          selectedTextColor: Theme.brightForeground
+          font.family: Theme.fontFamily
+          font.pixelSize: Theme.fontSize
+          clip: true
+          onAccepted: {
+            Things.add(text, root.view)
+            text = ""
+          }
+          Keys.onEscapePressed: popup.close()
+
+          Label {
+            anchors.fill: parent
+            visible: entry.text === ""
+            text: root.view === "upcoming" ? "New To-Do for tomorrow" : "New To-Do"
+            color: Theme.dim
+          }
+        }
+      }
+
+      Separator { visible: Things.ready; Layout.fillWidth: true }
 
       Label {
         visible: Things.ready
