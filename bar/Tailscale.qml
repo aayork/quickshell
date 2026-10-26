@@ -50,6 +50,8 @@ BarButton {
     off: !Tailscale.active
   }
 
+  // One machine: its kind in a tile with an online dot, name over address,
+  // and copy / send buttons while the pointer is on it.
   component Machine: Rectangle {
     id: machine
     property string name: ""
@@ -59,93 +61,126 @@ BarButton {
     // Who owns it, for a machine shared in from someone else's tailnet.
     property string owner: ""
     property string note: ""
+    property bool self: false
     // The peer, when files can be sent to it.
     property var sendTo: null
 
+    readonly property bool hovered: mouse.containsMouse || copyMouse.containsMouse || sendMouse.containsMouse
+
     Layout.fillWidth: true
-    implicitHeight: owner !== "" ? Theme.rowHeight + 10 : Theme.rowHeight
-    radius: Theme.controlRadius
-    color: mouse.containsMouse ? Theme.hover : "transparent"
-
-    RowLayout {
-      anchors.fill: parent
-      anchors.leftMargin: 6
-      anchors.rightMargin: 6
-      spacing: Theme.spacing
-
-      Rectangle {
-        implicitWidth: 6
-        implicitHeight: 6
-        radius: 3
-        color: machine.online ? Theme.green : "transparent"
-        border.width: machine.online ? 0 : 1
-        border.color: Theme.dim
-      }
-
-      Label {
-        text: root.osGlyph(machine.os)
-        color: machine.online ? Theme.foreground : Theme.dim
-        font.pixelSize: Theme.iconSize
-        horizontalAlignment: Text.AlignHCenter
-        Layout.preferredWidth: 16
-        elide: Text.ElideNone
-      }
-
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 0
-
-        Label {
-          text: machine.name
-          color: machine.online ? Theme.foreground : Theme.dim
-          Layout.fillWidth: true
-        }
-        Label {
-          visible: machine.owner !== ""
-          text: machine.owner
-          color: Theme.dim
-          font.pixelSize: Theme.fontSmall
-          Layout.fillWidth: true
-        }
-      }
-
-      Label {
-        visible: machine.note !== ""
-        text: machine.note
-        color: Theme.accent
-        font.pixelSize: Theme.fontSmall
-        elide: Text.ElideNone
-      }
-
-      Label {
-        text: root.copied === machine.ip && machine.ip !== "" ? "Copied" : machine.ip
-        color: Theme.dim
-        font.pixelSize: Theme.fontSmall
-        elide: Text.ElideNone
-      }
-
-      // Taildrop, offered on hover to machines that can take a file.
-      Label {
-        id: sendLabel
-        visible: machine.sendTo !== null && mouse.containsMouse
-        text: "Send file"
-        color: Theme.accent
-        font.pixelSize: Theme.fontSmall
-        elide: Text.ElideNone
-      }
-    }
+    implicitHeight: 42
+    radius: Theme.controlRadius + 3
+    color: machine.self ? Theme.alpha(Theme.accent, hovered ? 0.16 : 0.1) : hovered ? Theme.hover : "transparent"
 
     MouseArea {
       id: mouse
       anchors.fill: parent
       hoverEnabled: true
-      onClicked: function(event) {
-        // The right end of the row is the send button while it shows.
-        if (sendLabel.visible && event.x >= sendLabel.mapToItem(machine, 0, 0).x - 6) {
-          popup.close()
-          Tailscale.sendFile(machine.sendTo)
-        } else {
-          root.copy(machine.ip)
+      onClicked: root.copy(machine.ip)
+    }
+
+    RowLayout {
+      anchors.fill: parent
+      anchors.leftMargin: 6
+      anchors.rightMargin: 8
+      spacing: 10
+
+      // Kind of machine, with the online dot on the tile's corner.
+      Rectangle {
+        implicitWidth: 30
+        implicitHeight: 30
+        radius: Theme.controlRadius + 4
+        color: machine.self ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.foreground, machine.online ? 0.08 : 0.04)
+
+        Label {
+          anchors.centerIn: parent
+          text: root.osGlyph(machine.os)
+          color: machine.self ? Theme.accent : machine.online ? Theme.foreground : Theme.muted
+          font.pixelSize: Theme.iconSize + 1
+          elide: Text.ElideNone
+        }
+
+        Rectangle {
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.margins: -2
+          width: 10
+          height: 10
+          radius: 5
+          color: machine.online ? Theme.green : Theme.muted
+          border.width: 2
+          border.color: Theme.background
+        }
+      }
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 1
+
+        Label {
+          text: machine.name
+          color: machine.online ? Theme.foreground : Theme.dim
+          font.bold: machine.self
+          Layout.fillWidth: true
+        }
+        Label {
+          readonly property bool justCopied: root.copied === machine.ip && machine.ip !== ""
+          text: justCopied ? "Copied " + machine.ip
+            : [machine.owner, machine.ip, machine.online || machine.self ? "" : "offline"].filter(t => t !== "").join(" · ")
+          color: justCopied ? Theme.accent : Theme.dim
+          font.pixelSize: Theme.fontSmall
+          Layout.fillWidth: true
+        }
+      }
+
+      // A tag such as "This device" or "Exit node".
+      Rectangle {
+        visible: machine.note !== "" && !machine.hovered
+        implicitWidth: noteLabel.implicitWidth + 12
+        implicitHeight: 18
+        radius: 9
+        color: Theme.alpha(Theme.accent, 0.15)
+
+        Label {
+          id: noteLabel
+          anchors.centerIn: parent
+          text: machine.note
+          color: Theme.accent
+          font.pixelSize: Theme.fontSmall - 1
+          elide: Text.ElideNone
+        }
+      }
+
+      // Copy the address; send a file over Taildrop when it can take one.
+      Label {
+        visible: machine.hovered && machine.ip !== ""
+        text: Icons.glyph(0xF018F)
+        color: copyMouse.containsMouse ? Theme.foreground : Theme.dim
+        font.pixelSize: Theme.iconSize
+        elide: Text.ElideNone
+        MouseArea {
+          id: copyMouse
+          anchors.fill: parent
+          anchors.margins: -5
+          hoverEnabled: true
+          onClicked: root.copy(machine.ip)
+        }
+      }
+      Label {
+        visible: machine.hovered && machine.sendTo !== null
+        text: Icons.glyph(0xF048A)
+        color: sendMouse.containsMouse ? Theme.accent : Theme.dim
+        font.pixelSize: Theme.iconSize
+        elide: Text.ElideNone
+        MouseArea {
+          id: sendMouse
+          anchors.fill: parent
+          anchors.margins: -5
+          hoverEnabled: true
+          onClicked: {
+            popup.close()
+            Tailscale.sendFile(machine.sendTo)
+          }
         }
       }
     }
@@ -154,7 +189,7 @@ BarButton {
   Popup {
     id: popup
     anchorItem: root
-    contentWidth: 340
+    contentWidth: 360
     contentHeight: column.implicitHeight
 
     onOpenChanged: Tailscale.watching = open
@@ -164,12 +199,46 @@ BarButton {
       width: parent.width
       spacing: Theme.spacing
 
+      // Logo, name and state, and the switch.
       RowLayout {
         Layout.fillWidth: true
-        spacing: Theme.spacing
+        spacing: 10
 
-        Label { text: "Tailscale"; font.bold: true }
-        Label { text: Tailscale.status; color: Theme.dim; Layout.fillWidth: true }
+        Rectangle {
+          implicitWidth: 34
+          implicitHeight: 34
+          radius: Theme.controlRadius + 5
+          color: Tailscale.active ? Theme.alpha(Theme.accent, 0.18) : Theme.alpha(Theme.foreground, 0.06)
+
+          TailscaleIcon {
+            anchors.centerIn: parent
+            size: 16
+            color: Tailscale.active ? Theme.accent : Theme.dim
+            off: !Tailscale.active
+          }
+        }
+
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 1
+
+          Label { text: "Tailscale"; font.bold: true; font.pixelSize: Theme.fontLarge; Layout.fillWidth: true }
+          RowLayout {
+            spacing: 5
+            Rectangle {
+              implicitWidth: 6
+              implicitHeight: 6
+              radius: 3
+              color: Tailscale.running ? Theme.green : Tailscale.needsLogin ? Theme.yellow : Theme.muted
+            }
+            Label {
+              text: Tailscale.busy ? "Working…" : Tailscale.running ? "Connected" + (Tailscale.tailnet !== "" ? " · " + Tailscale.tailnet : "") : Tailscale.status
+              color: Theme.dim
+              font.pixelSize: Theme.fontSmall
+            }
+          }
+        }
+
         Toggle {
           checked: Tailscale.active
           enabled: !Tailscale.busy
@@ -219,7 +288,7 @@ BarButton {
         id: list
         visible: Tailscale.running
         Layout.fillWidth: true
-        implicitHeight: Math.min(machines.implicitHeight, Theme.rowHeight * 12)
+        implicitHeight: Math.min(machines.implicitHeight, 42 * 9)
         contentHeight: machines.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -227,15 +296,29 @@ BarButton {
         ColumnLayout {
           id: machines
           width: list.width
-          spacing: 0
+          spacing: 2
 
-          SectionHeader { text: "MY DEVICES"; Layout.leftMargin: 6; Layout.topMargin: 2; Layout.bottomMargin: 2 }
+          RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 6
+            Layout.rightMargin: 8
+            Layout.topMargin: 2
+            Layout.bottomMargin: 4
+            SectionHeader { text: "MY DEVICES"; Layout.fillWidth: true }
+            Label {
+              text: (Tailscale.ownPeers.filter(p => p.online).length + 1) + " of " + (Tailscale.ownPeers.length + 1) + " online"
+              color: Theme.muted
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
+          }
 
           Machine {
             name: Tailscale.selfName
             ip: Tailscale.selfIp
             os: Tailscale.selfOs
             note: "This device"
+            self: true
           }
 
           Repeater {
@@ -258,8 +341,8 @@ BarButton {
             visible: Tailscale.sharedPeers.length > 0
             text: "SHARED WITH ME · OTHER TAILNETS"
             Layout.leftMargin: 6
-            Layout.topMargin: 10
-            Layout.bottomMargin: 2
+            Layout.topMargin: 12
+            Layout.bottomMargin: 4
           }
 
           Repeater {
