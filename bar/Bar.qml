@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
-// Qualified: the Bose, Mouse, Tailscale and Things widgets here share names with services.
+// Qualified: the Bose, Tailscale and Things widgets here share names with services.
 import qs.services as Services
 import qs.theme
 import qs.ui
@@ -41,13 +41,13 @@ Scope {
       // See-through over the wallpaper, solid when it peeks over a window.
       readonly property color foreground: fullscreen ? Theme.foreground : Theme.barForeground
 
-      // Text for a widget from the wallpaper right behind it, widened a
-      // little since the glass blur spreads colour from either side.
+      // One text colour for the whole bar, from the wallpaper behind all of
+      // it, so both sides always match. x and w are kept for the callers.
+      readonly property color wholeBarForeground: Theme.barForegroundOver(0, 1,
+        Services.Config.bar.glass ? Services.Config.bar.tint : 0)
       function foregroundOver(x, w) {
         if (fullscreen || width <= 0) return foreground
-        var spread = Services.Config.bar.glass ? 32 : 0
-        return Theme.barForegroundOver((x - spread) / width, (x + w + spread) / width,
-          Services.Config.bar.glass ? Services.Config.bar.tint : 0)
+        return wholeBarForeground
       }
 
       screen: modelData
@@ -71,7 +71,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "mouse": mouse.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -138,7 +138,6 @@ Scope {
 
           Tray { id: tray; foreground: bar.foregroundOver(row.x + tray.x, tray.width) }
           Bose { id: bose; foreground: bar.foregroundOver(row.x + bose.x, bose.width) }
-          Mouse { id: mouse; foreground: bar.foregroundOver(row.x + mouse.x, mouse.width) }
           Things { id: things; foreground: bar.foregroundOver(row.x + things.x, things.width) }
           Tailscale { id: tailscale; foreground: bar.foregroundOver(row.x + tailscale.x, tailscale.width) }
           Network { id: network; foreground: bar.foregroundOver(row.x + network.x, network.width) }

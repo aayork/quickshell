@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.services
 import qs.theme
 
-// The control center's MOUSE section: the Razer mouse's battery, DPI stages,
+// The launcher's `mouse:` panel: the Razer mouse's battery, DPI stages,
 // polling rate and Hyprland's pointer acceleration and speed.
 ColumnLayout {
   id: root

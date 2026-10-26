@@ -50,7 +50,10 @@ Scope {
     { id: "clipboard", title: "Clipboard History", subtitle: "What you copied", keyword: "ch",
       aliases: ["clipboard", "clip", "paste", "copied", "history"], glyph: Icons.glyph(0xF014D), minChars: 0, debounceMs: 0, maxRows: 100, provider: clipboard },
     { id: "shots", title: "Capture History", subtitle: "Screenshots you took", keyword: "shots",
-      aliases: ["screenshots", "screenshot", "captures", "capture"], glyph: Icons.glyph(0xF02E9), minChars: 0, debounceMs: 0, maxRows: 100, provider: shots }
+      aliases: ["screenshots", "screenshot", "captures", "capture"], glyph: Icons.glyph(0xF02E9), minChars: 0, debounceMs: 0, maxRows: 100, provider: shots },
+    // Shows the mouse settings panel in place of a list.
+    { id: "mouse", title: "Mouse", subtitle: "Razer DPI, polling and speed", keyword: "mouse",
+      aliases: ["razer", "dpi", "pointer", "sensitivity", "acceleration"], glyph: Icons.glyph(0xF037D), minChars: 0, debounceMs: 0, maxRows: 1, panel: "mouse" }
   ]
   readonly property var scopes: builtins.concat(extensions)
 
@@ -246,6 +249,10 @@ Scope {
   function scopedRows() {
     var extension = scoped.extension
     if (extension.provider) return extension.provider.rows(scoped.text)
+    if (extension.panel === "mouse") {
+      if (Mouse.connected) return []
+      return [hintRow(Mouse.present ? "The mouse is asleep. Move it to wake it" : "No Razer mouse found", extension)]
+    }
     if (scoped.text.trim().length < extension.minChars) return [hintRow("Keep typing to search " + extension.title, extension)]
     if (extensionRows.length === 0) return [hintRow(extensionBusy ? "Searching…" : "Nothing found", extension)]
     return extensionRows
@@ -673,7 +680,16 @@ Scope {
           }
         }
 
-        Separator { Layout.fillWidth: true; visible: list.count > 0 }
+        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible }
+
+        // The `mouse:` keyword's panel, the same one the bar used to open.
+        MouseSettings {
+          id: mousePanel
+          visible: root.open && root.scoped !== null && root.scoped.extension.panel === "mouse" && Mouse.connected
+          Layout.fillWidth: true
+          Layout.margins: 14
+          onVisibleChanged: Mouse.watching = visible
+        }
 
         RowLayout {
           Layout.fillWidth: true
