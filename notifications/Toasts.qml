@@ -81,16 +81,12 @@ PanelWindow {
           anchors.margins: 12
           spacing: 10
 
-          Image {
+          NotificationIcon {
             visible: card.icon !== ""
             source: card.icon
             Layout.preferredWidth: 32
             Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignTop
-            sourceSize.width: 64
-            sourceSize.height: 64
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
           }
 
           ColumnLayout {
