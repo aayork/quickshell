@@ -16,11 +16,13 @@ import qs.ui
 //   Space, held     move the area while dragging
 //   click / Enter   take the window under the pointer (or the whole screen)
 //   arrow keys      nudge the crosshair a pixel (Shift: ten)
+//   M               show or hide the magnifier
 //   Esc, right click, or the shortcut again   cancel
 //
-// A loupe beside the pointer magnifies the pixels under it with their
-// coordinates, and the selection shows its size as you drag. The result is
-// cropped out of the still, so nothing of the picker gets into it.
+// Drawn as CleanShot draws it: the screen untouched until you drag, a small
+// crosshair with its coordinates beside it, then the outside dimmed, white
+// handles on the selection's corners and edges, and its size by the pointer.
+// The result is cropped out of the still, so nothing of the picker gets in.
 Scope {
   id: root
 
@@ -145,6 +147,8 @@ Scope {
       property real ay: 0
       property bool square: false
       property bool seen: false
+      // The magnifier, off unless asked for (M), as in CleanShot.
+      property bool magnify: false
 
       function reset() {
         dragging = false
@@ -201,6 +205,7 @@ Scope {
         if (event.key === Qt.Key_Escape) root.cancel()
         else if (event.key === Qt.Key_Space && !event.isAutoRepeat) moving = true
         else if (event.key === Qt.Key_Shift) square = true
+        else if (event.key === Qt.Key_M) magnify = !magnify
         else if (event.key === Qt.Key_Left) moveTo(cx - step, cy)
         else if (event.key === Qt.Key_Right) moveTo(cx + step, cy)
         else if (event.key === Qt.Key_Up) moveTo(cx, cy - step)
@@ -224,80 +229,124 @@ Scope {
         smooth: true
       }
 
-      // Dim everything but the focus.
+      // While dragging: the outside dimmed, the selection outlined, with
+      // white L-shaped handles on its corners and short bars mid-edge.
       Item {
         anchors.fill: parent
-        readonly property var r: surface.target
-        readonly property color shade: Theme.alpha("#000000", 0.42)
+        readonly property var r: surface.selection && surface.selection.w >= 1 ? surface.selection : null
+        readonly property color shade: Theme.alpha("#000000", 0.38)
+        visible: !!r
 
-        Rectangle { visible: !parent.r; anchors.fill: parent; color: Theme.alpha("#000000", 0.22) }
-        Rectangle { visible: !!parent.r; x: 0; y: 0; width: parent.width; height: parent.r ? parent.r.y : 0; color: parent.shade }
-        Rectangle { visible: !!parent.r; x: 0; y: parent.r ? parent.r.y + parent.r.h : 0; width: parent.width; height: parent.r ? parent.height - parent.r.y - parent.r.h : 0; color: parent.shade }
-        Rectangle { visible: !!parent.r; x: 0; y: parent.r ? parent.r.y : 0; width: parent.r ? parent.r.x : 0; height: parent.r ? parent.r.h : 0; color: parent.shade }
-        Rectangle { visible: !!parent.r; x: parent.r ? parent.r.x + parent.r.w : 0; y: parent.r ? parent.r.y : 0; width: parent.r ? parent.width - parent.r.x - parent.r.w : 0; height: parent.r ? parent.r.h : 0; color: parent.shade }
+        Rectangle { x: 0; y: 0; width: parent.width; height: parent.r ? parent.r.y : 0; color: parent.shade }
+        Rectangle { x: 0; y: parent.r ? parent.r.y + parent.r.h : 0; width: parent.width; height: parent.r ? parent.height - parent.r.y - parent.r.h : 0; color: parent.shade }
+        Rectangle { x: 0; y: parent.r ? parent.r.y : 0; width: parent.r ? parent.r.x : 0; height: parent.r ? parent.r.h : 0; color: parent.shade }
+        Rectangle { x: parent.r ? parent.r.x + parent.r.w : 0; y: parent.r ? parent.r.y : 0; width: parent.r ? parent.width - parent.r.x - parent.r.w : 0; height: parent.r ? parent.r.h : 0; color: parent.shade }
 
-        // The outline: white, with a dark line outside it for contrast.
-        Rectangle {
-          visible: !!parent.r
-          x: parent.r ? parent.r.x - 1 : 0
-          y: parent.r ? parent.r.y - 1 : 0
-          width: parent.r ? parent.r.w + 2 : 0
-          height: parent.r ? parent.r.h + 2 : 0
-          color: "transparent"
-          border.width: 1
-          border.color: Theme.alpha("#000000", 0.45)
+        Item {
+          x: parent.r ? parent.r.x : 0
+          y: parent.r ? parent.r.y : 0
+          width: parent.r ? parent.r.w : 0
+          height: parent.r ? parent.r.h : 0
+
           Rectangle {
             anchors.fill: parent
-            anchors.margins: 1
             color: "transparent"
             border.width: 1
-            border.color: surface.dragging ? "#ffffff" : Theme.alpha("#ffffff", 0.85)
+            border.color: Theme.alpha("#ffffff", 0.7)
+          }
+
+          // Corners: two bars each, 3 px thick, sitting just outside.
+          Repeater {
+            model: [[0, 0], [1, 0], [0, 1], [1, 1]]
+            Item {
+              required property var modelData
+              readonly property int len: Math.min(16, Math.max(6, Math.min(parent.width, parent.height) / 3))
+              x: modelData[0] ? parent.width - len + 3 : -3
+              y: modelData[1] ? parent.height - len + 3 : -3
+              width: len
+              height: len
+              Rectangle { x: 0; y: parent.modelData[1] ? parent.height - 3 : 0; width: parent.width; height: 3; color: "#ffffff" }
+              Rectangle { x: parent.modelData[0] ? parent.width - 3 : 0; y: 0; width: 3; height: parent.height; color: "#ffffff" }
+            }
+          }
+          // Mid-edge handles.
+          Rectangle { visible: parent.width > 48; x: (parent.width - 14) / 2; y: -2; width: 14; height: 3; radius: 1.5; color: "#ffffff" }
+          Rectangle { visible: parent.width > 48; x: (parent.width - 14) / 2; y: parent.height - 1; width: 14; height: 3; radius: 1.5; color: "#ffffff" }
+          Rectangle { visible: parent.height > 48; x: -2; y: (parent.height - 14) / 2; width: 3; height: 14; radius: 1.5; color: "#ffffff" }
+          Rectangle { visible: parent.height > 48; x: parent.width - 1; y: (parent.height - 14) / 2; width: 3; height: 14; radius: 1.5; color: "#ffffff" }
+        }
+      }
+
+      // The window under the pointer, when a click would take it: a soft
+      // tint and an outline, nothing else dimmed.
+      Rectangle {
+        readonly property var r: surface.dragging ? null : surface.hovered
+        visible: !!r
+        x: r ? r.x : 0
+        y: r ? r.y : 0
+        width: r ? r.w : 0
+        height: r ? r.h : 0
+        color: Theme.alpha(Theme.accent, 0.14)
+        border.width: 2
+        border.color: Theme.alpha(Theme.accent, 0.8)
+      }
+
+      // The pointer: a small crosshair with a ring, black with a white halo
+      // so it shows on any picture, and beside it the coordinates (or, while
+      // dragging, the size) in two short lines.
+      Item {
+        id: crosshair
+        visible: surface.seen && !surface.moving
+        x: Math.round(surface.cx)
+        y: Math.round(surface.cy)
+
+        Repeater {
+          // Halo first, then the black lines over it.
+          model: [{ c: Theme.alpha("#ffffff", 0.85), w: 3 }, { c: "#000000", w: 1 }]
+          Item {
+            required property var modelData
+            Rectangle { x: -11; y: -modelData.w / 2; width: 22; height: modelData.w; color: modelData.c }
+            Rectangle { x: -modelData.w / 2; y: -11; width: modelData.w; height: 22; color: modelData.c }
+            Rectangle {
+              x: -6; y: -6; width: 12; height: 12; radius: 6
+              color: "transparent"
+              border.width: modelData.w
+              border.color: modelData.c
+            }
+          }
+        }
+
+        Column {
+          x: 12
+          y: 6
+          spacing: -2
+          Repeater {
+            model: surface.dragging && surface.selection
+              ? [String(Math.round(surface.selection.w * surface.ratio)), String(Math.round(surface.selection.h * surface.ratio))]
+              : [String(Math.round(surface.cx * surface.ratio)), String(Math.round(surface.cy * surface.ratio))]
+            Text {
+              required property string modelData
+              text: modelData
+              color: "#000000"
+              style: Text.Outline
+              styleColor: Theme.alpha("#ffffff", 0.85)
+              font.family: Theme.fontFamily
+              font.pixelSize: 11
+            }
           }
         }
       }
 
-      // Crosshair lines across the screen while choosing a starting point.
-      Item {
-        anchors.fill: parent
-        visible: !surface.dragging && surface.seen
-        Rectangle { x: 0; y: Math.round(surface.cy); width: parent.width; height: 1; color: Theme.alpha("#ffffff", 0.45) }
-        Rectangle { x: Math.round(surface.cx); y: 0; width: 1; height: parent.height; color: Theme.alpha("#ffffff", 0.45) }
-      }
-
-      // Size, in device pixels, under the selection (or above it when it
-      // reaches the bottom of the screen).
-      Rectangle {
-        id: sizeTag
-        readonly property var r: surface.target
-        visible: !!r
-        x: r ? Math.max(4, Math.min(parent.width - width - 4, r.x + r.w - width)) : 0
-        y: r ? (r.y + r.h + height + 10 < parent.height ? r.y + r.h + 8 : Math.max(4, r.y - height - 8)) : 0
-        width: sizeLabel.implicitWidth + 16
-        height: 22
-        radius: 6
-        color: Theme.alpha("#000000", 0.75)
-        border.width: 1
-        border.color: Theme.alpha("#ffffff", 0.18)
-        Label {
-          id: sizeLabel
-          anchors.centerIn: parent
-          text: sizeTag.r ? Math.round(sizeTag.r.w * surface.ratio) + " × " + Math.round(sizeTag.r.h * surface.ratio) : ""
-          color: "#ffffff"
-          font.pixelSize: Theme.fontSmall
-          elide: Text.ElideNone
-        }
-      }
-
-      // The loupe: the pixels under the crosshair, magnified, with a
-      // centre marker and the coordinates below.
+      // The magnifier (M): the pixels under the crosshair, enlarged, with the
+      // pixel itself marked.
       Item {
         id: loupe
         readonly property int size: 132
-        visible: surface.seen && !surface.moving
+        visible: surface.magnify && surface.seen && !surface.moving
         width: size
-        height: size + 26
-        x: surface.cx + 26 + size > surface.width ? surface.cx - 26 - size : surface.cx + 26
-        y: surface.cy + 26 + height > surface.height ? surface.cy - 26 - height : surface.cy + 26
+        height: size
+        x: surface.cx + 34 + size > surface.width ? surface.cx - 34 - size : surface.cx + 34
+        y: surface.cy + 34 + size > surface.height ? surface.cy - 34 - size : surface.cy + 34
 
         RectangularShadow {
           anchors.fill: lens
@@ -331,9 +380,6 @@ Scope {
             y: -surface.cy * surface.zoom + loupe.size / 2 - surface.zoom / 2
           }
 
-          // Faint crosshair through the lens, and the pixel under the pointer.
-          Rectangle { x: 0; y: (loupe.size - surface.zoom) / 2; width: loupe.size; height: surface.zoom; color: Theme.alpha("#ffffff", 0.1) }
-          Rectangle { x: (loupe.size - surface.zoom) / 2; y: 0; width: surface.zoom; height: loupe.size; color: Theme.alpha("#ffffff", 0.1) }
           Rectangle {
             x: (loupe.size - surface.zoom) / 2 - 1
             y: (loupe.size - surface.zoom) / 2 - 1
@@ -355,56 +401,11 @@ Scope {
         }
 
         Rectangle {
-          width: loupe.size
-          height: loupe.size
+          anchors.fill: parent
           radius: width / 2
           color: "transparent"
           border.width: 2
           border.color: Theme.alpha("#ffffff", 0.9)
-        }
-
-        Rectangle {
-          anchors.horizontalCenter: lens.horizontalCenter
-          anchors.top: lens.bottom
-          anchors.topMargin: 6
-          width: coords.implicitWidth + 14
-          height: 20
-          radius: 6
-          color: Theme.alpha("#000000", 0.75)
-          Label {
-            id: coords
-            anchors.centerIn: parent
-            text: Math.round(surface.cx * surface.ratio) + ", " + Math.round(surface.cy * surface.ratio)
-            color: "#ffffff"
-            font.pixelSize: Theme.fontSmall
-            elide: Text.ElideNone
-          }
-        }
-      }
-
-      // What the keys do, along the bottom until the pointer first moves.
-      Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 40
-        visible: !surface.dragging
-        opacity: surface.seen ? 0.0 : 1
-        Behavior on opacity { NumberAnimation { duration: 400 } }
-        width: hint.implicitWidth + 28
-        height: 32
-        radius: 16
-        color: Theme.alpha("#000000", 0.72)
-        border.width: 1
-        border.color: Theme.alpha("#ffffff", 0.15)
-        Label {
-          id: hint
-          anchors.centerIn: parent
-          text: root.mode === "windows"
-            ? "Click a window  ·  Esc to cancel"
-            : "Drag to select  ·  Click a window  ·  Space to move  ·  Shift for a square  ·  Esc to cancel"
-          color: "#ffffff"
-          font.pixelSize: Theme.fontSmall
-          elide: Text.ElideNone
         }
       }
 
@@ -412,7 +413,8 @@ Scope {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        cursorShape: Qt.CrossCursor
+        // The crosshair above stands in for the pointer.
+        cursorShape: Qt.BlankCursor
 
         onPositionChanged: function(mouse) { surface.moveTo(mouse.x, mouse.y) }
         onPressed: function(mouse) {
