@@ -1,0 +1,7 @@
+0-agave-dew.jpg: "Dew on agave leaf" from Wikimedia Commons, CC0. Cropped to 3:2.
+slideshow/: photos by Glacier National Park (U.S. National Park Service), public domain,
+from Wikimedia Commons: Swiftcurrent Lake Sunrise (18996509564); Sunrise at Swiftcurrent Lake
+as seen from the Many Glacier Hotel (48490111337); Predawn at Swiftcurrent Lake (29484610925);
+Two Medicine Lake Reflections (20499664708); Oldman Lake Sunrise Reflections (28812289214);
+Sunset at Swiftcurrent Lake 7 23 16 (28302742524). Downscaled.
+backgrounds/1-aero-meadow.jpg: drawn in code for this theme.

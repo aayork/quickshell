@@ -11,8 +11,8 @@ Row {
 
   property color foreground: Theme.foreground
 
-  readonly property int dot: 9
-  readonly property int pill: 26
+  readonly property int dot: 7
+  readonly property int pill: 20
   readonly property int gap: 8
   readonly property int maxExtraWindows: 3
 
@@ -57,10 +57,10 @@ Row {
         height: root.dot
 
         // The urgent pulse multiplies in, so it does not fight the Behavior.
-        property real baseOpacity: slot.focused || slot.urgent ? 1 : hover.hovered ? 1 : 0.85
+        property real baseOpacity: slot.focused || slot.urgent ? 1 : hover.hovered ? 0.9 : 0.6
         property real pulse: 1
         opacity: baseOpacity * pulse
-        scale: hover.hovered && !slot.focused ? 1.15 : 1
+        scale: hover.hovered && !slot.focused ? 1.1 : 1
 
         Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         Behavior on baseOpacity { NumberAnimation { duration: 160 } }
@@ -71,7 +71,7 @@ Row {
           anchors.fill: parent
           anchors.margins: -2
           radius: height / 2
-          color: Theme.alpha(slot.urgent ? Theme.orange : Theme.accent, 0.28)
+          color: Theme.alpha(slot.urgent ? Theme.orange : Theme.accent, 0.15)
           opacity: slot.focused || slot.urgent ? 1 : 0
           Behavior on opacity { NumberAnimation { duration: 160 } }
         }
@@ -79,7 +79,7 @@ Row {
         Gel {
           anchors.fill: parent
           base: slot.urgent ? Theme.orange : Theme.accent
-          opacity: slot.focused || slot.urgent ? 1 : 0
+          opacity: slot.focused || slot.urgent ? 0.85 : 0
           Behavior on opacity { NumberAnimation { duration: 160 } }
         }
 
@@ -113,10 +113,10 @@ Row {
           opacity: slot.filled || slot.urgent ? 0 : 1
           Behavior on opacity { NumberAnimation { duration: 160 } }
           border.width: 1
-          border.color: Theme.alpha("#ffffff", 0.9)
+          border.color: Theme.alpha("#ffffff", 0.6)
           gradient: Gradient {
-            GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.05) }
-            GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.35) }
+            GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.03) }
+            GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.18) }
           }
           // A faint dark outline so it still shows over pale sky.
           Rectangle {

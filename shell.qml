@@ -12,6 +12,7 @@ import qs.osd
 import qs.polkit
 import qs.session
 import qs.settings
+import qs.widgets
 
 ShellRoot {
   // The night light is a service; naming it here is what starts it.
@@ -20,6 +21,8 @@ ShellRoot {
   readonly property int clipboardEntries: Clipboard.entries.length
 
   Wallpaper {}
+  // Frutiger Aero: Vista-style desktop gadgets.
+  Sidebar {}
   Bar {}
   Toasts {}
   Osd {}

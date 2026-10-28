@@ -77,14 +77,18 @@ Singleton {
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
   }
 
-  // Frutiger Aero glass, worked out from the palette so any theme gets it:
-  // a pale pane that runs from near white to a hint of the accent, a white
-  // gloss over its top, a white inner edge and a soft accent outline.
-  readonly property color glassTop: alpha(Qt.tint(background, alpha("#ffffff", 0.55)), 0.84)
-  readonly property color glassBottom: alpha(Qt.tint(background, alpha(accent, 0.16)), 0.78)
-  readonly property color glassBorder: alpha(Qt.darker(accent, 1.3), 0.3)
-  readonly property color glassEdge: alpha("#ffffff", 0.75)
-  readonly property color gloss: alpha("#ffffff", 0.6)
+  // Frutiger Aero glass, worked out from the palette so any theme gets it.
+  // Light themes get a pale pane; dark ones Vista's smoked glass. Both are
+  // quite see-through (the compositor blurs lightly behind them), with a
+  // white gloss over the top and a soft outline.
+  readonly property bool dark: luminance(background) < 0.25
+  readonly property color glassTop: dark ? alpha(Qt.tint(background, alpha("#ffffff", 0.1)), 0.6)
+    : alpha(Qt.tint(background, alpha("#ffffff", 0.55)), 0.7)
+  readonly property color glassBottom: dark ? alpha(Qt.tint(darkerBackground, alpha(accent, 0.08)), 0.66)
+    : alpha(Qt.tint(background, alpha(accent, 0.16)), 0.62)
+  readonly property color glassBorder: dark ? alpha("#000000", 0.55) : alpha(Qt.darker(accent, 1.3), 0.3)
+  readonly property color glassEdge: alpha("#ffffff", dark ? 0.2 : 0.75)
+  readonly property color gloss: alpha("#ffffff", dark ? 0.22 : 0.6)
   // Glossy "gel" buttons: the accent, lighter at the top.
   readonly property color gelTop: Qt.lighter(accent, 1.45)
   readonly property color gelMiddle: Qt.lighter(accent, 1.1)

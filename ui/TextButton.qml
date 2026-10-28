@@ -23,9 +23,9 @@ Rectangle {
   border.width: 1
   border.color: mouse.containsMouse ? Theme.glassBorder : Theme.alpha(Theme.foreground, 0.22)
   gradient: Gradient {
-    GradientStop { position: 0; color: mouse.pressed ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.25)) : "#ffffff" }
-    GradientStop { position: 0.5; color: Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.12 : 0.03)) }
-    GradientStop { position: 1; color: Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.22 : 0.1)) }
+    GradientStop { position: 0; color: mouse.pressed ? Theme.alpha(Theme.accent, 0.3) : Theme.alpha("#ffffff", Theme.dark ? 0.2 : 0.95) }
+    GradientStop { position: 0.5; color: Theme.alpha(Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.18 : 0.04)), Theme.dark ? 0.35 : 0.9) }
+    GradientStop { position: 1; color: Theme.alpha(Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.3 : 0.12)), Theme.dark ? 0.5 : 0.9) }
   }
 
   Gel {

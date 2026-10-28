@@ -81,7 +81,7 @@ Item {
       font.pixelSize: 72
       font.weight: Font.Light
       style: Text.Raised
-      styleColor: Theme.alpha("#ffffff", 0.7)
+      styleColor: Theme.dark ? Theme.alpha("#000000", 0.45) : Theme.alpha("#ffffff", 0.7)
       elide: Text.ElideNone
     }
 

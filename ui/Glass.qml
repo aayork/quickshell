@@ -47,10 +47,11 @@ Rectangle {
       anchors.fill: parent
       radius: root.radius
       gradient: Gradient {
-        GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.95) }
-        GradientStop { position: 0.35; color: Theme.alpha("#ffffff", 0.25) }
-        GradientStop { position: 0.75; color: Theme.alpha("#ffffff", 0.12) }
-        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.6) }
+        // Faint on smoked glass, where a bright rim reads as a hard line.
+        GradientStop { position: 0; color: Theme.alpha("#ffffff", Theme.dark ? 0.32 : 0.8) }
+        GradientStop { position: 0.3; color: Theme.alpha("#ffffff", Theme.dark ? 0.08 : 0.22) }
+        GradientStop { position: 0.75; color: Theme.alpha("#ffffff", Theme.dark ? 0.04 : 0.1) }
+        GradientStop { position: 1; color: Theme.alpha("#ffffff", Theme.dark ? 0.14 : 0.45) }
       }
     }
   }
@@ -63,7 +64,7 @@ Rectangle {
       anchors.fill: parent
       radius: root.radius
       color: "transparent"
-      border.width: 1.5
+      border.width: 1
       border.color: "#ffffff"
     }
   }

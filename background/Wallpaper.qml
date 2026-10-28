@@ -172,7 +172,8 @@ Scope {
           autoPaddingEnabled: false
           blurEnabled: true
           blurMax: 64
-          blur: 1
+          // Frutiger Aero: a light blur, so the glass stays see-through.
+          blur: 0.45
           maskEnabled: true
           maskSource: fadeMask
           // Centred so the fade spans the whole gradient; at 0 the edge is hard.

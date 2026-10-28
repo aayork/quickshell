@@ -65,11 +65,14 @@ Singleton {
   readonly property int controlRadius: 6
   readonly property int borderWidth: 2
 
-  // Aero glass, from the palette.
-  readonly property color glassTop: alpha(Qt.tint(base, alpha("#ffffff", 0.6)), 0.55)
-  readonly property color glassBottom: alpha(Qt.tint(base, alpha(accent, 0.18)), 0.42)
-  readonly property color glassBorder: alpha("#ffffff", 0.55)
-  readonly property color gloss: alpha("#ffffff", 0.55)
+  // Aero glass, from the palette: pale on a light theme, Vista's smoked
+  // glass on a dark one.
+  readonly property bool dark: (0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b) < 0.35
+  readonly property color glassTop: dark ? alpha(Qt.tint(base, alpha("#ffffff", 0.1)), 0.55)
+    : alpha(Qt.tint(base, alpha("#ffffff", 0.6)), 0.55)
+  readonly property color glassBottom: dark ? alpha(base, 0.62) : alpha(Qt.tint(base, alpha(accent, 0.18)), 0.42)
+  readonly property color glassBorder: dark ? alpha("#000000", 0.5) : alpha("#ffffff", 0.55)
+  readonly property color gloss: alpha("#ffffff", dark ? 0.22 : 0.55)
   readonly property int rowHeight: 28
   readonly property int spacing: 8
 

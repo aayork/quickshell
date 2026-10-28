@@ -41,7 +41,7 @@ Rectangle {
     anchors.fill: input
     visible: input.text === ""
     text: root.placeholder
-    color: Theme.dim
+    color: "#6d8597"
   }
 
   TextInput {
@@ -51,9 +51,10 @@ Rectangle {
     anchors.rightMargin: 8
     verticalAlignment: TextInput.AlignVCenter
     clip: true
-    color: Theme.foreground
-    selectionColor: Theme.selection
-    selectedTextColor: Theme.brightForeground
+    // The well is white whatever the theme, so the text is always dark.
+    color: "#0b2540"
+    selectionColor: Theme.alpha(Theme.accent, 0.35)
+    selectedTextColor: "#0b2540"
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fontSize
     echoMode: root.password ? TextInput.Password : TextInput.Normal

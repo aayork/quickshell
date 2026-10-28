@@ -43,7 +43,8 @@ Scope {
 
       // One text colour for the whole bar, from the wallpaper behind all of
       // it, so both sides always match. x and w are kept for the callers.
-      readonly property color wholeBarForeground: Theme.barForegroundOver(0, 1,
+      // A dark theme's bar is smoked glass, which always wants light text.
+      readonly property color wholeBarForeground: Theme.dark ? Theme.brightForeground : Theme.barForegroundOver(0, 1,
         Services.Config.bar.glass ? Services.Config.bar.tint : 0)
       function foregroundOver(x, w) {
         if (fullscreen || width <= 0) return foreground
@@ -122,69 +123,48 @@ Scope {
           color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.glass ? Services.Config.bar.tint : 0)
         }
 
-        // Aero / liquid glass: a frosted white body, a gloss band over the
-        // top half, a bright edge along the top and a rim of light along the
-        // foot with a faint shadow line under it.
+        // Vista taskbar glass: smoked (or frosted, on a light theme) body,
+        // the upper half lifted by a soft sheen that ends in a gentle step at
+        // the middle, and faint diagonal streaks of reflected light. No hard
+        // edge lines.
         Item {
           anchors.fill: parent
-          // Frutiger Aero: always glass, whatever the background setting says.
-          visible: true
+          clip: true
 
           Rectangle {
             anchors.fill: parent
             gradient: Gradient {
-              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.32) }
-              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.14) }
+              GradientStop { position: 0; color: Theme.dark ? Theme.alpha(Theme.darkerBackground, 0.4) : Theme.alpha("#ffffff", 0.3) }
+              GradientStop { position: 1; color: Theme.dark ? Theme.alpha(Theme.darkerBackground, 0.62) : Theme.alpha("#ffffff", 0.14) }
             }
           }
           Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: Math.round(parent.height * 0.48)
+            height: Math.round(parent.height * 0.5)
             gradient: Gradient {
-              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.42) }
-              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.08) }
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", Theme.dark ? 0.16 : 0.36) }
+              GradientStop { position: 0.85; color: Theme.alpha("#ffffff", Theme.dark ? 0.07 : 0.16) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", Theme.dark ? 0.04 : 0.1) }
             }
           }
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: 1
-            color: Theme.alpha("#ffffff", 0.7)
-          }
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 1
-            height: 1
-            color: Theme.alpha("#ffffff", 0.75)
-          }
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 1
-            color: Theme.alpha("#0b2540", 0.18)
-          }
-          // Reflections: soft glints of light along the glass, like the
-          // Vista taskbar catching a window.
-          Rectangle {
-            anchors.fill: parent
-            anchors.bottomMargin: 2
-            gradient: Gradient {
-              orientation: Gradient.Horizontal
-              GradientStop { position: 0.00; color: Theme.alpha("#ffffff", 0.0) }
-              GradientStop { position: 0.10; color: Theme.alpha("#ffffff", 0.22) }
-              GradientStop { position: 0.20; color: Theme.alpha("#ffffff", 0.0) }
-              GradientStop { position: 0.42; color: Theme.alpha("#ffffff", 0.0) }
-              GradientStop { position: 0.52; color: Theme.alpha("#ffffff", 0.16) }
-              GradientStop { position: 0.58; color: Theme.alpha("#ffffff", 0.0) }
-              GradientStop { position: 0.74; color: Theme.alpha("#ffffff", 0.0) }
-              GradientStop { position: 0.84; color: Theme.alpha("#ffffff", 0.2) }
-              GradientStop { position: 1.00; color: Theme.alpha("#ffffff", 0.04) }
+          Repeater {
+            // Streaks: x as a share of the width, and how wide.
+            model: [[0.06, 90], [0.11, 26], [0.37, 140], [0.44, 34], [0.68, 110], [0.9, 60]]
+            Rectangle {
+              required property var modelData
+              x: parent.width * modelData[0]
+              y: -parent.height
+              width: modelData[1]
+              height: parent.height * 3
+              rotation: 28
+              gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0; color: Theme.alpha("#ffffff", 0) }
+                GradientStop { position: 0.5; color: Theme.alpha("#ffffff", Theme.dark ? 0.06 : 0.1) }
+                GradientStop { position: 1; color: Theme.alpha("#ffffff", 0) }
+              }
             }
           }
         }
