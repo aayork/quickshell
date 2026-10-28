@@ -34,6 +34,10 @@ Scope {
   readonly property string scriptPath: "PATH=" + quote(Quickshell.shellDir + "/bin:" + Quickshell.shellDir + "/launcher/scripts") + ":\"$PATH\"; "
   readonly property int maxRows: 60
   readonly property int rowHeight: 32
+  // Corners follow the window rounding set in Settings › Windows, so the
+  // launcher matches the windows around it; rows and popovers scale with it.
+  readonly property int corner: Math.max(0, Number(Config.windows.rounding) || 0)
+  readonly property int smallCorner: Math.min(8, Math.round(corner * 0.6))
 
   // key -> { count, last }
   property var frecency: ({})
@@ -738,10 +742,12 @@ Scope {
       height: column.implicitHeight
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.round(parent.height * 0.2)
-      color: Theme.background
+      // Translucent: Hyprland blurs what is behind it (a layer rule for
+      // aayork-launcher in hyprland.lua).
+      color: Theme.alpha(Theme.background, 0.8)
       border.width: 1
       border.color: Theme.alpha(Theme.foreground, 0.14)
-      radius: 12
+      radius: root.corner
       clip: true
 
       MouseArea { anchors.fill: parent }
@@ -912,7 +918,7 @@ Scope {
                 anchors.rightMargin: 8
                 anchors.topMargin: 1
                 anchors.bottomMargin: 1
-                radius: 8
+                radius: root.smallCorner
                 color: row.armed ? Theme.alpha(Theme.red, 0.2) : row.current && !row.modelData.hint ? Theme.alpha(Theme.foreground, 0.09) : "transparent"
               }
 
@@ -1223,10 +1229,10 @@ Scope {
       anchors.rightMargin: 10
       anchors.bottom: card.bottom
       anchors.bottomMargin: 46
-      color: Theme.background
+      color: Theme.alpha(Theme.background, 0.86)
       border.width: 1
       border.color: Theme.alpha(Theme.foreground, 0.16)
-      radius: 10
+      radius: root.corner
 
       MouseArea { anchors.fill: parent }
 
@@ -1256,7 +1262,7 @@ Scope {
 
             width: actionColumn.width
             height: 30
-            radius: 7
+            radius: root.smallCorner
             color: root.actionCursor === index ? Theme.alpha(Theme.foreground, 0.09) : "transparent"
 
             Label {
