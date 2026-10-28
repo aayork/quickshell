@@ -27,6 +27,9 @@ Scope {
   property bool promptEcho: false
   property string pending: ""
   property bool answered: false
+  // Goes up by one per wrong password, so the screen can shake the field.
+  property int wrongPasswords: 0
+  readonly property string wrongPasswordText: "Wrong password. Try again."
   readonly property bool busy: status === "checking" || status === "launching"
 
   readonly property string stateDir: Greetd.available
@@ -79,11 +82,18 @@ Scope {
     Greetd.createSession(user.name)
   }
 
-  function fail(text) {
+  // `cancel` is false when greetd has already ended the session itself: a
+  // second cancel only earns an error back that would replace the message.
+  function fail(text, cancel) {
     pending = ""
-    if (Greetd.available && Greetd.state !== GreetdState.Inactive) Greetd.cancelSession()
+    if (cancel !== false && Greetd.available && Greetd.state !== GreetdState.Inactive) Greetd.cancelSession()
     message = text
     status = "failed"
+  }
+
+  function wrongPassword() {
+    fail(wrongPasswordText, false)
+    wrongPasswords++
   }
 
   function launch() {
@@ -132,15 +142,22 @@ Scope {
         root.message = text
       }
     }
-    function onAuthFailure(text) { root.fail("That password didn't work") }
-    function onError(text) { root.fail(text || "Something went wrong") }
+    function onAuthFailure(text) { root.wrongPassword() }
+    function onError(text) {
+      console.warn("greetd error:", text)
+      // Errors after the attempt is over (replies to a cancel) are noise.
+      if (root.status !== "checking" && root.status !== "prompt" && root.status !== "launching") return
+      // PAM's raw codes (pam_authenticate: AUTH_ERR and friends) mean the password.
+      if (/AUTH_ERR|authenticat|password/i.test(text || "")) return root.wrongPassword()
+      root.fail("Couldn't log in. Try again.", false)
+    }
     function onReadyToLaunch() { root.launch() }
   }
 
   Timer {
     id: previewTimer
     interval: 700
-    onTriggered: root.pending === "fail" ? root.fail("That password didn't work") : root.launch()
+    onTriggered: root.pending === "fail" ? root.wrongPassword() : root.launch()
   }
   Timer {
     id: previewReset

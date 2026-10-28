@@ -136,6 +136,20 @@ Item {
       implicitHeight: 34
       password: root.greeter.status !== "prompt" || !root.greeter.promptEcho
       enabled: !root.greeter.busy
+      // A short side-to-side shake on a wrong password, like macOS.
+      transform: Translate { id: shakeOffset }
+      SequentialAnimation {
+        id: shake
+        NumberAnimation { target: shakeOffset; property: "x"; to: -10; duration: 50; easing.type: Easing.OutQuad }
+        NumberAnimation { target: shakeOffset; property: "x"; to: 9; duration: 70; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: shakeOffset; property: "x"; to: -6; duration: 70; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: shakeOffset; property: "x"; to: 3; duration: 60; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: shakeOffset; property: "x"; to: 0; duration: 50; easing.type: Easing.OutQuad }
+      }
+      Connections {
+        target: root.greeter
+        function onWrongPasswordsChanged() { shake.restart() }
+      }
       placeholder: root.greeter.status === "checking" ? "Checking…"
         : root.greeter.status === "launching" ? "Starting " + (root.greeter.session ? root.greeter.session.name : "") + "…"
         : root.greeter.status === "prompt" ? root.greeter.prompt
