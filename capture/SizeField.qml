@@ -9,9 +9,9 @@ Rectangle {
   property int value: 0
   signal committed(int value)
 
-  width: 70
-  height: 34
-  radius: 8
+  width: 58
+  height: 28
+  radius: 7
   color: Theme.alpha("#000000", 0.35)
   border.width: 1
   border.color: input.activeFocus ? Theme.alpha("#ffffff", 0.45) : Theme.alpha("#ffffff", 0.08)
@@ -24,7 +24,7 @@ Rectangle {
     color: "#ffffff"
     selectionColor: Theme.alpha("#ffffff", 0.3)
     font.family: Theme.fontFamily
-    font.pixelSize: 15
+    font.pixelSize: 13
     validator: IntValidator { bottom: 1; top: 99999 }
     selectByMouse: true
     // Follows the area unless being typed in.

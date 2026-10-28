@@ -20,10 +20,13 @@ Item {
 
   width: content.width
   height: content.height
-  // Under the area if it fits, else above it, else just inside its bottom.
+  // As CleanShot places it: inside the area, centred, a little below the
+  // middle. An area too small to hold it gets it underneath (or above).
+  readonly property bool fitsInside: r && r.w > width + 40 && r.h > height + 60
   x: r ? Math.max(8, Math.min(area.width - width - 8, r.x + r.w / 2 - width / 2)) : 0
   y: {
     if (!r) return 0
+    if (fitsInside) return Math.round(r.y + r.h * 0.62 - height / 2)
     if (r.y + r.h + gap + height < area.height - 8) return r.y + r.h + gap
     if (r.y - gap - height > 8) return r.y - gap - height
     return r.y + r.h - height - gap
@@ -47,9 +50,9 @@ Item {
       spacing: 10
 
       Rectangle {
-        width: modeRow.width + 12
-        height: 62
-        radius: 16
+        width: modeRow.width + 10
+        height: 50
+        radius: 13
         color: root.panel
         border.width: 1
         border.color: root.edge
@@ -76,35 +79,35 @@ Item {
               id: mode
               required property var modelData
               readonly property bool sep: modelData.id === "sep"
-              width: sep ? 13 : Math.max(62, modeLabel.implicitWidth + 18)
-              height: 54
+              width: sep ? 11 : Math.max(52, modeLabel.implicitWidth + 14)
+              height: 44
 
               Rectangle {
                 visible: mode.sep
                 anchors.centerIn: parent
                 width: 1
-                height: 34
+                height: 28
                 color: root.edge
               }
 
               Rectangle {
                 visible: !mode.sep
                 anchors.fill: parent
-                radius: 11
+                radius: 9
                 color: modeMouse.pressed ? Theme.alpha("#ffffff", 0.16) : modeMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
               }
 
               Column {
                 visible: !mode.sep
                 anchors.centerIn: parent
-                spacing: 3
+                spacing: 2
 
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: mode.modelData.text || Icons.glyph(mode.modelData.glyph || 0)
                   color: "#ffffff"
                   font.family: mode.modelData.text ? Theme.fontFamily : Theme.fontFamily
-                  font.pixelSize: mode.modelData.text ? 16 : 20
+                  font.pixelSize: mode.modelData.text ? 13 : 17
                   font.bold: !!mode.modelData.text
                 }
                 Text {
@@ -113,7 +116,7 @@ Item {
                   text: mode.modelData.id === "timer" ? "Timer · " + picker.timerSeconds + "s" : (mode.modelData.label || "")
                   color: Theme.alpha("#ffffff", 0.82)
                   font.family: Theme.fontFamily
-                  font.pixelSize: 11
+                  font.pixelSize: 10
                 }
               }
 
@@ -146,9 +149,9 @@ Item {
 
       // Exact size, the ratio lock, and the capture button.
       Rectangle {
-        width: sizeRow.width + 24
-        height: 62
-        radius: 16
+        width: sizeRow.width + 18
+        height: 50
+        radius: 13
         color: root.panel
         border.width: 1
         border.color: root.edge
@@ -156,7 +159,7 @@ Item {
         Row {
           id: sizeRow
           anchors.centerIn: parent
-          spacing: 8
+          spacing: 6
 
           SizeField {
             anchors.verticalCenter: parent.verticalCenter
@@ -179,9 +182,9 @@ Item {
           // Aspect-ratio lock.
           Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: 30
-            height: 28
-            radius: 7
+            width: 26
+            height: 24
+            radius: 6
             color: picker.lockRatio ? Theme.alpha("#ffffff", 0.2) : lockMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
             border.width: 1
             border.color: picker.lockRatio ? Theme.alpha("#ffffff", 0.4) : root.edge
@@ -204,23 +207,23 @@ Item {
           Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 1
-            height: 34
+            height: 28
             color: root.edge
           }
 
           // Capture the area (Enter does the same).
           Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: 40
-            height: 40
-            radius: 10
+            width: 34
+            height: 34
+            radius: 8
             color: shotMouse.pressed ? Theme.alpha("#ffffff", 0.16) : shotMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
             Text {
               anchors.centerIn: parent
               text: Icons.glyph(0xF019E)
               color: "#ffffff"
               font.family: Theme.fontFamily
-              font.pixelSize: 20
+              font.pixelSize: 17
             }
             MouseArea {
               id: shotMouse
@@ -238,8 +241,8 @@ Item {
     Column {
       id: recordColumn
       visible: picker.recordPanel
-      spacing: 10
-      width: 300
+      spacing: 8
+      width: 260
 
       Rectangle {
         width: parent.width
