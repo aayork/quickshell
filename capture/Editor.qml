@@ -10,7 +10,10 @@ import qs.theme
 import qs.ui
 
 // The screenshot editor: mark a capture up, crop it, put it on a background,
-// then copy, save or pin the result.
+// then copy, save or pin the result. Laid out like CleanShot X's Annotate
+// window: one toolbar along the top (close, the tools, undo and redo), a
+// row under it with the current tool's options, the picture, and a bottom
+// bar with the size on the left and Pin, Copy, Save and Done on the right.
 //
 // Everything is drawn in the picture's own pixels on a "sheet" that is scaled
 // down to fit the screen, so what is exported is full resolution whatever
@@ -62,8 +65,13 @@ Scope {
     { id: "pixelate", glyph: 0xF013A, name: "Pixelate", key: "X" },
     { id: "redact", glyph: 0xF0764, name: "Black out", key: "D" },
     { id: "spotlight", glyph: 0xF04C9, name: "Spotlight", key: "S" },
-    { id: "crop", glyph: 0xF019E, name: "Crop", key: "C" }
+    { id: "crop", glyph: 0xF019E, name: "Crop", key: "C" },
+    { id: "background", glyph: 0xF0E09, name: "Background", key: "G" }
   ]
+  readonly property bool drawingTool: tool !== "crop" && tool !== "background"
+  // Corners follow the window rounding in Settings › Windows, as the
+  // launcher's do.
+  readonly property int corner: Math.max(0, Number(Config.windows.rounding) || 0)
   readonly property var inks: [Theme.red, pickOrange, Theme.yellow, Theme.green, pickBlue, Theme.accent, Theme.brightForeground, Theme.background]
   readonly property color pickOrange: Theme.pick("orange", "#da956c")
   readonly property color pickBlue: Theme.pick("blue", "#6c91da")
@@ -108,6 +116,8 @@ Scope {
 
   // A press at (x, y) in picture pixels starts the current tool.
   function begin(x, y) {
+    // The background tool works from its options row, not on the picture.
+    if (tool === "background") return
     if (tool === "text") {
       textEntry.start(x, y)
       return
@@ -493,7 +503,7 @@ Scope {
     screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
     visible: root.open
     anchors { top: true; bottom: true; left: true; right: true }
-    color: Theme.alpha(Theme.darkerBackground, 0.92)
+    color: Theme.alpha("#000000", 0.45)
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "aayork-capture-editor"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -533,224 +543,279 @@ Scope {
         }
       }
 
-      // ---- tools along the top
-      Rectangle {
-        id: toolbar
-        anchors.top: parent.top
-        anchors.topMargin: 16
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: toolRow.implicitWidth + 20
-        height: 44
-        color: Theme.background
-        border.width: 1
-        border.color: Theme.alpha(Theme.foreground, 0.2)
-        radius: Theme.controlRadius + 6
-        z: 5
-
-        RowLayout {
-          id: toolRow
-          anchors.centerIn: parent
-          spacing: 4
-
-          Repeater {
-            model: root.tools
-
-            ToolButton {
-              required property var modelData
-              glyph: modelData.glyph
-              hint: modelData.name + "  " + modelData.key
-              selected: root.tool === modelData.id
-              onClicked: root.tool = modelData.id
-            }
-          }
-
-          Divider {}
-
-          Repeater {
-            model: root.inks
-
-            Rectangle {
-              required property color modelData
-              implicitWidth: 20
-              implicitHeight: 20
-              radius: 10
-              color: modelData
-              border.width: Qt.colorEqual(root.ink, modelData) ? 3 : 1
-              border.color: Qt.colorEqual(root.ink, modelData) ? Theme.brightForeground : Theme.alpha(Theme.foreground, 0.3)
-
-              MouseArea {
-                anchors.fill: parent
-                onClicked: root.ink = parent.modelData
-              }
-            }
-          }
-
-          Divider {}
-
-          Repeater {
-            model: 3
-
-            Rectangle {
-              required property int index
-              implicitWidth: 28
-              implicitHeight: 28
-              radius: Theme.controlRadius + 2
-              color: root.weight === index ? Theme.selection : "transparent"
-
-              Rectangle {
-                anchors.centerIn: parent
-                width: 16
-                height: 2 + index * 2.5
-                radius: height / 2
-                color: Theme.foreground
-              }
-              MouseArea {
-                anchors.fill: parent
-                onClicked: root.weight = parent.index
-              }
-            }
-          }
-
-          Divider {}
-
-          ToolButton { glyph: 0xF054C; hint: "Undo  Ctrl Z"; enabled: root.ops.length > 0; onClicked: root.undo() }
-          ToolButton { glyph: 0xF044E; hint: "Redo  Ctrl Shift Z"; enabled: root.undone.length > 0; onClicked: root.redo() }
-        }
+      // The window itself: centred, with a shadow, like an app window.
+      RectangularShadow {
+        anchors.fill: win
+        radius: win.radius
+        offset.y: 16
+        blur: 56
+        spread: -6
+        color: Theme.alpha("#000000", 0.55)
       }
 
-      // ---- frame options down the right
       Rectangle {
-        id: side
-        anchors.right: parent.right
-        anchors.rightMargin: 16
-        anchors.verticalCenter: parent.verticalCenter
-        width: 220
-        height: sideColumn.implicitHeight + 28
+        id: win
+        anchors.centerIn: parent
+        width: Math.round(parent.width * 0.86)
+        height: Math.round(parent.height * 0.88)
+        radius: root.corner
         color: Theme.background
         border.width: 1
-        border.color: Theme.alpha(Theme.foreground, 0.2)
-        radius: Theme.controlRadius + 6
-        z: 5
+        border.color: Theme.alpha(Theme.foreground, 0.14)
+        clip: true
 
-        ColumnLayout {
-          id: sideColumn
+        // Clicks on the window's own surface don't reach the dim around it.
+        MouseArea { anchors.fill: parent }
+
+        // The canvas behind the picture: a shade darker than the bars.
+        Rectangle {
+          anchors.top: optionsBar.bottom
+          anchors.bottom: bottomBar.top
           anchors.left: parent.left
           anchors.right: parent.right
+          color: Theme.darkerBackground
+        }
+
+        // ---- top bar: close, the tools, undo and redo
+        Item {
+          id: titleBar
           anchors.top: parent.top
-          anchors.margins: 14
-          spacing: 8
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 52
 
-          SectionHeader { text: "BACKGROUND" }
+          ToolButton {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            glyph: 0xF0156
+            hint: "Close  Esc"
+            onClicked: root.close()
+          }
 
-          GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 4
-            columnSpacing: 4
+          RowLayout {
+            anchors.centerIn: parent
+            spacing: 2
 
             Repeater {
-              model: [
-                { id: "none", label: "None" },
-                { id: "theme", label: "Theme" },
-                { id: "accent", label: "Accent" },
-                { id: "wallpaper", label: "Wallpaper" }
-              ]
+              model: root.tools
 
-              TextButton {
+              RowLayout {
                 required property var modelData
-                Layout.fillWidth: true
-                text: modelData.label
-                selected: root.backdrop === modelData.id
-                onClicked: {
-                  root.backdrop = modelData.id
-                  // A background needs room around the picture to show.
-                  if (modelData.id !== "none" && root.padding === 0) root.padding = Math.round(root.unit * 20)
-                  if (modelData.id === "none") root.padding = 0
+                required property int index
+                spacing: 2
+                // Crop and Background stand apart from the drawing tools.
+                Divider { visible: modelData.id === "crop"; Layout.leftMargin: 6; Layout.rightMargin: 6 }
+                ToolButton {
+                  glyph: modelData.glyph
+                  hint: modelData.name + "  " + modelData.key
+                  selected: root.tool === modelData.id
+                  onClicked: root.tool = modelData.id
                 }
               }
             }
           }
 
-          Label { text: "Padding"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
-          Slider {
-            Layout.fillWidth: true
-            enabled: root.backdrop !== "none"
-            value: root.padding / (root.unit * 60)
-            onMoved: function(value) { root.padding = Math.round(value * root.unit * 60) }
-          }
-
-          Label { text: "Rounded corners"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
-          Slider {
-            Layout.fillWidth: true
-            value: root.rounding / (root.unit * 16)
-            onMoved: function(value) { root.rounding = Math.round(value * root.unit * 16) }
-          }
-
           RowLayout {
-            Layout.fillWidth: true
-            Label { text: "Shadow"; Layout.fillWidth: true }
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            ToolButton { glyph: 0xF054C; hint: "Undo  Ctrl Z"; enabled: root.ops.length > 0; onClicked: root.undo() }
+            ToolButton { glyph: 0xF044E; hint: "Redo  Ctrl Shift Z"; enabled: root.undone.length > 0; onClicked: root.redo() }
+          }
+
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 1
+            color: Theme.alpha(Theme.foreground, 0.1)
+          }
+        }
+
+        // ---- the current tool's options
+        Rectangle {
+          id: optionsBar
+          anchors.top: titleBar.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 44
+          color: Theme.alpha(Theme.foreground, 0.03)
+          z: 2
+
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 1
+            color: Theme.alpha(Theme.foreground, 0.1)
+          }
+
+          // Drawing tools: colour and stroke.
+          RowLayout {
+            anchors.centerIn: parent
+            visible: root.drawingTool
+            spacing: 6
+
+            Repeater {
+              model: root.inks
+
+              Rectangle {
+                required property color modelData
+                implicitWidth: 20
+                implicitHeight: 20
+                radius: 10
+                color: modelData
+                border.width: Qt.colorEqual(root.ink, modelData) ? 3 : 1
+                border.color: Qt.colorEqual(root.ink, modelData) ? Theme.brightForeground : Theme.alpha(Theme.foreground, 0.3)
+
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.ink = parent.modelData
+                }
+              }
+            }
+
+            Divider { Layout.leftMargin: 8; Layout.rightMargin: 8 }
+
+            Repeater {
+              model: 3
+
+              Rectangle {
+                required property int index
+                implicitWidth: 30
+                implicitHeight: 28
+                radius: 6
+                color: root.weight === index ? Theme.alpha(Theme.foreground, 0.12) : "transparent"
+
+                Rectangle {
+                  anchors.centerIn: parent
+                  width: 16
+                  height: 2 + index * 2.5
+                  radius: height / 2
+                  color: Theme.foreground
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.weight = parent.index
+                }
+              }
+            }
+          }
+
+          // Crop.
+          RowLayout {
+            anchors.centerIn: parent
+            visible: root.tool === "crop"
+            spacing: 12
+            Label { text: "Drag across the picture to crop it"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
+            TextButton {
+              text: "Reset"
+              enabled: root.crop.width !== root.naturalWidth || root.crop.height !== root.naturalHeight
+              onClicked: root.crop = Qt.rect(0, 0, root.naturalWidth, root.naturalHeight)
+            }
+          }
+
+          // Background: the frame around the picture.
+          RowLayout {
+            anchors.centerIn: parent
+            visible: root.tool === "background"
+            spacing: 8
+
+            Segmented {
+              options: [
+                { label: "None", value: "none" },
+                { label: "Theme", value: "theme" },
+                { label: "Accent", value: "accent" },
+                { label: "Wallpaper", value: "wallpaper" }
+              ]
+              current: root.backdrop
+              onPicked: function(value) {
+                root.backdrop = value
+                // A background needs room around the picture to show.
+                if (value !== "none" && root.padding === 0) root.padding = Math.round(root.unit * 20)
+                if (value === "none") root.padding = 0
+              }
+            }
+
+            Divider { Layout.leftMargin: 6; Layout.rightMargin: 6 }
+            Label { text: "Padding"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
+            Slider {
+              Layout.preferredWidth: 110
+              enabled: root.backdrop !== "none"
+              value: root.padding / (root.unit * 60)
+              onMoved: function(value) { root.padding = Math.round(value * root.unit * 60) }
+            }
+            Label { text: "Corners"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
+            Slider {
+              Layout.preferredWidth: 110
+              value: root.rounding / (root.unit * 16)
+              onMoved: function(value) { root.rounding = Math.round(value * root.unit * 16) }
+            }
+            Label { text: "Shadow"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
             Toggle {
               enabled: root.backdrop !== "none"
               checked: root.shadow
               onToggled: root.shadow = !root.shadow
             }
           }
+        }
 
-          Separator { Layout.fillWidth: true }
+        // ---- bottom bar: size on the left, what to do with it on the right
+        Rectangle {
+          id: bottomBar
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 52
+          color: Theme.background
+          z: 2
 
-          TextButton {
-            Layout.fillWidth: true
-            text: "Reset crop"
-            icon: Icons.glyph(0xF019E)
-            enabled: root.crop.width !== root.naturalWidth || root.crop.height !== root.naturalHeight
-            onClicked: root.crop = Qt.rect(0, 0, root.naturalWidth, root.naturalHeight)
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            color: Theme.alpha(Theme.foreground, 0.1)
           }
 
           Label {
-            text: Math.round(sheet.width) + " × " + Math.round(sheet.height) + " px"
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            text: Math.round(sheet.width) + " × " + Math.round(sheet.height) + "  ·  " + Math.round(viewport.fit * 100) + "%"
             color: Theme.dim
             font.pixelSize: Theme.fontSmall
-            Layout.alignment: Qt.AlignHCenter
           }
-        }
-      }
 
-      // ---- what to do with it, along the bottom
-      Rectangle {
-        id: actions
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 16
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: actionRow.implicitWidth + 20
-        height: 44
-        color: Theme.background
-        border.width: 1
-        border.color: Theme.alpha(Theme.foreground, 0.2)
-        radius: Theme.controlRadius + 6
-        z: 5
+          RowLayout {
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
 
-        RowLayout {
-          id: actionRow
-          anchors.centerIn: parent
-          spacing: 6
-
-          TextButton { text: "Cancel"; icon: Icons.glyph(0xF0156); onClicked: root.close() }
-          Divider {}
-          TextButton { text: "Copy"; icon: Icons.glyph(0xF018F); onClicked: root.finish("copy") }
-          TextButton { text: "Save"; icon: Icons.glyph(0xF0193); onClicked: root.finish("save") }
-          TextButton { text: "Pin"; icon: Icons.glyph(0xF0403); onClicked: root.finish("pin") }
-          TextButton { text: "Done"; icon: Icons.glyph(0xF012C); selected: true; onClicked: root.finish("keep") }
+            TextButton { text: "Pin"; icon: Icons.glyph(0xF0403); dimIcon: true; onClicked: root.finish("pin") }
+            TextButton { text: "Copy"; icon: Icons.glyph(0xF018F); dimIcon: true; onClicked: root.finish("copy") }
+            TextButton { text: "Save"; icon: Icons.glyph(0xF0193); dimIcon: true; onClicked: root.finish("save") }
+            TextButton { text: "Done"; selected: true; onClicked: root.finish("keep") }
+          }
         }
       }
 
       // ---- the picture
       Item {
         id: viewport
-        anchors.top: toolbar.bottom
-        anchors.bottom: actions.top
-        anchors.left: parent.left
-        anchors.right: side.left
-        anchors.margins: 24
+        anchors.top: win.top
+        anchors.topMargin: titleBar.height + optionsBar.height + 24
+        anchors.bottom: win.bottom
+        anchors.bottomMargin: bottomBar.height + 24
+        anchors.left: win.left
+        anchors.right: win.right
+        anchors.leftMargin: 32
+        anchors.rightMargin: 32
 
         readonly property real fit: Math.min(1, width / Math.max(1, sheet.width), height / Math.max(1, sheet.height))
 
