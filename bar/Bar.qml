@@ -127,7 +127,8 @@ Scope {
         // foot with a faint shadow line under it.
         Item {
           anchors.fill: parent
-          visible: bar.fullscreen || Services.Config.bar.glass
+          // Frutiger Aero: always glass, whatever the background setting says.
+          visible: true
 
           Rectangle {
             anchors.fill: parent
@@ -167,6 +168,24 @@ Scope {
             anchors.bottom: parent.bottom
             height: 1
             color: Theme.alpha("#0b2540", 0.18)
+          }
+          // Reflections: soft glints of light along the glass, like the
+          // Vista taskbar catching a window.
+          Rectangle {
+            anchors.fill: parent
+            anchors.bottomMargin: 2
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              GradientStop { position: 0.00; color: Theme.alpha("#ffffff", 0.0) }
+              GradientStop { position: 0.10; color: Theme.alpha("#ffffff", 0.22) }
+              GradientStop { position: 0.20; color: Theme.alpha("#ffffff", 0.0) }
+              GradientStop { position: 0.42; color: Theme.alpha("#ffffff", 0.0) }
+              GradientStop { position: 0.52; color: Theme.alpha("#ffffff", 0.16) }
+              GradientStop { position: 0.58; color: Theme.alpha("#ffffff", 0.0) }
+              GradientStop { position: 0.74; color: Theme.alpha("#ffffff", 0.0) }
+              GradientStop { position: 0.84; color: Theme.alpha("#ffffff", 0.2) }
+              GradientStop { position: 1.00; color: Theme.alpha("#ffffff", 0.04) }
+            }
           }
         }
 

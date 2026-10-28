@@ -138,7 +138,8 @@ Scope {
       Item {
         id: glass
 
-        visible: Config.bar.glass
+        // Frutiger Aero: the bar is always glass, whatever the setting says.
+        visible: true
         readonly property int fade: 40
         readonly property int depth: Theme.barHeight + fade
 
