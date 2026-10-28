@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import qs.services
 import qs.theme
 
 // A card that drops from a bar button. Clicking anywhere else, or Escape,
@@ -21,6 +22,11 @@ PopupWindow {
 
   function toggle() { open = !open }
   function close() { open = false }
+
+  Connections {
+    target: Session
+    function onScreensaverChanged() { if (Session.screensaver) root.close() }
+  }
 
   visible: open || card.opacity > 0
   color: "transparent"

@@ -13,6 +13,7 @@ Scope {
     model: Captures.pins
 
     PanelWindow {
+      visible: !Session.screensaver
       id: pin
       required property var modelData
 

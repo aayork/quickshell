@@ -25,6 +25,16 @@ Scope {
   // Addresses of screensaver windows currently open.
   property var saverWindows: ({})
   readonly property int saverCount: Object.keys(saverWindows).length
+  // Set the moment the screensaver is asked for, so the shell's popups and
+  // overlays are gone before mpv maps; one closing over mpv would put the
+  // pointer on it, which mpv takes as movement and quits.
+  property bool saverStarting: false
+  onSaverCountChanged: if (saverCount > 0) saverStarting = false
+  Binding {
+    target: Session
+    property: "screensaver"
+    value: root.saverStarting || root.saverCount > 0
+  }
 
   readonly property string saverClass: "org.aayork.screensaver"
 
@@ -37,7 +47,21 @@ Scope {
     + "'any(.[]; .fullscreen > 0 and .class != \"" + saverClass + "\" and (.workspace.id as $w | $active | index($w)))' >/dev/null && echo fullscreen"
 
   function launchScreensaver() {
-    Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver", Config.screensaver.folder, Config.screensaver.sound ? "yes" : "no"])
+    saverStarting = true
+    saverLaunch.restart()
+    saverGiveUp.restart()
+  }
+
+  Timer {
+    id: saverLaunch
+    interval: 400
+    onTriggered: Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver", Config.screensaver.folder, Config.screensaver.sound ? "yes" : "no"])
+  }
+  // No window came up (no videos, mpv failed): let the shell show again.
+  Timer {
+    id: saverGiveUp
+    interval: 6000
+    onTriggered: root.saverStarting = false
   }
 
   function start() {
@@ -115,7 +139,7 @@ Scope {
   // Time for mpv to put its window up before a missing one means anything.
   Timer {
     id: grace
-    interval: 3000
+    interval: 3400
     onTriggered: if (root.cycling && root.saverCount === 0 && !monitor.isIdle) root.cancel("screensaver did not start")
   }
 

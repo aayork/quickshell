@@ -15,6 +15,10 @@ Scope {
   id: root
 
   property bool open: false
+  Connections {
+    target: Session
+    function onScreensaverChanged() { if (Session.screensaver) root.open = false }
+  }
   property int cursor: 0
   // Index of the card waiting for its second press, or -1.
   property int confirming: -1

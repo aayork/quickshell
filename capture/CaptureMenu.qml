@@ -12,6 +12,10 @@ Scope {
   id: root
 
   property bool open: false
+  Connections {
+    target: Session
+    function onScreensaverChanged() { if (Session.screensaver) root.open = false }
+  }
 
   readonly property string script: Quickshell.shellDir + "/bin/screenshot"
   readonly property var modes: [

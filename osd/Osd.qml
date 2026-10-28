@@ -40,7 +40,7 @@ PanelWindow {
   }
 
   screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
-  visible: showing || card.opacity > 0
+  visible: (showing || card.opacity > 0) && !Session.screensaver
   anchors.bottom: true
   margins.bottom: 80
   implicitWidth: 260

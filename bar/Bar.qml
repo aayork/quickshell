@@ -35,7 +35,7 @@ Scope {
       readonly property var monitor: Hyprland.monitorFor(screen)
       readonly property bool fullscreen: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.hasFullscreen === true : false
       property bool peeking: false
-      readonly property bool tucked: fullscreen && !peeking
+      readonly property bool tucked: fullscreen && (!peeking || Services.Session.screensaver)
       readonly property bool peekHeld: slideHover.hovered || edgeHover.hovered || PopupState.active !== null
 
       // See-through over the wallpaper, solid when it peeks over a window.

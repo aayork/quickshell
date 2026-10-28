@@ -16,7 +16,7 @@ PanelWindow {
   readonly property int cardWidth: 360
 
   screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
-  visible: Notifs.toasts.length > 0
+  visible: Notifs.toasts.length > 0 && !Session.screensaver
   anchors { top: true; right: true }
   margins { top: Theme.popupGap; right: Theme.popupGap }
   implicitWidth: cardWidth

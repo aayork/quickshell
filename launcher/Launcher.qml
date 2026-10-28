@@ -390,6 +390,11 @@ Scope {
     open = false
   }
 
+  Connections {
+    target: Session
+    function onScreensaverChanged() { if (Session.screensaver) root.hide() }
+  }
+
   onQueryChanged: {
     cursor = 0
     armed = ""

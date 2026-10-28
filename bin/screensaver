@@ -38,7 +38,7 @@ for monitor in $(hyprctl monitors -j | jq -r '.[] | select(.disabled == false) |
     --shuffle \
     --mute="$([[ $sound == yes ]] && echo no || echo yes)" \
     --stop-screensaver=no \
-    --cursor-autohide=1000 \
+    --cursor-autohide=always \
     --really-quiet \
     --idle=no \
     "${videos[@]}" >/dev/null 2>&1

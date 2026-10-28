@@ -17,7 +17,7 @@ PanelWindow {
   readonly property int cardHeight: 150
 
   screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
-  visible: Captures.stack.length > 0
+  visible: Captures.stack.length > 0 && !Session.screensaver
   anchors { bottom: true; left: true }
   margins { bottom: 12; left: 12 }
   implicitWidth: cardWidth
