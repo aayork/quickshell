@@ -1,7 +1,8 @@
 #!/bin/bash
 set -uo pipefail
 
-# Takes a screenshot: region, smart (drag, or click a window), or fullscreen,
+# Takes a screenshot: region, smart (drag, or click a window), fullscreen, or
+# allinone (CleanShot's All-In-One bar: every mode from one shortcut),
 # and hands it to the shell, where it lands in the quick-access stack to be
 # copied, saved, edited or pinned.
 #
@@ -49,6 +50,8 @@ cleanup() {
 trap cleanup EXIT
 
 set_no_hw_cursors 0
+# slurp has no All-In-One; fall back to a plain smart pick.
+[[ $MODE == allinone ]] && MODE=smart
 { read -r FREEZE_PID; read -r SELECTION; } < <("$BIN/capture-region" "$MODE" --keep-freeze)
 
 [[ -z "$SELECTION" ]] && exit 1

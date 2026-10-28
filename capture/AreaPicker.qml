@@ -23,6 +23,12 @@ import qs.ui
 // crosshair with its coordinates beside it, then the outside dimmed, white
 // handles on the selection's corners and edges, and its size by the pointer.
 // The result is cropped out of the still, so nothing of the picker gets in.
+//
+// In "allinone" mode (CleanShot's All-In-One) the area stays put once drawn:
+// it starts on the last one used, moves when dragged, resizes from its edges
+// and corners, and a bar under it takes it as a screenshot, the whole screen,
+// a window, a scrolling capture, a timed shot, text (OCR) or a recording.
+// A pill beside the bar sets the size exactly and locks the aspect ratio.
 Scope {
   id: root
 
@@ -36,6 +42,17 @@ Scope {
   // topmost first, in this screen's own coordinates.
   property var monitorInfo: null
   property var windows: []
+
+  // All-In-One state.
+  readonly property bool aio: mode === "allinone"
+  property int timerSeconds: 5
+  property bool recordPanel: false
+  property bool recSystem: true
+  property bool recMic: false
+  property bool recCursor: true
+  property bool lockRatio: false
+  // What happens to the cropped area: "capture" (into the stack) or "ocr".
+  property string cropAction: "capture"
 
   Connections {
     target: Captures
@@ -51,9 +68,67 @@ Scope {
 
   function start() {
     surface.reset()
+    recordPanel = false
+    if (aio) surface.initKept()
     open = true
     Captures.picking = true
   }
+
+  // A rectangle in this screen's points, as layout coordinates for grim
+  // ("X,Y WxH") and gpu-screen-recorder ("WxH+X+Y").
+  function grimGeo(r) {
+    var mx = monitorInfo ? monitorInfo.x : 0, my = monitorInfo ? monitorInfo.y : 0
+    return Math.round(mx + r.x) + "," + Math.round(my + r.y) + " " + Math.round(r.w) + "x" + Math.round(r.h)
+  }
+  function recorderGeo(r) {
+    var mx = monitorInfo ? monitorInfo.x : 0, my = monitorInfo ? monitorInfo.y : 0
+    return Math.round(r.w) + "x" + Math.round(r.h) + "+" + Math.round(mx + r.x) + "+" + Math.round(my + r.y)
+  }
+
+  // Closes the picker without taking anything, for actions that work on
+  // the live screen (recording, scrolling, the timer).
+  function dismissForLive() {
+    if (surface.kept) Captures.rememberSelection(monitorName, surface.kept)
+    cancel()
+  }
+
+  // ---- All-In-One actions
+  function aioArea() {
+    if (!surface.kept) return
+    Captures.rememberSelection(monitorName, surface.kept)
+    finish(surface.kept)
+  }
+  function aioFullscreen() { finish({ x: 0, y: 0, w: surface.width, h: surface.height }) }
+  function aioWindow() { mode = "windows" }
+  function aioScrolling() {
+    if (!surface.kept) return
+    var geo = grimGeo(surface.kept)
+    dismissForLive()
+    Quickshell.execDetached([Quickshell.shellDir + "/bin/scroll-capture", "--region", geo])
+  }
+  function aioTimer() {
+    if (!surface.kept) return
+    var geo = grimGeo(surface.kept)
+    countdownRect = surface.kept
+    dismissForLive()
+    Captures.timedCapture(geo, timerSeconds)
+  }
+  function aioOcr() {
+    if (!surface.kept) return
+    Captures.rememberSelection(monitorName, surface.kept)
+    cropAction = "ocr"
+    out = (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/capture-text-" + Date.now() + ".png"
+    finish(surface.kept)
+  }
+  function aioRecord(format) {
+    if (!surface.kept) return
+    var geo = recorderGeo(surface.kept)
+    dismissForLive()
+    Captures.startRecording(geo, format, recSystem, recMic, recCursor)
+  }
+
+  // Where the timer's countdown shows, in this screen's points.
+  property var countdownRect: null
 
   function cancel() {
     if (!open && frozen === "") return
@@ -79,7 +154,11 @@ Scope {
   Process {
     id: crop
     onExited: function(code) {
-      if (code === 0) Captures.add(root.out)
+      if (code === 0) {
+        if (root.cropAction === "ocr") Captures.recognize(root.out)
+        else Captures.add(root.out)
+      }
+      root.cropAction = "capture"
       root.frozen = ""
     }
   }
@@ -150,11 +229,79 @@ Scope {
       // The magnifier, off unless asked for (M), as in CleanShot.
       property bool magnify: false
 
+      // All-In-One: the area that stays put, and an edit in progress on it
+      // ("move", or "resize" with the edges being dragged).
+      property var kept: null
+      property string editOp: ""
+      property var editFrom: null
+      property var editEdges: ({ l: false, r: false, t: false, b: false })
+
       function reset() {
         dragging = false
         moving = false
         square = false
         seen = false
+        kept = null
+        editOp = ""
+      }
+
+      function initKept() {
+        var last = Captures.lastSelection
+        if (last && last.monitor === root.monitorName && last.w > 4 && last.h > 4
+            && last.x + last.w <= width && last.y + last.h <= height)
+          kept = { x: last.x, y: last.y, w: last.w, h: last.h }
+        else
+          kept = { x: Math.round(width * 0.25), y: Math.round(height * 0.22), w: Math.round(width * 0.5), h: Math.round(height * 0.5) }
+      }
+
+      // Which handles, if any, sit under (x, y).
+      function edgesAt(x, y) {
+        var r = kept, t = 8
+        if (!r) return null
+        var e = {
+          l: Math.abs(x - r.x) <= t, r: Math.abs(x - (r.x + r.w)) <= t,
+          t: Math.abs(y - r.y) <= t, b: Math.abs(y - (r.y + r.h)) <= t
+        }
+        var inX = x >= r.x - t && x <= r.x + r.w + t, inY = y >= r.y - t && y <= r.y + r.h + t
+        if (!(inX && inY)) return null
+        if (!(e.l || e.r || e.t || e.b)) return null
+        return e
+      }
+      function inside(x, y) {
+        var r = kept
+        return r && x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h
+      }
+
+      // Apply an edit as the pointer moves.
+      function edit(x, y) {
+        var f = editFrom, dx = x - f.px, dy = y - f.py
+        var r = { x: f.r.x, y: f.r.y, w: f.r.w, h: f.r.h }
+        if (editOp === "move") {
+          r.x = Math.max(0, Math.min(width - r.w, r.x + dx))
+          r.y = Math.max(0, Math.min(height - r.h, r.y + dy))
+        } else {
+          var e = editEdges
+          if (e.l) { r.x = Math.min(f.r.x + f.r.w - 8, f.r.x + dx); r.w = f.r.x + f.r.w - r.x }
+          if (e.r) r.w = Math.max(8, f.r.w + dx)
+          if (e.t) { r.y = Math.min(f.r.y + f.r.h - 8, f.r.y + dy); r.h = f.r.y + f.r.h - r.y }
+          if (e.b) r.h = Math.max(8, f.r.h + dy)
+          if (root.lockRatio && f.r.h > 0) {
+            var ratio = f.r.w / f.r.h
+            if (e.l || e.r) { var nh = r.w / ratio; if (e.t) r.y = f.r.y + f.r.h - nh; r.h = nh }
+            else { var nw = r.h * ratio; if (e.l) r.x = f.r.x + f.r.w - nw; r.w = nw }
+          }
+          r.x = Math.max(0, r.x); r.y = Math.max(0, r.y)
+          r.w = Math.min(width - r.x, r.w); r.h = Math.min(height - r.y, r.h)
+        }
+        kept = r
+      }
+
+      // Exact size from the pill, in device pixels.
+      function setSize(pw, ph) {
+        if (!kept) return
+        var w = Math.max(8, Math.min(width - kept.x, pw / ratio))
+        var h = Math.max(8, Math.min(height - kept.y, ph / ratio))
+        kept = { x: kept.x, y: kept.y, w: w, h: h }
       }
 
       function clampX(v) { return Math.max(0, Math.min(width - 1, v)) }
@@ -162,7 +309,7 @@ Scope {
 
       // The area between the anchor and the crosshair.
       readonly property var selection: {
-        if (!dragging) return null
+        if (!dragging) return root.aio && root.mode !== "windows" ? kept : null
         var w = Math.abs(cx - ax), h = Math.abs(cy - ay)
         if (square) { var side = Math.max(w, h); w = side; h = side }
         var x = cx >= ax ? ax : ax - w
@@ -174,7 +321,8 @@ Scope {
 
       // The window under the crosshair, when not dragging.
       readonly property var hovered: {
-        if (dragging || !seen) return null
+        if (dragging || !seen || editOp !== "") return null
+        if (root.aio) return null
         for (var i = 0; i < root.windows.length; i++) {
           var r = root.windows[i]
           if (cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h) return r
@@ -202,7 +350,10 @@ Scope {
 
       Keys.onPressed: function(event) {
         var step = (event.modifiers & Qt.ShiftModifier) ? 10 : 1
-        if (event.key === Qt.Key_Escape) root.cancel()
+        if (event.key === Qt.Key_Escape) {
+          if (root.recordPanel) root.recordPanel = false
+          else root.cancel()
+        }
         else if (event.key === Qt.Key_Space && !event.isAutoRepeat) moving = true
         else if (event.key === Qt.Key_Shift) square = true
         else if (event.key === Qt.Key_M) magnify = !magnify
@@ -211,7 +362,9 @@ Scope {
         else if (event.key === Qt.Key_Up) moveTo(cx, cy - step)
         else if (event.key === Qt.Key_Down) moveTo(cx, cy + step)
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          if (dragging && selection && selection.w >= 4 && selection.h >= 4) root.finish(selection)
+          if (root.recordPanel) root.aioRecord((event.modifiers & Qt.ShiftModifier) ? "gif" : "mp4")
+          else if (root.aio && !dragging) root.aioArea()
+          else if (dragging && selection && selection.w >= 4 && selection.h >= 4) root.finish(selection)
           else pickPoint()
         } else return
         event.accepted = true
@@ -296,7 +449,7 @@ Scope {
       // dragging, the size) in two short lines.
       Item {
         id: crosshair
-        visible: surface.seen && !surface.moving
+        visible: surface.seen && !surface.moving && pointer.cursorShape === Qt.BlankCursor
         x: Math.round(surface.cx)
         y: Math.round(surface.cy)
 
@@ -410,17 +563,48 @@ Scope {
       }
 
       MouseArea {
+        id: pointer
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        // The crosshair above stands in for the pointer.
-        cursorShape: Qt.BlankCursor
 
-        onPositionChanged: function(mouse) { surface.moveTo(mouse.x, mouse.y) }
+        // Over the kept area's handles or inside it, the pointer says what a
+        // drag would do; elsewhere the crosshair stands in for it.
+        readonly property var overEdges: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" ? surface.edgesAt(surface.cx, surface.cy) : null
+        readonly property bool overInside: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" && !overEdges && surface.inside(surface.cx, surface.cy)
+        cursorShape: {
+          if (surface.editOp === "move" || overInside) return Qt.SizeAllCursor
+          var e = surface.editOp === "resize" ? surface.editEdges : overEdges
+          if (!e) return Qt.BlankCursor
+          if ((e.l && e.t) || (e.r && e.b)) return Qt.SizeFDiagCursor
+          if ((e.r && e.t) || (e.l && e.b)) return Qt.SizeBDiagCursor
+          if (e.l || e.r) return Qt.SizeHorCursor
+          return Qt.SizeVerCursor
+        }
+
+        onPositionChanged: function(mouse) {
+          if (surface.editOp !== "") {
+            surface.edit(mouse.x, mouse.y)
+            surface.cx = mouse.x
+            surface.cy = mouse.y
+            return
+          }
+          surface.moveTo(mouse.x, mouse.y)
+        }
         onPressed: function(mouse) {
           surface.moveTo(mouse.x, mouse.y)
           if (mouse.button === Qt.RightButton) return root.cancel()
           if (root.mode === "windows") return
+          root.recordPanel = false
+          if (root.aio && surface.kept) {
+            var e = surface.edgesAt(mouse.x, mouse.y)
+            if (e || surface.inside(mouse.x, mouse.y)) {
+              surface.editOp = e ? "resize" : "move"
+              if (e) surface.editEdges = e
+              surface.editFrom = { px: mouse.x, py: mouse.y, r: surface.kept }
+              return
+            }
+          }
           surface.ax = mouse.x
           surface.ay = mouse.y
           surface.dragging = true
@@ -428,13 +612,76 @@ Scope {
         onReleased: function(mouse) {
           if (mouse.button !== Qt.LeftButton) return
           if (root.mode === "windows") return surface.pickPoint()
+          if (surface.editOp !== "") {
+            surface.editOp = ""
+            return
+          }
           var sel = surface.selection
           surface.dragging = false
           surface.moving = false
+          if (root.aio) {
+            // All-In-One keeps the new area for the bar to act on; a click
+            // keeps the old one.
+            if (sel && sel.w >= 4 && sel.h >= 4) surface.kept = sel
+            return
+          }
           // A click rather than a drag takes the window under it.
           if (!sel || sel.w < 4 || sel.h < 4) surface.pickPoint()
           else root.finish(sel)
         }
+      }
+
+      AllInOneBar {
+        id: aioBar
+        picker: root
+        area: surface
+        visible: root.aio && root.mode !== "windows" && !!surface.kept && !surface.dragging && surface.editOp === ""
+      }
+    }
+  }
+
+  // The self-timer's countdown: a big number over the area it will take,
+  // gone a moment before the shot.
+  PanelWindow {
+    screen: window.screen
+    visible: Captures.countdown > 0
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    mask: Region {}
+    WlrLayershell.namespace: "aayork-capture-countdown"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+    Rectangle {
+      readonly property var r: root.countdownRect
+      visible: !!r
+      x: r ? r.x : 0
+      y: r ? r.y : 0
+      width: r ? r.w : 0
+      height: r ? r.h : 0
+      color: "transparent"
+      border.width: 1
+      border.color: Theme.alpha("#ffffff", 0.6)
+    }
+
+    Rectangle {
+      readonly property var r: root.countdownRect
+      width: 96
+      height: 96
+      radius: 48
+      x: r ? r.x + r.w / 2 - 48 : (parent.width - 96) / 2
+      y: r ? r.y + r.h / 2 - 48 : (parent.height - 96) / 2
+      color: Theme.alpha("#1e1e20", 0.85)
+      border.width: 1
+      border.color: Theme.alpha("#ffffff", 0.2)
+      Text {
+        anchors.centerIn: parent
+        text: Captures.countdown
+        color: "#ffffff"
+        font.family: Theme.fontFamily
+        font.pixelSize: 44
+        font.bold: true
       }
     }
   }
