@@ -15,10 +15,10 @@ Item {
   id: card
 
   required property string path
-  property int cardWidth: 220
+  property int cardWidth: 200
 
   // Rounder than a window, as CleanShot's are.
-  readonly property int radius: 14
+  readonly property int radius: 16
   readonly property bool video: Captures.isVideo(path)
   readonly property bool hovered: hover.hovered
 
@@ -174,24 +174,24 @@ Item {
     }
 
     CornerButton {
-      anchors { top: parent.top; left: parent.left; margins: 9 }
+      anchors { top: parent.top; left: parent.left; margins: 6 }
       glyph: 0xF0156
       onClicked: Captures.dismiss(card.path)
     }
     CornerButton {
-      anchors { top: parent.top; right: parent.right; margins: 9 }
+      anchors { top: parent.top; right: parent.right; margins: 6 }
       visible: !card.video
       glyph: 0xF0403
       onClicked: Captures.pin(card.path)
     }
     CornerButton {
-      anchors { bottom: parent.bottom; left: parent.left; margins: 9 }
+      anchors { bottom: parent.bottom; left: parent.left; margins: 6 }
       // A recording opens in the player instead.
       glyph: card.video ? 0xF040A : 0xF03EB
       onClicked: Captures.edit(card.path)
     }
     CornerButton {
-      anchors { bottom: parent.bottom; right: parent.right; margins: 9 }
+      anchors { bottom: parent.bottom; right: parent.right; margins: 6 }
       glyph: 0xF0193
       onClicked: Captures.saveAs(card.path)
     }
