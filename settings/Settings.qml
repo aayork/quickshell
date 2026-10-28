@@ -872,7 +872,7 @@ Scope {
               Setting {
                 glyph: 0xF00B5
                 label: "Background effects"
-                note: Config.bar.glass ? "Blur the wallpaper behind the bar" : "None, the bar is clear"
+                note: Config.bar.glass ? "Vista glass: a light blur, a sheen and streaks of light" : "None, the bar is clear"
                 Toggle {
                   checked: Config.bar.glass
                   onToggled: Config.bar.glass = !Config.bar.glass

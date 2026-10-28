@@ -171,7 +171,9 @@ Scope {
           autoPaddingEnabled: false
           blurEnabled: true
           blurMax: 64
-          blur: 1
+          // A light blur, as on Windows Vista's taskbar: the wallpaper still
+          // reads through the glass.
+          blur: 0.45
           maskEnabled: true
           maskSource: fadeMask
           // Centred so the fade spans the whole gradient; at 0 the edge is hard.
