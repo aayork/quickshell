@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
@@ -36,6 +37,8 @@ Scope {
 
   // key -> { count, last }
   property var frecency: ({})
+  // Keys of the rows pinned to the top of the empty launcher, in order.
+  property var favorites: []
   // Extensions whose `when` check passed.
   property var extensions: []
   // Rows the current extension query produced.
@@ -85,7 +88,26 @@ Scope {
     { id: "capture", title: "Take a Screenshot", glyph: 0xF0E51, words: "screenshot capture region area window fullscreen scroll", run: () => Captures.menuRequested() },
     { id: "colorpicker", title: "Color Picker", glyph: 0xF0349, words: "colour pick hex hyprpicker", run: () => Quickshell.execDetached(["hyprpicker", "-a"]) },
     { id: "reload", title: "Reload Shell", glyph: 0xF0450, words: "restart quickshell", run: () => Quickshell.reload(true) }
-  ].filter(c => !scopes.some(s => s.keyword === c.id))
+  ].concat(windowCommands).filter(c => !scopes.some(s => s.keyword === c.id))
+
+  // Raycast-style window management, for the window that had focus before
+  // the launcher opened (bin/window-arrange).
+  function arrange(preset) {
+    Quickshell.execDetached([Quickshell.shellDir + "/bin/window-arrange", preset, String(Theme.barHeight)])
+  }
+  readonly property var windowCommands: [
+    { id: "win-left", title: "Left Half", glyph: 0xF10AA, words: "window snap tile side", kind: "Window", run: () => arrange("left-half") },
+    { id: "win-right", title: "Right Half", glyph: 0xF10AB, words: "window snap tile side", kind: "Window", run: () => arrange("right-half") },
+    { id: "win-top", title: "Top Half", glyph: 0xF1513, words: "window snap upper", kind: "Window", run: () => arrange("top-half") },
+    { id: "win-bottom", title: "Bottom Half", glyph: 0xF10A9, words: "window snap lower", kind: "Window", run: () => arrange("bottom-half") },
+    { id: "win-center", title: "Center", glyph: 0xF02F1, words: "window middle centre float", kind: "Window", run: () => arrange("center") },
+    { id: "win-almost", title: "Almost Maximize", glyph: 0xF004C, words: "window big large", kind: "Window", run: () => arrange("almost-maximize") },
+    { id: "win-maximize", title: "Maximize", glyph: 0xF05AF, words: "window full zoom", kind: "Window", run: () => arrange("maximize") },
+    { id: "win-fullscreen", title: "Toggle Fullscreen", glyph: 0xF0293, words: "window full screen", kind: "Window", run: () => arrange("fullscreen") },
+    { id: "win-float", title: "Toggle Floating", glyph: 0xF0E59, words: "window float tile", kind: "Window", run: () => arrange("float") },
+    { id: "win-tile", title: "Tile Window", glyph: 0xF0A1D, words: "window tiling layout restore", kind: "Window", run: () => arrange("tile") },
+    { id: "win-pin", title: "Pin to All Workspaces", glyph: 0xF0403, words: "window sticky every workspace", kind: "Window", run: () => arrange("pin") }
+  ]
 
   // What is listed. Each row carries a `header` when it starts a new group.
   readonly property var rows: withHeaders(scoped ? scopedRows() : query.trim() === "" ? emptyRows() : searchRows())
@@ -105,6 +127,39 @@ Scope {
     return Math.min(200, entry.count * 8) + (days < 7 ? 50 : 0)
   }
 
+  function isFavorite(key) { return favorites.indexOf(key) !== -1 }
+
+  function toggleFavorite(key) {
+    var next = favorites.filter(k => k !== key)
+    if (next.length === favorites.length) next.push(key)
+    setFavorites(next)
+  }
+
+  function moveFavorite(key, step) {
+    var next = favorites.slice()
+    var at = next.indexOf(key)
+    var to = at + step
+    if (at < 0 || to < 0 || to >= next.length) return
+    next.splice(at, 1)
+    next.splice(to, 0, key)
+    setFavorites(next)
+  }
+
+  function setFavorites(next) {
+    favorites = next
+    favoritesFile.setText(JSON.stringify(next))
+  }
+
+  // Ctrl+K entries every app, command and keyword gets.
+  function favoriteActions(key) {
+    if (!isFavorite(key)) return [{ title: "Add to Favorites", keepOpen: true, shortcut: ["Ctrl", "⇧", "F"], run: () => toggleFavorite(key) }]
+    var list = [{ title: "Remove from Favorites", keepOpen: true, shortcut: ["Ctrl", "⇧", "F"], run: () => toggleFavorite(key) }]
+    var at = favorites.indexOf(key)
+    if (at > 0) list.push({ title: "Move Up in Favorites", keepOpen: true, run: () => moveFavorite(key, -1) })
+    if (at < favorites.length - 1) list.push({ title: "Move Down in Favorites", keepOpen: true, run: () => moveFavorite(key, 1) })
+    return list
+  }
+
   function copyAction(title, text) {
     return { title: title, run: () => Quickshell.execDetached(["wl-copy", "--", text]) }
   }
@@ -116,8 +171,10 @@ Scope {
       actions.push({ title: extra[i].name, run: (function(action) { return () => action.execute() })(extra[i]) })
     }
     actions.push(copyAction("Copy Name", entry.name))
+    actions = actions.concat(favoriteActions("app:" + entry.id))
     return {
       key: "app:" + entry.id,
+      favorite: isFavorite("app:" + entry.id),
       title: entry.name,
       subtitle: entry.genericName || entry.comment || "",
       icon: Quickshell.iconPath(entry.icon, "application-x-executable"),
@@ -131,8 +188,9 @@ Scope {
   function commandRow(command, score) {
     return {
       key: "cmd:" + command.id,
+      favorite: isFavorite("cmd:" + command.id),
       title: command.title,
-      subtitle: "Command",
+      subtitle: command.kind || "Command",
       icon: "",
       glyph: Icons.glyph(command.glyph),
       // A drawn logo to show in place of the glyph.
@@ -140,7 +198,7 @@ Scope {
       chip: "",
       confirm: command.confirm === true,
       score: score,
-      actions: [{ title: "Run", run: command.run }]
+      actions: [{ title: command.kind === "Window" ? "Arrange Window" : "Run", run: command.run }].concat(favoriteActions("cmd:" + command.id))
     }
   }
 
@@ -148,13 +206,14 @@ Scope {
   function scopeRow(scope, score) {
     return {
       key: "kw:" + scope.id,
+      favorite: isFavorite("kw:" + scope.id),
       title: scope.title,
       subtitle: scope.subtitle !== scope.title ? scope.subtitle : "",
       icon: "",
       glyph: scope.glyph || Icons.glyph(0xF0349),
       chip: scope.keyword + ":",
       score: score,
-      actions: [{ title: "Use Keyword", fill: scope.keyword + ": " }]
+      actions: [{ title: "Use Keyword", fill: scope.keyword + ": " }].concat(favoriteActions("kw:" + scope.id))
     }
   }
 
@@ -180,22 +239,39 @@ Scope {
   function emptyRows() {
     var list = []
     var shown = {}
+    for (var f = 0; f < favorites.length; f++) {
+      var favorite = rowForKey(favorites[f])
+      if (!favorite) continue
+      favorite.group = "Favorites"
+      shown[favorite.key] = true
+      list.push(favorite)
+    }
+    var recentCount = 0
     var keys = Object.keys(frecency).sort((a, b) => frecency[b].last - frecency[a].last)
-    for (var i = 0; i < keys.length && list.length < 5; i++) {
+    for (var i = 0; i < keys.length && recentCount < 5; i++) {
+      if (shown[keys[i]]) continue
       var row = rowForKey(keys[i])
       if (!row) continue
       row.group = "Recent"
       shown[row.key] = true
       list.push(row)
+      recentCount++
     }
 
     var rest = []
-    for (var c = 0; c < commands.length; c++) rest.push(commandRow(commands[c], 0))
+    var windows = []
+    for (var c = 0; c < commands.length; c++) {
+      var commandEntry = commandRow(commands[c], 0)
+      if (commands[c].kind === "Window") windows.push(commandEntry)
+      else rest.push(commandEntry)
+    }
     for (var s = 0; s < scopes.length; s++) rest.push(scopeRow(scopes[s], 0))
     rest = rest.filter(r => !shown[r.key])
     rest.sort((a, b) => a.title.localeCompare(b.title))
     for (var r = 0; r < rest.length; r++) rest[r].group = "Commands"
-    return list.concat(rest)
+    windows = windows.filter(r => !shown[r.key])
+    for (var w = 0; w < windows.length; w++) windows[w].group = "Window Management"
+    return list.concat(rest).concat(windows)
   }
 
   function searchRows() {
@@ -207,7 +283,7 @@ Scope {
       var entry = apps[i]
       if (entry.noDisplay) continue
       var appScore = Fuzzy.best(text, entry.name, [entry.genericName, entry.id].concat(entry.keywords || []))
-      if (appScore > 0) list.push(appRow(entry, appScore + frecencyBonus("app:" + entry.id)))
+      if (appScore > 0) list.push(appRow(entry, appScore + frecencyBonus("app:" + entry.id) + (isFavorite("app:" + entry.id) ? 60 : 0)))
     }
 
     for (var c = 0; c < commands.length; c++) {
@@ -225,6 +301,7 @@ Scope {
 
     list.sort(function(a, b) { return b.score - a.score || a.title.localeCompare(b.title) })
     list = list.slice(0, maxRows)
+    for (var g = 0; g < list.length; g++) list[g].group = "Results"
 
     var answer = Calc.evaluate(text)
     if (answer !== null) {
@@ -236,7 +313,40 @@ Scope {
         icon: "",
         glyph: Icons.glyph(0xF00EC),
         chip: "",
+        group: "Calculator",
         actions: [copyAction("Copy Result", exact), copyAction("Copy Expression", text)]
+      })
+    }
+    return list.concat(fallbackRows(text))
+  }
+
+  // Raycast's fallback commands: what to do with the text when the list has
+  // nothing better, always offered at the bottom.
+  function fallbackRows(text) {
+    var group = "Use \u201c" + (text.length > 24 ? text.slice(0, 24) + "\u2026" : text) + "\u201d with"
+    var list = [{
+      key: "fallback:web",
+      title: "Search the Web",
+      subtitle: "DuckDuckGo",
+      icon: "",
+      glyph: Icons.glyph(0xF059F),
+      chip: "",
+      group: group,
+      actions: [{ title: "Search the Web", run: () => Quickshell.execDetached(["xdg-open", "https://duckduckgo.com/?q=" + encodeURIComponent(text)]) }]
+    }]
+    var more = [["files", "Search Files"], ["define", "Define Word"], ["ch", "Search Clipboard History"], ["emoji", "Search Emoji"]]
+    for (var i = 0; i < more.length; i++) {
+      var scope = scopes.find(s => s.keyword === more[i][0])
+      if (!scope) continue
+      list.push({
+        key: "fallback:" + scope.id,
+        title: more[i][1],
+        subtitle: scope.keyword + ":",
+        icon: "",
+        glyph: scope.glyph || Icons.glyph(0xF0349),
+        chip: "",
+        group: group,
+        actions: [{ title: more[i][1], fill: scope.keyword + ": " + text }]
       })
     }
     return list
@@ -370,7 +480,7 @@ Scope {
   }
 
   function remember(key) {
-    if (key === "calc") return
+    if (key === "calc" || key.indexOf("fallback:") === 0) return
     var next = Object.assign({}, frecency)
     var entry = next[key] || { count: 0, last: 0 }
     next[key] = { count: entry.count + 1, last: Date.now() }
@@ -494,6 +604,19 @@ Scope {
   }
 
   FileView {
+    id: favoritesFile
+    path: root.stateDir + "/favorites.json"
+    printErrors: false
+    atomicWrites: true
+    onLoaded: {
+      try {
+        var saved = JSON.parse(text())
+        if (Array.isArray(saved)) root.favorites = saved
+      } catch (e) {}
+    }
+  }
+
+  FileView {
     id: frecencyFile
     path: root.stateDir + "/frecency.json"
     printErrors: false
@@ -574,47 +697,71 @@ Scope {
     screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
     visible: root.open
     anchors { top: true; bottom: true; left: true; right: true }
-    color: Theme.alpha(Theme.background, 0.35)
+    // No dimming: like Raycast, it floats over whatever is there.
+    color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "aayork-launcher"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-    onVisibleChanged: if (visible) input.forceActiveFocus()
+    onVisibleChanged: if (visible) {
+      input.forceActiveFocus()
+      appear.restart()
+    }
 
     MouseArea {
       anchors.fill: parent
       onClicked: root.hide()
     }
 
+    // A soft shadow under the card, so it floats.
+    RectangularShadow {
+      anchors.fill: card
+      radius: card.radius
+      offset.y: 14
+      blur: 48
+      spread: -4
+      color: Theme.alpha("#000000", 0.5)
+      opacity: card.opacity
+    }
+
+    // Opens with a quick fade and settle, like Raycast.
+    ParallelAnimation {
+      id: appear
+      NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 120; easing.type: Easing.OutCubic }
+      NumberAnimation { target: card; property: "scale"; from: 0.975; to: 1; duration: 160; easing.type: Easing.OutCubic }
+    }
+
     Rectangle {
       id: card
-      width: 680
-      height: column.implicitHeight + 2 * Theme.borderWidth
+      width: 720
+      height: column.implicitHeight
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.round(parent.height * 0.2)
       color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
+      border.width: 1
+      border.color: Theme.alpha(Theme.foreground, 0.14)
+      radius: 12
+      clip: true
 
       MouseArea { anchors.fill: parent }
 
       ColumnLayout {
         id: column
-        x: Theme.borderWidth
-        y: Theme.borderWidth
-        width: parent.width - 2 * Theme.borderWidth
+        width: parent.width
         spacing: 0
 
         RowLayout {
           Layout.fillWidth: true
-          Layout.margins: 10
-          spacing: 10
+          Layout.leftMargin: 18
+          Layout.rightMargin: 14
+          Layout.topMargin: 14
+          Layout.bottomMargin: 14
+          spacing: 12
 
           Label {
             text: Icons.glyph(0xF0349)
-            font.pixelSize: Theme.iconSize
+            font.pixelSize: Theme.iconLarge
             color: Theme.dim
             elide: Text.ElideNone
           }
@@ -623,11 +770,11 @@ Scope {
             id: input
             Layout.fillWidth: true
             text: root.query
-            color: Theme.foreground
+            color: Theme.brightForeground
             selectionColor: Theme.selection
             selectedTextColor: Theme.brightForeground
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize + 1
+            font.pixelSize: Theme.fontLarge + 3
             clip: true
             onTextEdited: root.query = text
 
@@ -636,7 +783,7 @@ Scope {
               visible: input.text === ""
               text: "Search apps and commands"
               color: Theme.dim
-              font.pixelSize: Theme.fontSize + 1
+              font.pixelSize: Theme.fontLarge + 3
             }
 
             Keys.onPressed: function(event) {
@@ -644,7 +791,10 @@ Scope {
               var enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
               event.accepted = true
 
-              if (control && event.key === Qt.Key_K) {
+              if (control && (event.modifiers & Qt.ShiftModifier) && event.key === Qt.Key_F) {
+                var current = root.currentRow
+                if (current && /^(app|cmd|kw):/.test(current.key)) root.toggleFavorite(current.key)
+              } else if (control && event.key === Qt.Key_K) {
                 if (root.currentActions.length > 0) root.actionsOpen = !root.actionsOpen
               } else if (root.actionsOpen) {
                 // While the action list is up, the keys are its.
@@ -758,12 +908,12 @@ Scope {
 
               Rectangle {
                 anchors.fill: parent
-                anchors.leftMargin: 6
-                anchors.rightMargin: 6
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
                 anchors.topMargin: 1
                 anchors.bottomMargin: 1
-                radius: Theme.controlRadius
-                color: row.armed ? Theme.alpha(Theme.red, 0.2) : row.current && !row.modelData.hint ? Theme.selection : "transparent"
+                radius: 8
+                color: row.armed ? Theme.alpha(Theme.red, 0.2) : row.current && !row.modelData.hint ? Theme.alpha(Theme.foreground, 0.09) : "transparent"
               }
 
               MouseArea {
@@ -880,6 +1030,15 @@ Scope {
                   }
                 }
 
+                Label {
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: row.modelData.favorite === true
+                  text: Icons.glyph(0xF04CE)
+                  color: Theme.yellow
+                  font.pixelSize: Theme.fontSmall
+                  elide: Text.ElideNone
+                }
+
                 Chip {
                   anchors.verticalCenter: parent.verticalCenter
                   text: row.modelData.chip || ""
@@ -972,81 +1131,120 @@ Scope {
           }
         }
 
-        Separator { Layout.fillWidth: true; visible: footer.visible }
-
-        // What Enter does to the current row, and how to get at the rest,
-        // with the keys drawn as keys.
-        RowLayout {
+        // The footer, as in Raycast: where you are on the left; what Enter
+        // does and the way into the other actions on the right.
+        Rectangle {
           id: footer
-          visible: root.currentActions.length > 0
+          visible: root.currentActions.length > 0 || root.scoped !== null
           Layout.fillWidth: true
-          Layout.leftMargin: 12
-          Layout.rightMargin: 12
-          Layout.topMargin: 6
-          Layout.bottomMargin: 6
-          spacing: 6
-
-          Label {
-            text: root.currentActions.length > 0 ? root.currentActions[0].title : ""
-            font.pixelSize: Theme.fontSmall
-            Layout.maximumWidth: 220
-          }
-          Keycap { text: "↵" }
-
-          Item { Layout.fillWidth: true }
-
-          Label {
-            visible: root.currentActions.length > 1
-            text: root.currentActions.length > 1 ? root.currentActions[1].title : ""
-            color: Theme.dim
-            font.pixelSize: Theme.fontSmall
-            Layout.maximumWidth: 180
-          }
-          Keycap { visible: root.currentActions.length > 1; text: "⇧" }
-          Keycap { visible: root.currentActions.length > 1; text: "↵" }
+          implicitHeight: 40
+          color: Theme.alpha(Theme.foreground, 0.035)
 
           Rectangle {
-            visible: root.currentActions.length > 1
-            Layout.leftMargin: 6
-            Layout.rightMargin: 6
-            implicitWidth: 1
-            implicitHeight: 14
-            color: Theme.separator
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            color: Theme.alpha(Theme.foreground, 0.1)
           }
 
-          Label {
-            visible: root.currentActions.length > 1
-            text: "Actions"
-            color: root.actionsOpen ? Theme.accent : Theme.dim
-            font.pixelSize: Theme.fontSmall
-            elide: Text.ElideNone
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 16
+            anchors.rightMargin: 12
+            spacing: 6
+
+            Label {
+              text: root.scoped ? (root.scoped.extension.glyph || Icons.glyph(0xF0349)) : Icons.glyph(0xF0349)
+              color: Theme.dim
+              font.pixelSize: Theme.iconSize
+              elide: Text.ElideNone
+            }
+            Label {
+              text: root.scoped ? root.scoped.extension.title : "Search"
+              color: Theme.dim
+              font.pixelSize: Theme.fontSmall
+              Layout.maximumWidth: 200
+            }
+
+            Item { Layout.fillWidth: true }
+
+            Label {
+              visible: root.currentActions.length > 0
+              text: root.currentActions.length > 0 ? root.currentActions[0].title : ""
+              color: Theme.foreground
+              font.pixelSize: Theme.fontSmall
+              font.bold: true
+              Layout.maximumWidth: 220
+            }
+            Keycap { visible: root.currentActions.length > 0; text: "↵" }
+
+            Rectangle {
+              visible: root.currentActions.length > 1
+              Layout.leftMargin: 6
+              Layout.rightMargin: 6
+              implicitWidth: 1
+              implicitHeight: 16
+              color: Theme.alpha(Theme.foreground, 0.15)
+            }
+
+            Label {
+              visible: root.currentActions.length > 1
+              text: "Actions"
+              color: root.actionsOpen ? Theme.accent : Theme.dim
+              font.pixelSize: Theme.fontSmall
+              elide: Text.ElideNone
+            }
+            Keycap { visible: root.currentActions.length > 1; text: "Ctrl" }
+            Keycap { visible: root.currentActions.length > 1; text: "K" }
           }
-          Keycap { visible: root.currentActions.length > 1; text: "Ctrl" }
-          Keycap { visible: root.currentActions.length > 1; text: "K" }
         }
       }
     }
 
     // Ctrl+K: everything else the current row can do.
+    // A popover just above the footer's right end, the way Raycast's opens.
+    RectangularShadow {
+      anchors.fill: actionPanel
+      visible: actionPanel.visible
+      radius: actionPanel.radius
+      offset.y: 10
+      blur: 36
+      spread: -4
+      color: Theme.alpha("#000000", 0.5)
+    }
+
     Rectangle {
+      id: actionPanel
       visible: root.actionsOpen && root.currentActions.length > 0
-      width: 300
-      height: actionColumn.implicitHeight + 12
+      width: 320
+      height: actionColumn.implicitHeight + 14
       anchors.right: card.right
-      anchors.top: card.bottom
-      anchors.topMargin: 6
+      anchors.rightMargin: 10
+      anchors.bottom: card.bottom
+      anchors.bottomMargin: 46
       color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
+      border.width: 1
+      border.color: Theme.alpha(Theme.foreground, 0.16)
+      radius: 10
 
       MouseArea { anchors.fill: parent }
 
       Column {
         id: actionColumn
-        x: 6
-        y: 6
-        width: parent.width - 12
+        x: 7
+        y: 7
+        width: parent.width - 14
+
+        Label {
+          width: parent.width
+          leftPadding: 10
+          topPadding: 2
+          bottomPadding: 6
+          text: root.currentRow ? root.currentRow.title : "Actions"
+          color: Theme.dim
+          font.pixelSize: Theme.fontSmall
+        }
 
         Repeater {
           model: root.actionsOpen ? root.currentActions : []
@@ -1057,9 +1255,9 @@ Scope {
             required property int index
 
             width: actionColumn.width
-            height: 28
-            radius: Theme.controlRadius
-            color: root.actionCursor === index ? Theme.selection : "transparent"
+            height: 30
+            radius: 7
+            color: root.actionCursor === index ? Theme.alpha(Theme.foreground, 0.09) : "transparent"
 
             Label {
               anchors.left: parent.left
@@ -1076,6 +1274,10 @@ Scope {
               spacing: 4
               Keycap { visible: actionRow.index === 1; text: "⇧" }
               Keycap { visible: actionRow.index < 2; text: "↵" }
+              Repeater {
+                model: actionRow.index >= 2 ? (actionRow.modelData.shortcut || []) : []
+                Keycap { required property string modelData; text: modelData }
+              }
             }
 
             MouseArea {

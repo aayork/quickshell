@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Arrange the focused window, Raycast Window Management style. The launcher's
+# window commands call this.
+#
+#   window-arrange <preset> [top-reserve]
+#
+#   left-half right-half top-half bottom-half   float it and fill that half
+#   center                                      float it at 60% x 65%, centred
+#   almost-maximize                             float it at 90%, centred
+#   maximize                                    Hyprland's maximized state (toggle)
+#   fullscreen                                  real fullscreen (toggle)
+#   float                                       toggle floating
+#   tile                                        back into the tiling layout
+#   pin                                         toggle showing on every workspace
+#
+# top-reserve is the bar's height, so a half never slides under it.
+
+preset=${1:-}
+top=${2:-26}
+gap=8
+
+[[ $top =~ ^[0-9]+$ ]] || top=26
+
+simple() { hyprctl eval "hl.dispatch($1)" >/dev/null; }
+
+case $preset in
+  maximize)   simple 'hl.dsp.window.fullscreen({ mode = "maximized" })'; exit ;;
+  fullscreen) simple 'hl.dsp.window.fullscreen({ mode = "fullscreen" })'; exit ;;
+  float)      simple 'hl.dsp.window.float({ action = "toggle" })'; exit ;;
+  tile)       simple 'hl.dsp.window.float({ action = "disable" })'; exit ;;
+  pin)        simple 'hl.dsp.window.pin()'; exit ;;
+  left-half|right-half|top-half|bottom-half|center|almost-maximize) ;;
+  *) echo "Usage: window-arrange <left-half|right-half|top-half|bottom-half|center|almost-maximize|maximize|fullscreen|float|tile|pin> [top-reserve]" >&2; exit 1 ;;
+esac
+
+hyprctl eval "
+local w = hl.get_active_window()
+if not w then return end
+local m = hl.get_active_monitor()
+local gap, top = $gap, $top
+local W, H = m.width / m.scale, m.height / m.scale
+-- The usable area: below the bar, inside the gaps.
+local ax, ay = m.x + gap, m.y + top + gap
+local aw, ah = W - 2 * gap, H - top - 2 * gap
+local x, y, ww, hh
+local p = '$preset'
+if p == 'left-half' then
+  x, y, ww, hh = ax, ay, (aw - gap) / 2, ah
+elseif p == 'right-half' then
+  x, y, ww, hh = ax + (aw + gap) / 2, ay, (aw - gap) / 2, ah
+elseif p == 'top-half' then
+  x, y, ww, hh = ax, ay, aw, (ah - gap) / 2
+elseif p == 'bottom-half' then
+  x, y, ww, hh = ax, ay + (ah + gap) / 2, aw, (ah - gap) / 2
+else
+  local f = p == 'center' and 0.6 or 0.9
+  local fh = p == 'center' and 0.65 or 0.9
+  ww, hh = aw * f, ah * fh
+  x, y = ax + (aw - ww) / 2, ay + (ah - hh) / 2
+end
+if not w.floating then hl.dispatch(hl.dsp.window.float({ action = 'enable' })) end
+hl.dispatch(hl.dsp.window.resize({ x = math.floor(ww), y = math.floor(hh) }))
+hl.dispatch(hl.dsp.window.move({ x = math.floor(x), y = math.floor(y) }))
+" >/dev/null
