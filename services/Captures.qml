@@ -25,6 +25,12 @@ Singleton {
 
   signal editRequested(string path)
   signal menuRequested()
+  // bin/screenshot froze the screen into `frozen` and wants an area picked
+  // from it (capture/AreaPicker.qml), the result going to `out`.
+  signal pickRequested(string mode, string monitor, string frozen, string out)
+  // The picker is up; a second press of the shortcut cancels it.
+  property bool picking: false
+  signal pickCancelled()
 
   function add(path) {
     stack = [path].concat(stack.filter(p => p !== path)).slice(0, 5)
@@ -125,6 +131,13 @@ Singleton {
     function edit(path: string): void { root.edit(path) }
     function pin(path: string): void { root.pin(path) }
     function menu(): void { root.menuRequested() }
+    function pick(mode: string, monitor: string, frozen: string, out: string): void {
+      // A second press while picking cancels; its own fresh still goes.
+      if (root.picking) {
+        Quickshell.execDetached(["rm", "-f", "--", frozen])
+        root.pickCancelled()
+      } else root.pickRequested(mode, monitor, frozen, out)
+    }
     function dismissAll(): void { root.dismissAll() }
     function scrolling(on: bool): void { root.scrolling = on }
   }

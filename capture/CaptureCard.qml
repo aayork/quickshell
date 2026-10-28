@@ -16,13 +16,13 @@ Item {
   required property string path
   property int cardWidth: 260
 
-  // The picture's own shape, kept within sensible bounds.
-  readonly property real aspect: pic.implicitWidth > 0 ? pic.implicitHeight / pic.implicitWidth : 0.62
   readonly property int radius: 10
   readonly property bool hovered: hover.hovered
 
+  // Every card is the same size, whatever the capture's shape, as in
+  // CleanShot X; the picture fits inside it.
   implicitWidth: cardWidth
-  implicitHeight: Math.round(Math.max(110, Math.min(230, cardWidth * aspect)))
+  implicitHeight: Math.round(cardWidth * 0.625)
 
   // Slides in from the left edge when it arrives.
   property real slide: 1
@@ -52,15 +52,38 @@ Item {
       maskSpreadAtMin: 1
     }
 
-    // Behind see-through parts of the picture.
-    Rectangle { anchors.fill: parent; color: Theme.background }
+    Rectangle { anchors.fill: parent; color: "#111111" }
+
+    // The same picture, blurred and darkened, filling the card behind the
+    // fitted one, so a tall or narrow capture still reads as a full card.
+    Image {
+      id: backdrop
+      anchors.fill: parent
+      source: "file://" + card.path
+      fillMode: Image.PreserveAspectCrop
+      sourceSize.width: 160
+      asynchronous: true
+      cache: false
+      visible: false
+    }
+    MultiEffect {
+      anchors.fill: parent
+      source: backdrop
+      blurEnabled: true
+      blurMax: 48
+      blur: 1
+      brightness: -0.35
+      saturation: -0.2
+    }
 
     Image {
       id: pic
       anchors.fill: parent
+      anchors.margins: 6
       source: "file://" + card.path
-      fillMode: Image.PreserveAspectCrop
+      fillMode: Image.PreserveAspectFit
       sourceSize.width: card.cardWidth * 2
+      sourceSize.height: card.cardWidth * 2
       asynchronous: true
       cache: false
       smooth: true

@@ -28,6 +28,7 @@ ShellRoot {
   Idle {}
   Polkit {}
   QuickAccess {}
+  AreaPicker {}
   Pins {}
   Editor {}
   CaptureMenu {}

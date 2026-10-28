@@ -18,6 +18,23 @@ CAPTURES="$HOME/.local/state/aayork-quickshell/captures"
 # A second press while a selection is in progress cancels it.
 pkill slurp && exit 0
 
+mkdir -p "$CAPTURES"
+FILE="$CAPTURES/capture-$(date +%s%N | cut -c1-13).png"
+
+# The shell's own picker (capture/AreaPicker.qml), CleanShot style: freeze the
+# focused monitor into a still, and let the shell show it and crop the pick
+# out of it. A second press goes to the picker too, which cancels it. When
+# the shell is not there to answer, fall through to slurp below.
+if [[ $MODE != fullscreen ]]; then
+  MONITOR=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .name')
+  FROZEN=$(mktemp -p "${XDG_RUNTIME_DIR:-/tmp}" --suffix=.png screenshot-still-XXXXXX)
+  if grim -o "$MONITOR" "$FROZEN" &&
+     qs -p "$BIN/.." ipc call capture pick "$MODE" "$MONITOR" "$FROZEN" "$FILE" >/dev/null 2>&1; then
+    exit 0
+  fi
+  rm -f "$FROZEN"
+fi
+
 NO_HW_CURSORS=$(hyprctl getoption cursor:no_hardware_cursors -j | jq '.int')
 
 set_no_hw_cursors() {
@@ -36,8 +53,6 @@ set_no_hw_cursors 0
 
 [[ -z "$SELECTION" ]] && exit 1
 
-mkdir -p "$CAPTURES"
-FILE="$CAPTURES/capture-$(date +%s%N | cut -c1-13).png"
 grim -g "$SELECTION" "$FILE" || { rm -f "$FILE"; exit 1; }
 
 # Without the shell there is nowhere to show it, so fall back to the clipboard.
