@@ -390,6 +390,12 @@ Scope {
     open = false
   }
 
+  // Like Raycast, it goes away when you move to another workspace.
+  Connections {
+    target: Hyprland
+    function onFocusedWorkspaceChanged() { if (root.open) root.hide() }
+  }
+
   Connections {
     target: Session
     function onScreensaverChanged() { if (Session.screensaver) root.hide() }
