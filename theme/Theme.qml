@@ -37,6 +37,7 @@ Singleton {
   readonly property color red: pick("red", "#da6c75")
   readonly property color yellow: pick("yellow", "#dab96c")
   readonly property color green: pick("green", "#7eda6c")
+  readonly property color orange: pick("orange", "#e8a26c")
 
   // Text on the bar while it is see-through. Set by the wallpaper layer from
   // the brightness of what sits behind the bar.

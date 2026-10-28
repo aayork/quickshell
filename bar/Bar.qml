@@ -196,10 +196,52 @@ Scope {
           foreground: bar.foregroundOver(workspaces.x, workspaces.width)
         }
 
+        // The status area sits in its own capsule of glass, like the
+        // Windows 7 notification area or the Wii's bottom bar.
+        Item {
+          x: row.x - 6
+          width: row.width + 12
+          anchors.verticalCenter: parent.verticalCenter
+          height: parent.height - 4
+
+          Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            border.width: 1
+            border.color: Theme.alpha("#ffffff", 0.6)
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.34) }
+              GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.14) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.22) }
+            }
+          }
+          // A faint dark line round it, so it holds its shape over pale sky.
+          Rectangle {
+            anchors.fill: parent
+            anchors.margins: -1
+            radius: height / 2
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.alpha("#0b2540", 0.14)
+          }
+          // Gloss over the top half, inset past the curved ends.
+          Rectangle {
+            x: parent.height * 0.4
+            y: 1.5
+            width: parent.width - 2 * x
+            height: parent.height * 0.42
+            radius: height / 2
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.5) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.04) }
+            }
+          }
+        }
+
         RowLayout {
           id: row
           anchors.right: parent.right
-          anchors.rightMargin: Theme.barPadding + 3
+          anchors.rightMargin: Theme.barPadding + 6
           height: parent.height
           spacing: 0
 

@@ -20,20 +20,34 @@ Item {
   implicitWidth: Math.max(minimumWidth, label.implicitWidth + Theme.barPadding * 2)
   implicitHeight: Theme.barHeight
 
-  // A pill of white glass behind the hovered or open slot.
-  Rectangle {
+  // Lit glass behind the hovered or open slot: a soft blue glow, a white
+  // glass bead over it and a glint along the top.
+  Item {
     anchors.fill: parent
-    anchors.topMargin: 3
-    anchors.bottomMargin: 3
-    radius: height / 2
-    opacity: root.active ? 1 : mouse.containsMouse ? 0.6 : 0
-    Behavior on opacity { NumberAnimation { duration: 120 } }
-    border.width: 1
-    border.color: Theme.alpha("#ffffff", 0.7)
-    gradient: Gradient {
-      GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.55) }
-      GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.25) }
-      GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.12) }
+    anchors.topMargin: 4
+    anchors.bottomMargin: 4
+    anchors.leftMargin: 1
+    anchors.rightMargin: 1
+    opacity: root.active ? 1 : mouse.containsMouse ? 0.75 : 0
+    Behavior on opacity { NumberAnimation { duration: 140 } }
+
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -1.5
+      radius: height / 2
+      color: Theme.alpha(Theme.accent, root.active ? 0.35 : 0.2)
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: height / 2
+      border.width: 1
+      border.color: Theme.alpha("#ffffff", 0.85)
+      gradient: Gradient {
+        GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.7) }
+        GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.3) }
+        GradientStop { position: 0.51; color: Theme.alpha(Theme.accent, 0.18) }
+        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.4) }
+      }
     }
   }
 
@@ -45,6 +59,9 @@ Item {
     font.family: root.fontFamily === Theme.fontFamily ? Theme.familyFor(root.text) : root.fontFamily
     font.pixelSize: root.fontSize
     elide: Text.ElideNone
+    // Embossed, as if pressed into the glass.
+    style: Text.Raised
+    styleColor: Theme.luminance(root.foreground) < 0.4 ? Theme.alpha("#ffffff", 0.55) : Theme.alpha("#000000", 0.3)
   }
 
   MouseArea {
