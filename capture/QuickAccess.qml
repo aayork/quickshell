@@ -8,138 +8,45 @@ import qs.theme
 import qs.ui
 
 // Fresh captures wait here, stacked in the bottom-left corner, newest at the
-// bottom. Click one to edit it; the buttons on hover copy, save, pin or
-// dismiss it. Nothing leaves until you say so.
+// bottom, like CleanShot X's Quick Access Overlay (capture/CaptureCard.qml).
+// Nothing leaves until you say so.
 PanelWindow {
   id: root
 
-  readonly property int cardWidth: 240
-  readonly property int cardHeight: 150
+  readonly property int cardWidth: 260
+  // Room round the cards for their shadows.
+  readonly property int pad: 18
 
   screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
   visible: Captures.stack.length > 0 && !Session.screensaver
   anchors { bottom: true; left: true }
-  margins { bottom: 12; left: 12 }
-  implicitWidth: cardWidth
-  implicitHeight: Math.max(1, column.implicitHeight)
+  margins { bottom: 4; left: 4 }
+  implicitWidth: cardWidth + 2 * pad
+  implicitHeight: Math.max(1, column.implicitHeight + 2 * pad)
   color: "transparent"
   exclusionMode: ExclusionMode.Ignore
   WlrLayershell.namespace: "aayork-captures"
   WlrLayershell.layer: WlrLayer.Overlay
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-  component Action: Rectangle {
-    id: action
-    property int glyph: 0
-    property string hint: ""
-    signal clicked()
+  // Only the cards take the pointer; the shadow margin passes clicks through.
+  mask: Region { item: column }
 
-    width: 30
-    height: 30
-    radius: 15
-    color: actionMouse.containsMouse ? Theme.accent : Theme.alpha(Theme.background, 0.85)
-    border.width: 1
-    border.color: Theme.alpha(Theme.foreground, 0.25)
-
-    Label {
-      anchors.centerIn: parent
-      text: Icons.glyph(action.glyph)
-      color: actionMouse.containsMouse ? Theme.background : Theme.foreground
-      font.pixelSize: Theme.iconSize
-      elide: Text.ElideNone
-    }
-
-    MouseArea {
-      id: actionMouse
-      anchors.fill: parent
-      hoverEnabled: true
-      onClicked: action.clicked()
-    }
-  }
-
-  ColumnLayout {
+  Column {
     id: column
-    width: parent.width
-    spacing: 8
+    x: root.pad
+    y: root.pad
+    width: root.cardWidth
+    spacing: 12
 
     Repeater {
       // Oldest at the top, so the newest lands nearest the corner.
       model: Captures.stack.slice().reverse()
 
-      Rectangle {
-        id: card
+      CaptureCard {
         required property string modelData
-
-        Layout.fillWidth: true
-        implicitHeight: root.cardHeight
-        color: Theme.background
-        border.width: Theme.borderWidth
-        border.color: hover.hovered ? Theme.accent : Theme.alpha(Theme.foreground, 0.3)
-        radius: Theme.controlRadius + 4
-
-        HoverHandler { id: hover }
-
-        Image {
-          anchors.fill: parent
-          anchors.margins: Theme.borderWidth + 4
-          source: "file://" + card.modelData
-          fillMode: Image.PreserveAspectFit
-          sourceSize.width: root.cardWidth * 2
-          sourceSize.height: root.cardHeight * 2
-          asynchronous: true
-          cache: false
-        }
-
-        MouseArea {
-          anchors.fill: parent
-          onClicked: Captures.edit(card.modelData)
-        }
-
-        // Dim the picture a little so the buttons read.
-        Rectangle {
-          anchors.fill: parent
-          anchors.margins: Theme.borderWidth
-          visible: hover.hovered
-          color: Theme.alpha(Theme.background, 0.45)
-
-          Label {
-            anchors.centerIn: parent
-            text: "Click to edit"
-            color: Theme.brightForeground
-            font.pixelSize: Theme.fontSmall
-          }
-        }
-
-        Action {
-          visible: hover.hovered
-          anchors { top: parent.top; left: parent.left; margins: 8 }
-          glyph: 0xF018F
-          onClicked: {
-            Captures.copy(card.modelData)
-            Captures.dismiss(card.modelData)
-          }
-        }
-        Action {
-          visible: hover.hovered
-          anchors { top: parent.top; right: parent.right; margins: 8 }
-          glyph: 0xF0156
-          onClicked: Captures.dismiss(card.modelData)
-        }
-        Action {
-          visible: hover.hovered
-          anchors { bottom: parent.bottom; left: parent.left; margins: 8 }
-          glyph: 0xF0403
-          onClicked: Captures.pin(card.modelData)
-        }
-        Action {
-          visible: hover.hovered
-          anchors { bottom: parent.bottom; right: parent.right; margins: 8 }
-          glyph: 0xF0193
-          onClicked: {
-            Captures.save(card.modelData)
-            Captures.dismiss(card.modelData)
-          }
-        }
+        path: modelData
+        cardWidth: root.cardWidth
       }
     }
   }

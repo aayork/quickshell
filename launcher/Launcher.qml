@@ -772,7 +772,7 @@ Scope {
             font.pixelSize: Theme.iconLarge
             color: Theme.dim
             horizontalAlignment: Text.AlignHCenter
-            Layout.preferredWidth: 18
+            Layout.preferredWidth: 20
             elide: Text.ElideNone
           }
 
@@ -951,18 +951,21 @@ Scope {
 
               Item {
                 id: icon
-                width: 18
-                height: 18
+                width: 20
+                height: 20
                 anchors.left: parent.left
                 anchors.leftMargin: 34
                 anchors.verticalCenter: parent.verticalCenter
 
+                // Asked for at exactly the pixels it is drawn at (Qt draws this
+                // screen at 2x), so nothing gets rescaled and it stays sharp.
                 Image {
                   anchors.fill: parent
                   visible: row.modelData.icon !== ""
                   source: row.modelData.icon
-                  sourceSize.width: 36
-                  sourceSize.height: 36
+                  sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio)
+                  sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio)
+                  fillMode: Image.PreserveAspectFit
                   asynchronous: true
                 }
                 TailscaleIcon {
