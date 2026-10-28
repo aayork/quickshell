@@ -13,7 +13,7 @@ Rectangle {
   height: 28
   radius: 7
   color: Theme.alpha("#000000", 0.35)
-  border.width: 1
+  border.width: 1 / Screen.devicePixelRatio
   border.color: input.activeFocus ? Theme.alpha("#ffffff", 0.45) : Theme.alpha("#ffffff", 0.08)
 
   TextInput {

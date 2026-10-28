@@ -54,7 +54,7 @@ Item {
         height: 50
         radius: 13
         color: root.panel
-        border.width: 1
+        border.width: 1 / Screen.devicePixelRatio
         border.color: root.edge
 
         Row {
@@ -153,7 +153,7 @@ Item {
         height: 50
         radius: 13
         color: root.panel
-        border.width: 1
+        border.width: 1 / Screen.devicePixelRatio
         border.color: root.edge
 
         Row {
@@ -186,7 +186,7 @@ Item {
             height: 24
             radius: 6
             color: picker.lockRatio ? Theme.alpha("#ffffff", 0.2) : lockMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
-            border.width: 1
+            border.width: 1 / Screen.devicePixelRatio
             border.color: picker.lockRatio ? Theme.alpha("#ffffff", 0.4) : root.edge
             Text {
               anchors.centerIn: parent
@@ -249,7 +249,7 @@ Item {
         height: 104
         radius: 18
         color: root.panel
-        border.width: 1
+        border.width: 1 / Screen.devicePixelRatio
         border.color: root.edge
 
         Text {
@@ -320,7 +320,7 @@ Item {
         height: 104
         radius: 18
         color: root.panel
-        border.width: 1
+        border.width: 1 / Screen.devicePixelRatio
         border.color: root.edge
 
         Column {

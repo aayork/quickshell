@@ -396,16 +396,17 @@ Scope {
         Rectangle { x: parent.r ? parent.r.x + parent.r.w : 0; y: parent.r ? parent.r.y : 0; width: parent.r ? parent.width - parent.r.x - parent.r.w : 0; height: parent.r ? parent.r.h : 0; color: parent.shade }
 
         Item {
-          x: parent.r ? parent.r.x : 0
-          y: parent.r ? parent.r.y : 0
-          width: parent.r ? parent.r.w : 0
-          height: parent.r ? parent.r.h : 0
+          x: parent.r ? Math.round(parent.r.x) : 0
+          y: parent.r ? Math.round(parent.r.y) : 0
+          width: parent.r ? Math.round(parent.r.w) : 0
+          height: parent.r ? Math.round(parent.r.h) : 0
 
+          // A hairline: one device pixel, crisp white, not a soft band.
           Rectangle {
             anchors.fill: parent
             color: "transparent"
-            border.width: 1
-            border.color: Theme.alpha("#ffffff", 0.7)
+            border.width: 1 / Screen.devicePixelRatio
+            border.color: Theme.alpha("#ffffff", 0.95)
           }
 
           // Corners: two bars each, 3 px thick, sitting just outside.
@@ -414,19 +415,19 @@ Scope {
             Item {
               required property var modelData
               readonly property int len: Math.min(16, Math.max(6, Math.min(parent.width, parent.height) / 3))
-              x: modelData[0] ? parent.width - len + 3 : -3
-              y: modelData[1] ? parent.height - len + 3 : -3
+              x: modelData[0] ? parent.width - len + 2 : -2
+              y: modelData[1] ? parent.height - len + 2 : -2
               width: len
               height: len
-              Rectangle { x: 0; y: parent.modelData[1] ? parent.height - 3 : 0; width: parent.width; height: 3; color: "#ffffff" }
-              Rectangle { x: parent.modelData[0] ? parent.width - 3 : 0; y: 0; width: 3; height: parent.height; color: "#ffffff" }
+              Rectangle { x: 0; y: parent.modelData[1] ? parent.height - 2 : 0; width: parent.width; height: 2; color: "#ffffff" }
+              Rectangle { x: parent.modelData[0] ? parent.width - 2 : 0; y: 0; width: 2; height: parent.height; color: "#ffffff" }
             }
           }
           // Mid-edge handles.
-          Rectangle { visible: parent.width > 48; x: (parent.width - 14) / 2; y: -2; width: 14; height: 3; radius: 1.5; color: "#ffffff" }
-          Rectangle { visible: parent.width > 48; x: (parent.width - 14) / 2; y: parent.height - 1; width: 14; height: 3; radius: 1.5; color: "#ffffff" }
-          Rectangle { visible: parent.height > 48; x: -2; y: (parent.height - 14) / 2; width: 3; height: 14; radius: 1.5; color: "#ffffff" }
-          Rectangle { visible: parent.height > 48; x: parent.width - 1; y: (parent.height - 14) / 2; width: 3; height: 14; radius: 1.5; color: "#ffffff" }
+          Rectangle { visible: parent.width > 48; x: (parent.width - 12) / 2; y: -1; width: 12; height: 2; radius: 1; color: "#ffffff" }
+          Rectangle { visible: parent.width > 48; x: (parent.width - 12) / 2; y: parent.height - 1; width: 12; height: 2; radius: 1; color: "#ffffff" }
+          Rectangle { visible: parent.height > 48; x: -1; y: (parent.height - 12) / 2; width: 2; height: 12; radius: 1; color: "#ffffff" }
+          Rectangle { visible: parent.height > 48; x: parent.width - 1; y: (parent.height - 12) / 2; width: 2; height: 12; radius: 1; color: "#ffffff" }
         }
       }
 
