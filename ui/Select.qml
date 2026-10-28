@@ -24,8 +24,11 @@ ColumnLayout {
 
     Layout.fillWidth: true
     implicitHeight: Theme.rowHeight
-    radius: Theme.controlRadius
-    color: mouse.containsMouse ? Theme.hover : "transparent"
+    radius: 3
+    // Vista menu highlight: pale blue with a blue edge.
+    color: mouse.containsMouse ? "#dcebfc" : "transparent"
+    border.width: mouse.containsMouse ? 1 : 0
+    border.color: "#7da2ce"
 
     Label {
       anchors.left: parent.left
@@ -33,7 +36,7 @@ ColumnLayout {
       anchors.leftMargin: 8
       anchors.verticalCenter: parent.verticalCenter
       text: row.label
-      color: row.selected ? Theme.accent : Theme.foreground
+      color: row.selected ? "#0b4f86" : "#1e1e1e"
     }
 
     Label {
@@ -42,7 +45,7 @@ ColumnLayout {
       anchors.rightMargin: 8
       anchors.verticalCenter: parent.verticalCenter
       text: row.trailing
-      color: Theme.dim
+      color: "#4a4a4a"
       elide: Text.ElideNone
     }
 
@@ -57,10 +60,20 @@ ColumnLayout {
   Rectangle {
     Layout.fillWidth: true
     implicitHeight: body.implicitHeight
-    radius: Theme.controlRadius
-    color: Theme.alpha(Theme.foreground, 0.04)
+    // A Vista drop-down: a silver button face on top, a white menu below
+    // it while open.
+    radius: 3
+    color: "#ffffff"
     border.width: 1
-    border.color: Theme.alpha(Theme.foreground, 0.2)
+    border.color: "#8e8f8f"
+
+    VistaFace {
+      width: parent.width
+      height: Theme.rowHeight
+      hovered: headerHover.hovered
+      lit: root.expanded
+      HoverHandler { id: headerHover }
+    }
 
     ColumnLayout {
       id: body

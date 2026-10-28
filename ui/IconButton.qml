@@ -1,7 +1,8 @@
 import QtQuick
 import qs.theme
 
-// A glyph button inside a popup.
+// A glyph button inside a popup: flat until the pointer is on it, then a
+// Windows Vista toolbar button lights up behind it.
 Item {
   id: root
 
@@ -15,18 +16,17 @@ Item {
   implicitHeight: Theme.rowHeight
   opacity: enabled ? 1 : 0.4
 
-  Rectangle {
+  VistaFace {
     anchors.fill: parent
-    radius: Theme.controlRadius
-    color: mouse.pressed ? Theme.alpha(Theme.accent, 0.25) : mouse.containsMouse ? Theme.alpha(Theme.accent, 0.12) : "transparent"
-    border.width: mouse.containsMouse ? 1 : 0
-    border.color: Theme.alpha(Theme.accent, 0.35)
+    visible: mouse.containsMouse
+    hovered: true
+    pressed: mouse.pressed
   }
 
   Label {
     anchors.centerIn: parent
     text: root.icon
-    color: root.foreground
+    color: mouse.containsMouse ? "#1e1e1e" : root.foreground
     font.pixelSize: root.size
     elide: Text.ElideNone
   }

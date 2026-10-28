@@ -205,32 +205,47 @@ Item {
     }
   }
 
-  // Domed glass: a broad reflection over the top, a thin bright crescent
-  // along the lower rim where the dome curves away.
+  // Domed glass: a broad reflection over the top and a thin bright crescent
+  // along the lower rim where the dome curves away. Both are clipped to the
+  // dial's circle so they meet the rim exactly, with no gap.
   Item {
     anchors.fill: dial
+    layer.enabled: true
+    layer.effect: MultiEffect {
+      maskEnabled: true
+      maskSource: domeMask
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 1
+    }
     Rectangle {
-      x: parent.width * 0.1
-      y: parent.height * 0.03
-      width: parent.width * 0.8
-      height: parent.height * 0.5
-      radius: width / 2
+      x: -parent.width * 0.1
+      y: -parent.height * 0.32
+      width: parent.width * 1.2
+      height: parent.height * 0.8
+      radius: height / 2
       gradient: Gradient {
-        GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.6) }
+        GradientStop { position: 0.4; color: Theme.alpha("#ffffff", 0.6) }
         GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.0) }
       }
     }
     Rectangle {
-      x: parent.width * 0.2
-      y: parent.height * 0.84
-      width: parent.width * 0.6
-      height: parent.height * 0.12
+      x: parent.width * 0.1
+      y: parent.height * 0.82
+      width: parent.width * 0.8
+      height: parent.height * 0.3
       radius: height / 2
       gradient: Gradient {
         GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.0) }
-        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.35) }
+        GradientStop { position: 0.6; color: Theme.alpha("#ffffff", 0.3) }
       }
     }
+  }
+  Item {
+    id: domeMask
+    anchors.fill: dial
+    visible: false
+    layer.enabled: true
+    Rectangle { anchors.fill: parent; radius: width / 2 }
   }
 
   MouseArea {

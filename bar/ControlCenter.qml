@@ -197,16 +197,28 @@ BarButton {
             // The ones that end the session warn in red as soon as they are hovered.
             readonly property bool warning: modelData.confirm && sessionMouse.containsMouse
 
-            color: armed ? Theme.red
-              : warning ? Theme.alpha(Theme.red, 0.22)
-              : sessionMouse.containsMouse ? Theme.pressed : Theme.alpha(Theme.foreground, 0.05)
-            border.width: 1
-            border.color: warning || armed ? Theme.alpha(Theme.red, 0.6) : Theme.alpha(Theme.foreground, 0.12)
+            // Vista buttons; the ones that end the session turn to red gel
+            // when hovered, like Vista's shut down button.
+            color: "transparent"
+
+            VistaFace {
+              anchors.fill: parent
+              visible: !sessionButton.warning && !sessionButton.armed
+              hovered: sessionMouse.containsMouse
+              pressed: sessionMouse.pressed
+            }
+            Gel {
+              anchors.fill: parent
+              radius: 3
+              base: Theme.red
+              visible: sessionButton.warning || sessionButton.armed
+              opacity: sessionButton.armed ? 1 : 0.85
+            }
 
             Label {
               anchors.centerIn: parent
               text: Icons.glyph(sessionButton.modelData.icon)
-              color: sessionButton.armed ? Theme.background : sessionButton.warning ? Theme.red : Theme.foreground
+              color: sessionButton.armed || sessionButton.warning ? "#ffffff" : "#1e1e1e"
               font.pixelSize: Theme.iconLarge
               elide: Text.ElideNone
             }

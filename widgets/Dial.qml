@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import qs.theme
 
 // One dashboard dial for the meter gadget: a chrome rim, a black face with
@@ -108,17 +109,34 @@ Item {
       }
     }
 
-    // Glass glint.
-    Rectangle {
-      x: parent.width * 0.15
-      y: 2
-      width: parent.width * 0.7
-      height: parent.height * 0.42
-      radius: width / 2
-      gradient: Gradient {
-        GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.3) }
-        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0) }
+    // Glass glint, clipped to the face's circle so it meets the rim.
+    Item {
+      anchors.fill: parent
+      layer.enabled: true
+      layer.effect: MultiEffect {
+        maskEnabled: true
+        maskSource: glintMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1
       }
+      Rectangle {
+        x: -parent.width * 0.1
+        y: -parent.height * 0.34
+        width: parent.width * 1.2
+        height: parent.height * 0.8
+        radius: height / 2
+        gradient: Gradient {
+          GradientStop { position: 0.4; color: Theme.alpha("#ffffff", 0.3) }
+          GradientStop { position: 1; color: Theme.alpha("#ffffff", 0) }
+        }
+      }
+    }
+    Item {
+      id: glintMask
+      anchors.fill: parent
+      visible: false
+      layer.enabled: true
+      Rectangle { anchors.fill: parent; radius: width / 2 }
     }
   }
 }
