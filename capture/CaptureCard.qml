@@ -5,16 +5,17 @@ import qs.theme
 import qs.ui
 
 // One fresh capture in the corner stack, after CleanShot X's Quick Access
-// Overlay: the picture itself as a rounded card with a soft shadow, sliding
-// in from the side. On hover it dims and offers Copy and Save in the middle,
-// close and pin in the top corners, delete and edit in the bottom ones, and
-// Save As underneath. Click it to edit; drag it into another app to drop the
-// file there.
+// Overlay: the picture filling a rounded card with a soft shadow, sliding in
+// from the side. On hover it dims and offers Copy and Save in the middle;
+// close top left, pin top right, annotate bottom left, Save As bottom right
+// (where CleanShot has its cloud upload). Right click for the rest, Move to
+// Trash among them. Click it to annotate; drag it into another app to drop
+// the file there.
 Item {
   id: card
 
   required property string path
-  property int cardWidth: 260
+  property int cardWidth: 220
 
   readonly property int radius: 10
   readonly property bool hovered: hover.hovered
@@ -54,36 +55,13 @@ Item {
 
     Rectangle { anchors.fill: parent; color: "#111111" }
 
-    // The same picture, blurred and darkened, filling the card behind the
-    // fitted one, so a tall or narrow capture still reads as a full card.
-    Image {
-      id: backdrop
-      anchors.fill: parent
-      source: "file://" + card.path
-      fillMode: Image.PreserveAspectCrop
-      sourceSize.width: 160
-      asynchronous: true
-      cache: false
-      visible: false
-    }
-    MultiEffect {
-      anchors.fill: parent
-      source: backdrop
-      blurEnabled: true
-      blurMax: 48
-      blur: 1
-      brightness: -0.35
-      saturation: -0.2
-    }
-
+    // Zoomed in to fill the card, as CleanShot does: no bars at the sides.
     Image {
       id: pic
       anchors.fill: parent
-      anchors.margins: 6
       source: "file://" + card.path
-      fillMode: Image.PreserveAspectFit
+      fillMode: Image.PreserveAspectCrop
       sourceSize.width: card.cardWidth * 2
-      sourceSize.height: card.cardWidth * 2
       asynchronous: true
       cache: false
       smooth: true
@@ -137,10 +115,10 @@ Item {
     onClicked: Captures.edit(card.path)
   }
 
-  // Hover controls.
+  // Hover controls, where CleanShot puts them.
   Item {
     anchors.fill: parent
-    opacity: card.hovered ? 1 : 0
+    opacity: card.hovered && !menu.visible ? 1 : 0
     visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: 140 } }
 
@@ -162,44 +140,45 @@ Item {
           Captures.dismiss(card.path)
         }
       }
-      Label {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "Save As…"
-        color: saveAsMouse.containsMouse ? "#ffffff" : Theme.alpha("#ffffff", 0.75)
-        font.pixelSize: Theme.fontSmall
-        font.underline: saveAsMouse.containsMouse
-        elide: Text.ElideNone
-        MouseArea {
-          id: saveAsMouse
-          anchors.fill: parent
-          anchors.margins: -4
-          hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
-          onClicked: Captures.saveAs(card.path)
-        }
-      }
     }
 
     CornerButton {
-      anchors { top: parent.top; left: parent.left; margins: 8 }
+      anchors { top: parent.top; left: parent.left; margins: 7 }
       glyph: 0xF0156
       onClicked: Captures.dismiss(card.path)
     }
     CornerButton {
-      anchors { top: parent.top; right: parent.right; margins: 8 }
+      anchors { top: parent.top; right: parent.right; margins: 7 }
       glyph: 0xF0403
       onClicked: Captures.pin(card.path)
     }
     CornerButton {
-      anchors { bottom: parent.bottom; left: parent.left; margins: 8 }
-      glyph: 0xF09E7
-      danger: true
-      onClicked: Captures.remove(card.path)
-    }
-    CornerButton {
-      anchors { bottom: parent.bottom; right: parent.right; margins: 8 }
+      anchors { bottom: parent.bottom; left: parent.left; margins: 7 }
       glyph: 0xF03EB
       onClicked: Captures.edit(card.path)
     }
+    CornerButton {
+      anchors { bottom: parent.bottom; right: parent.right; margins: 7 }
+      glyph: 0xF0193
+      onClicked: Captures.saveAs(card.path)
+    }
   }
+
+  // Right click: everything, as a small menu over the card.
+  MouseArea {
+    anchors.fill: parent
+    acceptedButtons: Qt.RightButton
+    onClicked: menu.visible = true
+  }
+
+  CaptureMenuList {
+    id: menu
+    visible: false
+    anchors.centerIn: parent
+    path: card.path
+    onDone: visible = false
+  }
+
+  // A menu left open goes away with the pointer.
+  onHoveredChanged: if (!hovered) menu.visible = false
 }

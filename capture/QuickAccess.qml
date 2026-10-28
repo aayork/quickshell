@@ -13,7 +13,7 @@ import qs.ui
 PanelWindow {
   id: root
 
-  readonly property int cardWidth: 260
+  readonly property int cardWidth: 220
   // Room round the cards for their shadows.
   readonly property int pad: 18
 
