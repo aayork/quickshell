@@ -52,13 +52,9 @@ PanelWindow {
   WlrLayershell.layer: WlrLayer.Overlay
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-  Rectangle {
+  Glass {
     id: card
     anchors.fill: parent
-    color: Theme.background
-    border.width: Theme.borderWidth
-    border.color: Theme.accent
-    radius: Theme.radius
     opacity: root.showing ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 140 } }
 

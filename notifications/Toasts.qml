@@ -35,7 +35,7 @@ PanelWindow {
     Repeater {
       model: Notifs.toasts
 
-      Rectangle {
+      Glass {
         id: card
         required property var modelData
 
@@ -46,10 +46,7 @@ PanelWindow {
 
         Layout.fillWidth: true
         implicitHeight: body.implicitHeight + 24
-        color: Theme.background
-        border.width: Theme.borderWidth
-        border.color: critical ? Theme.red : Theme.accent
-        radius: Theme.radius
+        border.color: critical ? Theme.red : Theme.glassBorder
 
         Timer {
           interval: card.lifetime * 1000

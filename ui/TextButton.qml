@@ -13,15 +13,26 @@ Rectangle {
   property bool dimIcon: false
   signal clicked()
 
-  readonly property color ink: selected ? Theme.background : Theme.foreground
+  readonly property color ink: selected ? "#ffffff" : Theme.foreground
 
   implicitWidth: content.implicitWidth + 20
   implicitHeight: Theme.rowHeight
   radius: Theme.controlRadius
   opacity: enabled ? 1 : 0.4
-  color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.hover : Theme.alpha(Theme.foreground, 0.04)
-  border.width: selected ? 0 : 1
-  border.color: Theme.alpha(Theme.foreground, 0.2)
+  // Unselected: a glassy white button that warms to pale blue on hover.
+  border.width: 1
+  border.color: mouse.containsMouse ? Theme.glassBorder : Theme.alpha(Theme.foreground, 0.22)
+  gradient: Gradient {
+    GradientStop { position: 0; color: mouse.pressed ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.25)) : "#ffffff" }
+    GradientStop { position: 0.5; color: Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.12 : 0.03)) }
+    GradientStop { position: 1; color: Qt.tint(Theme.background, Theme.alpha(Theme.accent, mouse.containsMouse ? 0.22 : 0.1)) }
+  }
+
+  Gel {
+    anchors.fill: parent
+    radius: root.radius
+    visible: root.selected
+  }
 
   Row {
     id: content
@@ -33,6 +44,8 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       text: root.icon
       color: root.selected ? root.ink : root.dimIcon ? Theme.dim : Theme.accent
+      style: root.selected ? Text.Raised : Text.Normal
+      styleColor: Theme.alpha("#000000", 0.25)
       font.pixelSize: Theme.iconSize
       elide: Text.ElideNone
     }
@@ -41,6 +54,8 @@ Rectangle {
       text: root.text
       color: root.ink
       elide: Text.ElideNone
+      style: root.selected ? Text.Raised : Text.Normal
+      styleColor: Theme.alpha("#000000", 0.25)
     }
   }
 

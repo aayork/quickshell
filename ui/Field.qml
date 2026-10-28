@@ -17,9 +17,25 @@ Rectangle {
 
   implicitHeight: Theme.rowHeight
   radius: Theme.controlRadius
-  color: Theme.alpha(Theme.foreground, 0.04)
+  // A white well with a faint shade along its top edge, ringed in blue
+  // while typing.
   border.width: 1
   border.color: input.activeFocus ? Theme.accent : Theme.alpha(Theme.foreground, 0.25)
+  gradient: Gradient {
+    GradientStop { position: 0; color: Qt.tint("#ffffff", Theme.alpha(Theme.foreground, 0.08)) }
+    GradientStop { position: 0.25; color: "#ffffff" }
+    GradientStop { position: 1; color: "#ffffff" }
+  }
+
+  Rectangle {
+    anchors.fill: parent
+    anchors.margins: -3
+    radius: root.radius + 3
+    color: "transparent"
+    border.width: 3
+    border.color: Theme.alpha(Theme.accent, 0.22)
+    visible: input.activeFocus
+  }
 
   Label {
     anchors.fill: input

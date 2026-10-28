@@ -1,0 +1,32 @@
+mode = "light"
+
+# Frutiger Aero: sky blue glass, aqua and grass green, deep navy text.
+accent = "#1a8fe3"
+selection = "#bfe3fb"
+muted = "#8fb8d6"
+
+background = "#eef8ff"
+dark_background = "#dcefff"
+darker_background = "#c6e4fa"
+lighter_background = "#ffffff"
+
+foreground = "#14385a"
+dark_foreground = "#5b7d99"
+light_foreground = "#234a6c"
+bright_foreground = "#0b2540"
+
+red = "#d9363e"
+yellow = "#d99a00"
+orange = "#e8761c"
+green = "#3ea83a"
+cyan = "#0a9fc0"
+blue = "#1a8fe3"
+magenta = "#a84fc6"
+brown = "#8a5a2b"
+
+bright_red = "#ee5a60"
+bright_yellow = "#f0b52a"
+bright_green = "#62c64a"
+bright_cyan = "#2ec1de"
+bright_blue = "#43a8f0"
+bright_magenta = "#c472dd"

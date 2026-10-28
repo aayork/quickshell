@@ -108,14 +108,10 @@ Scope {
       onClicked: root.hide()
     }
 
-    Rectangle {
+    Glass {
       width: column.implicitWidth + 24
       height: column.implicitHeight + 22
       anchors.centerIn: parent
-      color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
 
       MouseArea { anchors.fill: parent }
 

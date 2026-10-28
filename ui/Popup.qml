@@ -82,13 +82,9 @@ PopupWindow {
     }
   }
 
-  Rectangle {
+  Glass {
     id: card
     anchors.fill: parent
-    color: Theme.background
-    border.width: Theme.borderWidth
-    border.color: Theme.accent
-    radius: Theme.radius
     opacity: root.open ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 

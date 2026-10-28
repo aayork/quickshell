@@ -581,16 +581,12 @@ Scope {
       onClicked: root.hide()
     }
 
-    Rectangle {
+    Glass {
       id: card
       width: 680
       height: column.implicitHeight + 2 * Theme.borderWidth
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.round(parent.height * 0.2)
-      color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
 
       MouseArea { anchors.fill: parent }
 
@@ -757,7 +753,16 @@ Scope {
                 anchors.topMargin: 1
                 anchors.bottomMargin: 1
                 radius: Theme.controlRadius
-                color: row.armed ? Theme.alpha(Theme.red, 0.2) : row.current && !row.modelData.hint ? Theme.selection : "transparent"
+                // Windows 7 style: a pale blue sheen with a blue outline.
+                readonly property bool lit: row.current && !row.modelData.hint && !row.armed
+                color: row.armed ? Theme.alpha(Theme.red, 0.2) : "transparent"
+                border.width: lit ? 1 : 0
+                border.color: Theme.alpha(Theme.accent, 0.55)
+                gradient: Gradient {
+                  GradientStop { position: 0; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.08)) : "transparent" }
+                  GradientStop { position: 0.5; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.2)) : "transparent" }
+                  GradientStop { position: 1; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.32)) : "transparent" }
+                }
               }
 
               MouseArea {
@@ -1022,17 +1027,13 @@ Scope {
     }
 
     // Ctrl+K: everything else the current row can do.
-    Rectangle {
+    Glass {
       visible: root.actionsOpen && root.currentActions.length > 0
       width: 300
       height: actionColumn.implicitHeight + 12
       anchors.right: card.right
       anchors.top: card.bottom
       anchors.topMargin: 6
-      color: Theme.background
-      border.width: Theme.borderWidth
-      border.color: Theme.accent
-      radius: Theme.radius
 
       MouseArea { anchors.fill: parent }
 

@@ -20,12 +20,21 @@ Item {
   implicitWidth: Math.max(minimumWidth, label.implicitWidth + Theme.barPadding * 2)
   implicitHeight: Theme.barHeight
 
+  // A pill of white glass behind the hovered or open slot.
   Rectangle {
     anchors.fill: parent
     anchors.topMargin: 3
     anchors.bottomMargin: 3
-    radius: Theme.controlRadius
-    color: Theme.alpha(root.foreground, root.active ? 0.16 : mouse.containsMouse ? 0.08 : 0)
+    radius: height / 2
+    opacity: root.active ? 1 : mouse.containsMouse ? 0.6 : 0
+    Behavior on opacity { NumberAnimation { duration: 120 } }
+    border.width: 1
+    border.color: Theme.alpha("#ffffff", 0.7)
+    gradient: Gradient {
+      GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.55) }
+      GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.25) }
+      GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.12) }
+    }
   }
 
   Label {

@@ -19,8 +19,10 @@ Singleton {
     return value !== undefined ? value : fallback
   }
 
+  // Takes a color or a "#rrggbb" string.
   function alpha(color, a) {
-    return Qt.rgba(color.r, color.g, color.b, a)
+    var c = Qt.tint(color, "transparent")
+    return Qt.rgba(c.r, c.g, c.b, a)
   }
 
   readonly property color background: pick("background", "#141c1f")
@@ -74,13 +76,28 @@ Singleton {
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
   }
 
+  // Frutiger Aero glass, worked out from the palette so any theme gets it:
+  // a pale pane that runs from near white to a hint of the accent, a white
+  // gloss over its top, a white inner edge and a soft accent outline.
+  readonly property color glassTop: alpha(Qt.tint(background, alpha("#ffffff", 0.55)), 0.985)
+  readonly property color glassBottom: alpha(Qt.tint(background, alpha(accent, 0.14)), 0.97)
+  readonly property color glassBorder: alpha(accent, 0.45)
+  readonly property color glassEdge: alpha("#ffffff", 0.75)
+  readonly property color gloss: alpha("#ffffff", 0.6)
+  // Glossy "gel" buttons: the accent, lighter at the top.
+  readonly property color gelTop: Qt.lighter(accent, 1.45)
+  readonly property color gelMiddle: Qt.lighter(accent, 1.1)
+  readonly property color gelBottom: Qt.darker(accent, 1.05)
+  readonly property color gelBorder: Qt.darker(accent, 1.35)
+
   readonly property color hover: alpha(foreground, 0.08)
   readonly property color pressed: alpha(foreground, 0.16)
   readonly property color track: alpha(foreground, 0.15)
   readonly property color separator: alpha(foreground, 0.12)
 
   // Resolved by fontconfig, so the system font setting carries over.
-  readonly property string fontFamily: "monospace"
+  // A humanist sans in the spirit of Frutiger and Segoe UI.
+  readonly property string fontFamily: "Open Sans"
   readonly property int fontSmall: 11
   readonly property int fontSize: 12
   readonly property int fontLarge: 14
@@ -91,9 +108,9 @@ Singleton {
   readonly property int barPadding: 6
   readonly property int barIconSlot: 27
 
-  readonly property int radius: 0
-  readonly property int controlRadius: 2
-  readonly property int borderWidth: 2
+  readonly property int radius: 12
+  readonly property int controlRadius: 6
+  readonly property int borderWidth: 1
   readonly property int popupPadding: 14
   readonly property int popupGap: 4
   readonly property int rowHeight: 28

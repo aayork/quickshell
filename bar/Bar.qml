@@ -122,6 +122,28 @@ Scope {
           color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.glass ? Services.Config.bar.tint : 0)
         }
 
+        // Aero gloss: a sheen over the top half and a bright line along the
+        // foot, like a pane of glass catching the light.
+        Rectangle {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          height: Math.round(parent.height * 0.5)
+          visible: bar.fullscreen || Services.Config.bar.glass
+          gradient: Gradient {
+            GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.38) }
+            GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.1) }
+          }
+        }
+        Rectangle {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          height: 1
+          visible: bar.fullscreen || Services.Config.bar.glass
+          color: Theme.alpha("#ffffff", 0.55)
+        }
+
         Workspaces {
           id: workspaces
           anchors.left: parent.left

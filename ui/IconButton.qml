@@ -18,7 +18,9 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: Theme.controlRadius
-    color: mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.hover : "transparent"
+    color: mouse.pressed ? Theme.alpha(Theme.accent, 0.25) : mouse.containsMouse ? Theme.alpha(Theme.accent, 0.12) : "transparent"
+    border.width: mouse.containsMouse ? 1 : 0
+    border.color: Theme.alpha(Theme.accent, 0.35)
   }
 
   Label {

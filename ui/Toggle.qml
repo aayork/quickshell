@@ -1,31 +1,48 @@
 import QtQuick
 import qs.theme
 
+// An Aero switch: a sunken groove that fills with blue gel when on, and a
+// glossy white knob.
 Item {
   id: root
 
   property bool checked: false
   signal toggled()
 
-  implicitWidth: 32
-  implicitHeight: 16
+  implicitWidth: 36
+  implicitHeight: 18
   opacity: enabled ? 1 : 0.4
 
   Rectangle {
     anchors.fill: parent
-    radius: Theme.controlRadius
-    color: root.checked ? Theme.accent : Theme.track
-    Behavior on color { ColorAnimation { duration: 120 } }
-
-    Rectangle {
-      y: 2
-      x: root.checked ? parent.width - width - 2 : 2
-      width: 12
-      height: 12
-      radius: Math.max(0, Theme.controlRadius - 1)
-      color: root.checked ? Theme.background : Theme.foreground
-      Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+    radius: height / 2
+    border.width: 1
+    border.color: Theme.alpha(Theme.foreground, 0.28)
+    gradient: Gradient {
+      GradientStop { position: 0; color: Theme.alpha(Theme.foreground, 0.16) }
+      GradientStop { position: 1; color: Theme.alpha(Theme.foreground, 0.05) }
     }
+  }
+
+  Gel {
+    anchors.fill: parent
+    opacity: root.checked ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: 140 } }
+  }
+
+  Rectangle {
+    y: 1
+    x: root.checked ? parent.width - width - 1 : 1
+    width: parent.height - 2
+    height: width
+    radius: width / 2
+    border.width: 1
+    border.color: Theme.alpha(Theme.foreground, 0.3)
+    gradient: Gradient {
+      GradientStop { position: 0; color: "#ffffff" }
+      GradientStop { position: 1; color: "#d9e6f0" }
+    }
+    Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
   }
 
   MouseArea {
