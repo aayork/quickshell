@@ -79,6 +79,7 @@ Scope {
     cursorCurrent.running = true
     iconList.running = true
     iconCurrent.running = true
+    matchStyleCurrent.running = true
     videoCount.running = true
     Background.check()
   }
@@ -103,9 +104,14 @@ Scope {
 
   // Builds a palette from the current background and applies it as the
   // generated "Wallpaper" theme.
-  function matchTheme() {
+  // How colourful a matched theme is: balanced, vibrant, muted or
+  // monochrome. theme-from-background remembers the last one.
+  property string matchStyle: "balanced"
+
+  function matchTheme(style) {
     if (Background.path === "" || matchProcess.running) return
-    matchProcess.command = [root.bin + "theme-from-background", Background.path]
+    if (style) matchStyle = style
+    matchProcess.command = [root.bin + "theme-from-background", "--style", matchStyle, Background.path]
     matchProcess.running = true
   }
 
@@ -169,6 +175,11 @@ Scope {
 
   Lines { id: themeList; command: [root.bin + "theme-list"]; onResultChanged: root.themes = result }
   Lines { id: themeCurrent; command: [root.bin + "theme-current"]; onResultChanged: root.theme = result[0] || "" }
+  Lines {
+    id: matchStyleCurrent
+    command: ["sh", "-c", "cat \"$HOME/.local/state/aayork-quickshell/match-style\" 2>/dev/null || echo balanced"]
+    onResultChanged: root.matchStyle = result[0] || "balanced"
+  }
   Lines { id: fontList; command: [root.bin + "font-list"]; onResultChanged: root.fonts = result }
   Lines { id: fontCurrent; command: [root.bin + "font-current"]; onResultChanged: root.font = result[0] || "" }
   Lines {
@@ -669,6 +680,27 @@ Scope {
                   text: matchProcess.running ? "Matching…" : "Match theme to background"
                   enabled: !matchProcess.running
                   onClicked: root.matchTheme()
+                }
+              }
+
+              // How colourful the matched theme is. Picking one matches again
+              // straight away in that style.
+              Setting {
+                glyph: 0xF03D8
+                label: "Match style"
+                note: ({ balanced: "The image's colour on tinted surfaces",
+                         vibrant: "Stronger colour everywhere",
+                         muted: "Nearly neutral, with a soft accent",
+                         monochrome: "Grey, with only a trace of the image" })[root.matchStyle] || ""
+                Segmented {
+                  options: [
+                    { label: "Balanced", value: "balanced" },
+                    { label: "Vibrant", value: "vibrant" },
+                    { label: "Muted", value: "muted" },
+                    { label: "Mono", value: "monochrome" }
+                  ]
+                  current: root.matchStyle
+                  onPicked: function(value) { root.matchTheme(value) }
                 }
               }
 

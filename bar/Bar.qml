@@ -140,9 +140,9 @@ Scope {
             anchors.top: parent.top
             height: Math.round(parent.height * 0.5)
             gradient: Gradient {
-              GradientStop { position: 0; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.16 : 0.36) }
-              GradientStop { position: 0.85; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.07 : 0.16) }
-              GradientStop { position: 1; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.04 : 0.1) }
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.3 : 0.48) }
+              GradientStop { position: 0.85; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.13 : 0.24) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.08 : 0.16) }
             }
           }
           Repeater {
@@ -158,7 +158,7 @@ Scope {
               gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0; color: Theme.alpha("#ffffff", 0) }
-                GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.08) }
+                GradientStop { position: 0.5; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.16 : 0.2) }
                 GradientStop { position: 1; color: Theme.alpha("#ffffff", 0) }
               }
             }

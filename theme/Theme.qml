@@ -19,8 +19,10 @@ Singleton {
     return value !== undefined ? value : fallback
   }
 
+  // Takes a color or a "#rrggbb" string.
   function alpha(color, a) {
-    return Qt.rgba(color.r, color.g, color.b, a)
+    var c = Qt.tint(color, "transparent")
+    return Qt.rgba(c.r, c.g, c.b, a)
   }
 
   readonly property color background: pick("background", "#141c1f")
