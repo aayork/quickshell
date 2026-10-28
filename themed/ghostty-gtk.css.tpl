@@ -122,6 +122,24 @@ tabbar .start-action button:hover, tabbar .end-action button:hover {
 }
 tabbar undershoot { background: none; }
 
+/* Unfocused (backdrop): libadwaita swaps the tab bar to its lighter backdrop
+   colour with a more specific :backdrop rule, so the bar brightened whenever
+   the window lost focus. Keep it exactly as it is when focused. */
+tabbar .box:backdrop {
+  background-color: {{ darker_background }};
+  box-shadow: inset 0 -1px {{ lighter_background }};
+}
+tabbar tab:backdrop { background: none; color: {{ dark_foreground }}; }
+tabbar tab:selected:backdrop,
+tabbar tabbox.single-tab tab:backdrop {
+  background-color: {{ background }};
+  color: {{ bright_foreground }};
+  box-shadow: inset 0 2px {{ accent }};
+}
+tabbar .start-action button:backdrop,
+tabbar .end-action button:backdrop { background: none; color: {{ dark_foreground }}; }
+tabbar tab button.image-button:backdrop { background: none; color: inherit; }
+
 /* Dialogs: close confirmation, clipboard confirmation, config errors,
    change-title */
 dialog.alert .dialog-contents,
