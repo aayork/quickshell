@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 import qs.services
 import qs.theme
@@ -56,6 +57,7 @@ Scope {
     { id: "arrow", glyph: 0xF005C, name: "Arrow", key: "A" },
     { id: "line", glyph: 0xF055E, name: "Line", key: "L" },
     { id: "rect", glyph: 0xF0E5F, name: "Rectangle", key: "R" },
+    { id: "filledrect", glyph: 0xF0E5E, name: "Filled rectangle", key: "F" },
     { id: "ellipse", glyph: 0xF0EA1, name: "Ellipse", key: "O" },
     { id: "pen", glyph: 0xF03EB, name: "Pen", key: "P" },
     { id: "highlighter", glyph: 0xF0652, name: "Highlighter", key: "H" },
@@ -65,10 +67,30 @@ Scope {
     { id: "pixelate", glyph: 0xF013A, name: "Pixelate", key: "X" },
     { id: "redact", glyph: 0xF0764, name: "Black out", key: "D" },
     { id: "spotlight", glyph: 0xF04C9, name: "Spotlight", key: "S" },
+    { id: "picker", glyph: 0xF020A, name: "Color picker", key: "I" },
     { id: "crop", glyph: 0xF019E, name: "Crop", key: "C" },
     { id: "background", glyph: 0xF0E09, name: "Background", key: "G" }
   ]
   readonly property bool drawingTool: tool !== "crop" && tool !== "background"
+
+  // Crop held to a shape (width over height), 0 for free.
+  property real cropRatio: 0
+  // The background's own shape, for social posts; 0 fits the picture.
+  property real bgRatio: 0
+  // Gradient backgrounds, as CleanShot offers; ids g0.. in `backdrop`.
+  readonly property var gradients: [
+    ["#ff8a5b", "#ff3d77"], ["#36d1dc", "#5b86e5"], ["#a18cd1", "#fbc2eb"],
+    ["#a8e063", "#56ab2f"], ["#f6d365", "#fda085"], ["#232526", "#414345"]
+  ]
+  readonly property int gradientIndex: /^g\d+$/.test(backdrop) ? parseInt(backdrop.slice(1)) : -1
+
+  // The sheet: the picture plus padding, widened or heightened to the
+  // background's shape when one is chosen.
+  readonly property real baseWidth: crop.width + padding * 2
+  readonly property real baseHeight: crop.height + padding * 2
+  readonly property bool shaped: bgRatio > 0 && backdrop !== "none"
+  readonly property real sheetWidth: shaped ? Math.max(baseWidth, baseHeight * bgRatio) : baseWidth
+  readonly property real sheetHeight: shaped ? Math.max(baseHeight, baseWidth / bgRatio) : baseHeight
   // Corners follow the window rounding in Settings › Windows, as the
   // launcher's do.
   readonly property int corner: Math.max(0, Number(Config.windows.rounding) || 0)
@@ -118,6 +140,12 @@ Scope {
   function begin(x, y) {
     // The background tool works from its options row, not on the picture.
     if (tool === "background") return
+    // The colour picker takes the colour of the pixel under it.
+    if (tool === "picker") {
+      sampler.command = ["magick", path, "-format", "%[hex:p{" + Math.round(x) + "," + Math.round(y) + "}]", "info:"]
+      sampler.running = true
+      return
+    }
     if (tool === "text") {
       textEntry.start(x, y)
       return
@@ -131,6 +159,22 @@ Scope {
     if (tool === "highlighter") op.width = strokeWidth * 5
     draft = op
   }
+
+  Process {
+    id: sampler
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var hex = text.trim().slice(0, 6)
+        if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+          root.ink = "#" + hex
+          root.tool = root.lastDrawingTool
+        }
+      }
+    }
+  }
+  // The drawing tool to go back to after picking a colour.
+  property string lastDrawingTool: "arrow"
+  onToolChanged: if (tool !== "picker" && tool !== "crop" && tool !== "background") lastDrawingTool = tool
 
   function drag(x, y) {
     if (!draft) return
@@ -146,7 +190,16 @@ Scope {
     var box = boxOf(op)
     var tiny = box.width < unit * 2 && box.height < unit * 2
     if (op.type === "crop") {
-      if (!tiny) crop = Qt.rect(Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height))
+      if (!tiny) {
+        var w = box.width, h = box.height
+        // Held to a shape: keep the width, fit the height (or the other way
+        // when that would run off the picture).
+        if (cropRatio > 0) {
+          h = w / cropRatio
+          if (box.y + h > naturalHeight) { h = naturalHeight - box.y; w = h * cropRatio }
+        }
+        crop = Qt.rect(Math.round(box.x), Math.round(box.y), Math.round(w), Math.round(h))
+      }
       return
     }
     // A click without a drag draws nothing.
@@ -201,7 +254,7 @@ Scope {
 
     anchors.fill: parent
     sourceComponent: op.type === "arrow" ? arrow : op.type === "line" ? line
-      : op.type === "rect" ? rectangle : op.type === "ellipse" ? ellipse
+      : op.type === "rect" || op.type === "filledrect" ? rectangle : op.type === "ellipse" ? ellipse
       : op.type === "pen" || op.type === "highlighter" ? stroke
       : op.type === "text" ? label : op.type === "counter" ? counter
       : op.type === "blur" ? blur : op.type === "pixelate" ? pixelate
@@ -262,8 +315,8 @@ Scope {
           y: note.box.y
           width: note.box.width
           height: note.box.height
-          color: "transparent"
-          border.width: note.op.width
+          color: note.op.type === "filledrect" ? note.op.color : "transparent"
+          border.width: note.op.type === "filledrect" ? 0 : note.op.width
           border.color: note.op.color
           radius: note.op.width
         }
@@ -712,6 +765,17 @@ Scope {
             visible: root.tool === "crop"
             spacing: 12
             Label { text: "Drag across the picture to crop it"; color: Theme.dim; font.pixelSize: Theme.fontSmall }
+            Segmented {
+              options: [
+                { label: "Free", value: 0 },
+                { label: "1:1", value: 1 },
+                { label: "4:3", value: 4 / 3 },
+                { label: "16:9", value: 16 / 9 },
+                { label: "9:16", value: 9 / 16 }
+              ]
+              current: root.cropRatio
+              onPicked: function(value) { root.cropRatio = value }
+            }
             TextButton {
               text: "Reset"
               enabled: root.crop.width !== root.naturalWidth || root.crop.height !== root.naturalHeight
@@ -739,6 +803,46 @@ Scope {
                 if (value !== "none" && root.padding === 0) root.padding = Math.round(root.unit * 20)
                 if (value === "none") root.padding = 0
               }
+            }
+
+            // Gradients.
+            Repeater {
+              model: root.gradients
+              Rectangle {
+                required property var modelData
+                required property int index
+                implicitWidth: 22
+                implicitHeight: 22
+                radius: 11
+                border.width: root.gradientIndex === index ? 2 : 1
+                border.color: root.gradientIndex === index ? Theme.brightForeground : Theme.alpha(Theme.foreground, 0.25)
+                gradient: Gradient {
+                  orientation: Gradient.Horizontal
+                  GradientStop { position: 0; color: modelData[0] }
+                  GradientStop { position: 1; color: modelData[1] }
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    root.backdrop = "g" + parent.index
+                    if (root.padding === 0) root.padding = Math.round(root.unit * 20)
+                  }
+                }
+              }
+            }
+
+            Divider { Layout.leftMargin: 6; Layout.rightMargin: 6 }
+            Segmented {
+              options: [
+                { label: "Auto", value: 0 },
+                { label: "16:9", value: 16 / 9 },
+                { label: "4:3", value: 4 / 3 },
+                { label: "1:1", value: 1 },
+                { label: "9:16", value: 9 / 16 }
+              ]
+              current: root.bgRatio
+              onPicked: function(value) { root.bgRatio = value }
             }
 
             Divider { Layout.leftMargin: 6; Layout.rightMargin: 6 }
@@ -822,8 +926,8 @@ Scope {
         // Everything that ends up in the exported file.
         Item {
           id: sheet
-          width: root.crop.width + root.padding * 2
-          height: root.crop.height + root.padding * 2
+          width: root.sheetWidth
+          height: root.sheetHeight
           scale: viewport.fit
           transformOrigin: Item.TopLeft
           x: Math.round((viewport.width - width * viewport.fit) / 2)
@@ -842,6 +946,15 @@ Scope {
               orientation: Gradient.Horizontal
               GradientStop { position: 0; color: Theme.accent }
               GradientStop { position: 1; color: Qt.darker(Theme.accent, 1.7) }
+            }
+          }
+          Rectangle {
+            anchors.fill: parent
+            visible: root.gradientIndex >= 0
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              GradientStop { position: 0; color: root.gradientIndex >= 0 ? root.gradients[root.gradientIndex][0] : "black" }
+              GradientStop { position: 1; color: root.gradientIndex >= 0 ? root.gradients[root.gradientIndex][1] : "black" }
             }
           }
           Image {
@@ -884,8 +997,8 @@ Scope {
           // The kept part of the picture, with its corners rounded.
           Item {
             id: frame
-            x: root.padding
-            y: root.padding
+            x: Math.round((root.sheetWidth - root.crop.width) / 2)
+            y: Math.round((root.sheetHeight - root.crop.height) / 2)
             width: root.crop.width
             height: root.crop.height
             clip: true
