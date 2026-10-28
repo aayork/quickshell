@@ -104,8 +104,8 @@ Scope {
 
   // Builds a palette from the current background and applies it as the
   // generated "Wallpaper" theme.
-  // How colourful a matched theme is: balanced, vibrant, muted or
-  // monochrome. theme-from-background remembers the last one.
+  // How colourful a matched theme is, strongest first: vibrant, balanced,
+  // soft, muted or monochrome. theme-from-background remembers the last one.
   property string matchStyle: "balanced"
 
   function matchTheme(style) {
@@ -688,14 +688,16 @@ Scope {
               Setting {
                 glyph: 0xF03D8
                 label: "Match style"
-                note: ({ balanced: "The image's colour on tinted surfaces",
-                         vibrant: "Stronger colour everywhere",
+                note: ({ vibrant: "Stronger colour everywhere",
+                         balanced: "The image's colour on tinted surfaces",
+                         soft: "Gentler colour throughout",
                          muted: "Nearly neutral, with a soft accent",
                          monochrome: "Grey, with only a trace of the image" })[root.matchStyle] || ""
                 Segmented {
                   options: [
-                    { label: "Balanced", value: "balanced" },
                     { label: "Vibrant", value: "vibrant" },
+                    { label: "Balanced", value: "balanced" },
+                    { label: "Soft", value: "soft" },
                     { label: "Muted", value: "muted" },
                     { label: "Mono", value: "monochrome" }
                   ]

@@ -28,8 +28,9 @@ done
 
 # How colourful the palette is. The last one asked for is remembered, so a
 # later match (a new background, say) keeps the same feel.
-#   balanced    the image's colour on tinted surfaces (the default)
 #   vibrant     stronger colour everywhere
+#   balanced    the image's colour on tinted surfaces (the default)
+#   soft        between balanced and muted: gentler colour throughout
 #   muted       nearly neutral surfaces, a soft accent, quiet terminal colours
 #   monochrome  grey surfaces with only a trace of the image's hue
 STYLE_FILE="$HOME/.local/state/aayork-quickshell/match-style"
@@ -38,8 +39,8 @@ if [[ -z $STYLE ]]; then
   STYLE=${STYLE:-balanced}
 fi
 
-if [[ -z $1 || ! $MODE =~ ^(dark|light|auto)$ || ! $STYLE =~ ^(balanced|vibrant|muted|monochrome)$ ]]; then
-  echo "Usage: theme-from-background [--mode dark|light|auto] [--style balanced|vibrant|muted|monochrome] [--print] <path-to-image-or-video>" >&2
+if [[ -z $1 || ! $MODE =~ ^(dark|light|auto)$ || ! $STYLE =~ ^(vibrant|balanced|soft|muted|monochrome)$ ]]; then
+  echo "Usage: theme-from-background [--mode dark|light|auto] [--style vibrant|balanced|soft|muted|monochrome] [--print] <path-to-image-or-video>" >&2
   exit 1
 fi
 
@@ -80,8 +81,9 @@ path, requested_mode, style_name = sys.argv[1], sys.argv[2], sys.argv[3]
 # on how much it tints the surfaces and on the accent, how saturated the
 # terminal colours are, and a scale on the text colours' faint tint.
 STYLES = {
-    "balanced":   dict(boost=1.0,  tint=(0.12, 0.35), accent=(0.5, 1.0),   ansi=0.6,  text=1.0),
     "vibrant":    dict(boost=1.6,  tint=(0.22, 0.55), accent=(0.75, 1.0),  ansi=0.78, text=1.3),
+    "balanced":   dict(boost=1.0,  tint=(0.12, 0.35), accent=(0.5, 1.0),   ansi=0.6,  text=1.0),
+    "soft":       dict(boost=0.7,  tint=(0.08, 0.22), accent=(0.34, 0.62), ansi=0.46, text=0.7),
     "muted":      dict(boost=0.45, tint=(0.04, 0.12), accent=(0.22, 0.38), ansi=0.34, text=0.45),
     "monochrome": dict(boost=0.1,  tint=(0.0, 0.03),  accent=(0.08, 0.14), ansi=0.2,  text=0.1),
 }
