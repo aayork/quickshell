@@ -17,7 +17,8 @@ Item {
   required property string path
   property int cardWidth: 220
 
-  readonly property int radius: 10
+  // Rounder than a window, as CleanShot's are.
+  readonly property int radius: 14
   readonly property bool hovered: hover.hovered
 
   // Every card is the same size, whatever the capture's shape, as in
@@ -35,10 +36,10 @@ Item {
   RectangularShadow {
     anchors.fill: frame
     radius: card.radius
-    offset.y: 8
-    blur: 30
-    spread: -2
-    color: Theme.alpha("#000000", 0.55)
+    offset.y: 6
+    blur: 24
+    spread: -3
+    color: Theme.alpha("#000000", 0.38)
   }
 
   // The picture, with rounded corners.
@@ -68,11 +69,21 @@ Item {
       mipmap: true
     }
 
-    // Dims under the pointer so the buttons read.
+    // Under the pointer the card turns to frosted glass, as CleanShot's
+    // does: the picture blurred and washed light, so the buttons read.
+    MultiEffect {
+      anchors.fill: parent
+      source: pic
+      blurEnabled: true
+      blurMax: 40
+      blur: 0.7
+      opacity: card.hovered ? 1 : 0
+      Behavior on opacity { NumberAnimation { duration: 160 } }
+    }
     Rectangle {
       anchors.fill: parent
-      color: Theme.alpha("#000000", card.hovered ? 0.5 : 0)
-      Behavior on color { ColorAnimation { duration: 140 } }
+      color: Theme.alpha("#ffffff", card.hovered ? 0.32 : 0)
+      Behavior on color { ColorAnimation { duration: 160 } }
     }
   }
 
@@ -84,14 +95,14 @@ Item {
     Rectangle { anchors.fill: parent; radius: card.radius }
   }
 
-  // A hairline edge, so a dark picture still has a shape against a dark
-  // desktop.
+  // Only the faintest edge, so a dark picture keeps its shape on a dark
+  // desktop without reading as a border.
   Rectangle {
     anchors.fill: parent
     radius: card.radius
     color: "transparent"
     border.width: 1
-    border.color: Theme.alpha("#ffffff", card.hovered ? 0.3 : 0.16)
+    border.color: Theme.alpha("#ffffff", 0.07)
   }
 
   HoverHandler { id: hover }
@@ -124,7 +135,7 @@ Item {
 
     Column {
       anchors.centerIn: parent
-      spacing: 8
+      spacing: 6
 
       PillButton {
         text: "Copy"
@@ -143,22 +154,22 @@ Item {
     }
 
     CornerButton {
-      anchors { top: parent.top; left: parent.left; margins: 7 }
+      anchors { top: parent.top; left: parent.left; margins: 9 }
       glyph: 0xF0156
       onClicked: Captures.dismiss(card.path)
     }
     CornerButton {
-      anchors { top: parent.top; right: parent.right; margins: 7 }
+      anchors { top: parent.top; right: parent.right; margins: 9 }
       glyph: 0xF0403
       onClicked: Captures.pin(card.path)
     }
     CornerButton {
-      anchors { bottom: parent.bottom; left: parent.left; margins: 7 }
+      anchors { bottom: parent.bottom; left: parent.left; margins: 9 }
       glyph: 0xF03EB
       onClicked: Captures.edit(card.path)
     }
     CornerButton {
-      anchors { bottom: parent.bottom; right: parent.right; margins: 7 }
+      anchors { bottom: parent.bottom; right: parent.right; margins: 9 }
       glyph: 0xF0193
       onClicked: Captures.saveAs(card.path)
     }
