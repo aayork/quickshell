@@ -187,6 +187,7 @@ Singleton {
   property double recordStart: 0
   property string recordFile: ""
   property string recordFormat: "mp4"
+  property bool dndBefore: false
 
   // `geo` is "WxH+X+Y" in layout points. Audio: the speakers, the
   // microphone, both or neither.
@@ -204,6 +205,9 @@ Singleton {
     if (sources.length > 0) command.push("-a", sources.join("|"))
     recorder.command = command
     recorder.running = true
+    // Do Not Disturb while recording, so no toast ends up in the video.
+    dndBefore = Notifs.dnd
+    Notifs.dnd = true
     recordStart = Date.now()
     recording = true
   }
@@ -216,6 +220,7 @@ Singleton {
     id: recorder
     onExited: function(code) {
       root.recording = false
+      Notifs.dnd = root.dndBefore
       var file = root.recordFile
       if (root.recordFormat === "gif") {
         root.converting = true
