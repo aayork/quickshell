@@ -240,6 +240,10 @@ BarButton {
         text: "Checklist items can only be ticked off in Things itself."
         color: Theme.muted
         font.pixelSize: Theme.fontSmall
+        // Wrap within the row: at its full width it would widen the to-do
+        // and push the row's markers past the edge.
+        wrapMode: Text.Wrap
+        Layout.fillWidth: true
       }
 
       Flow {
