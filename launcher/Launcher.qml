@@ -790,19 +790,16 @@ Scope {
 
               Item {
                 id: icon
-                width: 18
-                height: 18
+                width: 22
+                height: 22
                 anchors.left: parent.left
                 anchors.leftMargin: 34
                 anchors.verticalCenter: parent.verticalCenter
 
-                Image {
+                AppIcon {
                   anchors.fill: parent
                   visible: row.modelData.icon !== ""
                   source: row.modelData.icon
-                  sourceSize.width: 36
-                  sourceSize.height: 36
-                  asynchronous: true
                 }
                 TailscaleIcon {
                   anchors.centerIn: parent

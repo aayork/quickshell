@@ -150,11 +150,17 @@ Item {
         Layout.preferredWidth: 30
         Layout.preferredHeight: 30
         Layout.alignment: Qt.AlignTop
+        // App icons get the glossy tile; symbolic ones stay plain glyphs.
+        AppIcon {
+          anchors.fill: parent
+          source: root.group.icon
+          visible: root.group.icon !== "" && !/-symbolic/.test(root.group.icon)
+        }
         NotificationIcon {
           id: appIcon
           anchors.fill: parent
           source: root.group.icon
-          visible: root.group.icon !== ""
+          visible: root.group.icon !== "" && /-symbolic/.test(root.group.icon)
         }
         Rectangle {
           anchors.fill: parent

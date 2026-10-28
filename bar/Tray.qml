@@ -59,12 +59,13 @@ BarButton {
           radius: Theme.controlRadius
           color: mouse.containsMouse ? Theme.hover : "transparent"
 
-          IconImage {
+          AppIcon {
             id: icon
             anchors.left: parent.left
             anchors.leftMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            implicitSize: 16
+            width: 20
+            height: 20
             source: slot.modelData.icon
           }
 

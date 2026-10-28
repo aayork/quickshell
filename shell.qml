@@ -1,4 +1,4 @@
-//@ pragma IconTheme Colloid
+//@ pragma IconTheme oxygen
 import Quickshell
 import qs.background
 import qs.bar
