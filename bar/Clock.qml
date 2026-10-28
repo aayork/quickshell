@@ -32,6 +32,8 @@ BarButton {
   property var zoneOffsets: ({})
   // Months away from the current one the calendar is showing.
   property int monthOffset: 0
+  // Notification groups fanned out in the popup, by Notifs group key.
+  property var openGroups: ({})
 
   readonly property date now: clock.date
   readonly property date shownMonth: new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
@@ -613,7 +615,7 @@ BarButton {
         id: list
         visible: Notifs.history.length > 0
         Layout.fillWidth: true
-        implicitHeight: Math.min(entries.implicitHeight, 170)
+        implicitHeight: Math.min(entries.implicitHeight, 340)
         contentHeight: entries.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -621,53 +623,22 @@ BarButton {
         ColumnLayout {
           id: entries
           width: list.width - (notifScroll.needed ? notifScroll.width + 4 : 0)
-          spacing: 2
+          spacing: 8
 
           Repeater {
-            model: Notifs.history
+            model: Notifs.groups
 
-            Rectangle {
-              id: entry
+            NotificationGroup {
               required property var modelData
-
               Layout.fillWidth: true
-              implicitHeight: text.implicitHeight + 10
-              radius: Theme.controlRadius
-              color: entryHover.hovered ? Theme.hover : "transparent"
-
-              HoverHandler { id: entryHover }
-
-              ColumnLayout {
-                id: text
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: 6
-                anchors.rightMargin: 6
-                spacing: 0
-
-                RowLayout {
-                  Layout.fillWidth: true
-                  Label { text: entry.modelData.summary; Layout.fillWidth: true }
-                  Label {
-                    text: entryHover.hovered ? Icons.close : root.ago(entry.modelData.time)
-                    color: Theme.dim
-                    font.pixelSize: Theme.fontSmall
-                    elide: Text.ElideNone
-                    MouseArea {
-                      anchors.fill: parent
-                      anchors.margins: -6
-                      onClicked: Notifs.removeEntry(entry.modelData.id)
-                    }
-                  }
-                }
-                Label {
-                  visible: text !== ""
-                  text: [entry.modelData.app, entry.modelData.body.split("\n")[0]].filter(s => s !== "").join(" · ")
-                  color: Theme.dim
-                  font.pixelSize: Theme.fontSmall
-                  Layout.fillWidth: true
-                }
+              group: modelData
+              ago: t => root.ago(t)
+              expanded: !!root.openGroups[modelData.key]
+              onExpandedChanged: {
+                var open = Object.assign({}, root.openGroups)
+                if (expanded) open[modelData.key] = true
+                else delete open[modelData.key]
+                root.openGroups = open
               }
             }
           }
