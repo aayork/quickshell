@@ -444,7 +444,9 @@ Scope {
           height: note.box.height
           sourceItem: shot
           sourceRect: note.box
-          textureSize: Qt.size(Math.max(1, Math.round(note.box.width / (root.unit * 5))), Math.max(1, Math.round(note.box.height / (root.unit * 5))))
+          // Blocks four units across: fine enough to keep the shapes of
+          // things, coarse enough that text can't be read.
+          textureSize: Qt.size(Math.max(1, Math.round(note.box.width / (root.unit * 4))), Math.max(1, Math.round(note.box.height / (root.unit * 4))))
           smooth: false
         }
       }
@@ -636,6 +638,8 @@ Scope {
           anchors.left: parent.left
           anchors.right: parent.right
           height: 52
+          // Above the options row, so the tools' hints show over it.
+          z: 5
 
           ToolButton {
             anchors.left: parent.left
