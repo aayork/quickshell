@@ -122,26 +122,52 @@ Scope {
           color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.glass ? Services.Config.bar.tint : 0)
         }
 
-        // Aero gloss: a sheen over the top half and a bright line along the
-        // foot, like a pane of glass catching the light.
-        Rectangle {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.top: parent.top
-          height: Math.round(parent.height * 0.5)
+        // Aero / liquid glass: a frosted white body, a gloss band over the
+        // top half, a bright edge along the top and a rim of light along the
+        // foot with a faint shadow line under it.
+        Item {
+          anchors.fill: parent
           visible: bar.fullscreen || Services.Config.bar.glass
-          gradient: Gradient {
-            GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.38) }
-            GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.1) }
+
+          Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.32) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.14) }
+            }
           }
-        }
-        Rectangle {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          height: 1
-          visible: bar.fullscreen || Services.Config.bar.glass
-          color: Theme.alpha("#ffffff", 0.55)
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.round(parent.height * 0.48)
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.42) }
+              GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.08) }
+            }
+          }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            color: Theme.alpha("#ffffff", 0.7)
+          }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 1
+            height: 1
+            color: Theme.alpha("#ffffff", 0.75)
+          }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 1
+            color: Theme.alpha("#0b2540", 0.18)
+          }
         }
 
         Workspaces {

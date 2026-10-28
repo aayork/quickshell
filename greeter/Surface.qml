@@ -40,12 +40,28 @@ Item {
     autoPaddingEnabled: false
     blurEnabled: true
     blurMax: 64
-    blur: 1
+    blur: 0.35
   }
 
+  // A light wash, deeper towards the bottom, so the wallpaper still shows.
   Rectangle {
     anchors.fill: parent
-    color: Theme.alpha(Theme.base, 0.55)
+    gradient: Gradient {
+      GradientStop { position: 0; color: Theme.alpha(Theme.base, 0.1) }
+      GradientStop { position: 1; color: Theme.alpha(Theme.base, 0.35) }
+    }
+  }
+
+  // Frosted glass behind who is logging in, as on Windows 7 and the Wii.
+  Glass {
+    visible: root.primary
+    anchors.horizontalCenter: column.horizontalCenter
+    y: column.y + userRow.y - 26
+    width: 400
+    // The message line under the field is kept even when empty, so less
+    // padding below it.
+    height: column.y + column.height - y + 12
+    radius: 18
   }
 
   SystemClock {
@@ -62,7 +78,10 @@ Item {
       Layout.alignment: Qt.AlignHCenter
       text: Qt.formatDateTime(clock.date, "h:mm AP")
       color: Theme.brightForeground
-      font.pixelSize: 64
+      font.pixelSize: 72
+      font.weight: Font.Light
+      style: Text.Raised
+      styleColor: Theme.alpha("#ffffff", 0.7)
       elide: Text.ElideNone
     }
 
@@ -77,9 +96,10 @@ Item {
     // Who is logging in. Other accounts sit either side, smaller and faded;
     // click one, or press Up/Down in the field, to switch.
     RowLayout {
+      id: userRow
       visible: root.primary
       Layout.alignment: Qt.AlignHCenter
-      Layout.topMargin: 36
+      Layout.topMargin: 56
       spacing: 22
 
       // Fixed-width slots keep the current picture centred.
@@ -132,8 +152,8 @@ Item {
       visible: root.primary
       Layout.alignment: Qt.AlignHCenter
       Layout.topMargin: 16
-      Layout.preferredWidth: 280
-      implicitHeight: 34
+      Layout.preferredWidth: 300
+      implicitHeight: 36
       password: root.greeter.status !== "prompt" || !root.greeter.promptEcho
       enabled: !root.greeter.busy
       // A short side-to-side shake on a wrong password, like macOS.
@@ -188,10 +208,10 @@ Item {
 
     property bool open: false
 
-    Rectangle {
+    Glass {
       anchors.fill: parent
-      radius: Theme.controlRadius
-      color: sessionMouse.pressed ? Theme.pressed : sessionMouse.containsMouse || sessionButton.open ? Theme.hover : "transparent"
+      radius: height / 2
+      opacity: sessionMouse.containsMouse || sessionButton.open ? 1 : 0.8
     }
 
     RowLayout {
@@ -241,10 +261,13 @@ Item {
     anchors.bottomMargin: 6
     width: Math.max(220, sessionList.implicitWidth + 12)
     height: sessionList.implicitHeight + 12
-    radius: Theme.controlRadius
-    color: Theme.alpha(Theme.base, 0.92)
-    border.width: 1
-    border.color: Theme.separator
+    radius: Theme.radius
+    color: "transparent"
+
+    Glass {
+      anchors.fill: parent
+      radius: parent.radius
+    }
 
     ColumnLayout {
       id: sessionList
@@ -312,22 +335,23 @@ Item {
     IconButton {
       icon: String.fromCodePoint(0xF04B2)
       size: Theme.iconLarge
-      implicitWidth: Theme.rowHeight + 4
-      implicitHeight: Theme.rowHeight + 4
+      implicitWidth: Theme.rowHeight + 8
+      implicitHeight: Theme.rowHeight + 8
       onClicked: root.greeter.power("suspend")
     }
     IconButton {
       icon: String.fromCodePoint(0xF0709)
       size: Theme.iconLarge
-      implicitWidth: Theme.rowHeight + 4
-      implicitHeight: Theme.rowHeight + 4
+      implicitWidth: Theme.rowHeight + 8
+      implicitHeight: Theme.rowHeight + 8
       onClicked: root.greeter.power("reboot")
     }
     IconButton {
       icon: String.fromCodePoint(0xF0425)
+      gel: Theme.red
       size: Theme.iconLarge
-      implicitWidth: Theme.rowHeight + 4
-      implicitHeight: Theme.rowHeight + 4
+      implicitWidth: Theme.rowHeight + 8
+      implicitHeight: Theme.rowHeight + 8
       onClicked: root.greeter.power("poweroff")
     }
   }

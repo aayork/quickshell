@@ -46,6 +46,7 @@ BarButton {
 
   TailscaleIcon {
     anchors.centerIn: parent
+    size: 11
     color: root.foreground
     off: !Tailscale.active
   }

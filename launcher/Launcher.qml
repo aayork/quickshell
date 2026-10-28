@@ -747,6 +747,7 @@ Scope {
               height: row.modelData.detail ? root.rowHeight + 6 : root.rowHeight
 
               Rectangle {
+                id: rowLight
                 anchors.fill: parent
                 anchors.leftMargin: 6
                 anchors.rightMargin: 6
@@ -759,9 +760,10 @@ Scope {
                 border.width: lit ? 1 : 0
                 border.color: Theme.alpha(Theme.accent, 0.55)
                 gradient: Gradient {
-                  GradientStop { position: 0; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.08)) : "transparent" }
-                  GradientStop { position: 0.5; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.2)) : "transparent" }
-                  GradientStop { position: 1; color: parent.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.32)) : "transparent" }
+                  // The gradient hides `color`, so an armed row's red goes here too.
+                  GradientStop { position: 0; color: rowLight.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.08)) : rowLight.color }
+                  GradientStop { position: 0.5; color: rowLight.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.2)) : rowLight.color }
+                  GradientStop { position: 1; color: rowLight.lit ? Qt.tint(Theme.background, Theme.alpha(Theme.accent, 0.32)) : rowLight.color }
                 }
               }
 

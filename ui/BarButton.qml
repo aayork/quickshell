@@ -42,7 +42,7 @@ Item {
     anchors.centerIn: parent
     text: root.text
     color: root.foreground
-    font.family: root.fontFamily
+    font.family: root.fontFamily === Theme.fontFamily ? Theme.familyFor(root.text) : root.fontFamily
     font.pixelSize: root.fontSize
     elide: Text.ElideNone
   }

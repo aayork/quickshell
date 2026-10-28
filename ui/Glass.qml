@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import qs.theme
 
 // A Frutiger Aero glass pane: pale gradient, a white gloss over the top,
@@ -19,26 +20,57 @@ Rectangle {
     GradientStop { position: 1; color: Theme.glassBottom }
   }
 
-  Rectangle {
-    anchors.fill: parent
-    anchors.margins: 1
-    radius: Math.max(0, root.radius - 1)
-    color: "transparent"
-    border.width: 1
-    border.color: Theme.glassEdge
-  }
 
+  // Gloss band, inset past the corner curve so it stays inside round shapes.
   Rectangle {
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: parent.top
-    anchors.margins: 2
+    readonly property real curve: Math.min(root.radius, root.height / 2)
+    x: Math.max(2, curve * 0.45)
+    y: 2
+    width: root.width - 2 * x
     height: Math.min(parent.height * root.shineHeight, 80)
-    radius: Math.max(0, root.radius - 2)
+    radius: Math.min(height / 2, Math.max(0, curve - x * 0.5))
     opacity: root.shine
     gradient: Gradient {
       GradientStop { position: 0; color: Theme.gloss }
       GradientStop { position: 1; color: "transparent" }
     }
+  }
+
+  // Liquid glass rim: a thin ring that catches the light, brightest along the
+  // top, dim down the sides and lit again faintly at the bottom.
+  Item {
+    id: rimLight
+    anchors.fill: parent
+    visible: false
+    layer.enabled: true
+    Rectangle {
+      anchors.fill: parent
+      radius: root.radius
+      gradient: Gradient {
+        GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.95) }
+        GradientStop { position: 0.35; color: Theme.alpha("#ffffff", 0.25) }
+        GradientStop { position: 0.75; color: Theme.alpha("#ffffff", 0.12) }
+        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.6) }
+      }
+    }
+  }
+  Item {
+    id: rimShape
+    anchors.fill: parent
+    visible: false
+    layer.enabled: true
+    Rectangle {
+      anchors.fill: parent
+      radius: root.radius
+      color: "transparent"
+      border.width: 1.5
+      border.color: "#ffffff"
+    }
+  }
+  MultiEffect {
+    anchors.fill: parent
+    source: rimLight
+    maskEnabled: true
+    maskSource: rimShape
   }
 }

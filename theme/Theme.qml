@@ -79,9 +79,9 @@ Singleton {
   // Frutiger Aero glass, worked out from the palette so any theme gets it:
   // a pale pane that runs from near white to a hint of the accent, a white
   // gloss over its top, a white inner edge and a soft accent outline.
-  readonly property color glassTop: alpha(Qt.tint(background, alpha("#ffffff", 0.55)), 0.985)
-  readonly property color glassBottom: alpha(Qt.tint(background, alpha(accent, 0.14)), 0.97)
-  readonly property color glassBorder: alpha(accent, 0.45)
+  readonly property color glassTop: alpha(Qt.tint(background, alpha("#ffffff", 0.55)), 0.84)
+  readonly property color glassBottom: alpha(Qt.tint(background, alpha(accent, 0.16)), 0.78)
+  readonly property color glassBorder: alpha(Qt.darker(accent, 1.3), 0.3)
   readonly property color glassEdge: alpha("#ffffff", 0.75)
   readonly property color gloss: alpha("#ffffff", 0.6)
   // Glossy "gel" buttons: the accent, lighter at the top.
@@ -98,6 +98,13 @@ Singleton {
   // Resolved by fontconfig, so the system font setting carries over.
   // A humanist sans in the spirit of Frutiger and Segoe UI.
   readonly property string fontFamily: "Open Sans"
+  // Open Sans has no Nerd Font glyphs, and Qt's fallback for them is a
+  // narrow font that squashes them. Text holding a glyph uses the system
+  // monospace font (a Nerd Font) instead.
+  readonly property string iconFamily: "monospace"
+  function familyFor(text) {
+    return /[\uE000-\uF8FF]|[\uDB80-\uDBFF]/.test(String(text)) ? iconFamily : fontFamily
+  }
   readonly property int fontSmall: 11
   readonly property int fontSize: 12
   readonly property int fontLarge: 14
