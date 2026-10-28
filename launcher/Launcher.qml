@@ -757,24 +757,30 @@ Scope {
         width: parent.width
         spacing: 0
 
+        // The magnifier sits in the rows' icon column and the text starts
+        // where the row titles do, so the search lines up with the list.
         RowLayout {
           Layout.fillWidth: true
-          Layout.leftMargin: 18
+          Layout.leftMargin: 34
           Layout.rightMargin: 14
-          Layout.topMargin: 14
-          Layout.bottomMargin: 14
-          spacing: 12
+          Layout.topMargin: 12
+          Layout.bottomMargin: 12
+          spacing: 10
 
           Label {
             text: Icons.glyph(0xF0349)
             font.pixelSize: Theme.iconLarge
             color: Theme.dim
+            horizontalAlignment: Text.AlignHCenter
+            Layout.preferredWidth: 18
             elide: Text.ElideNone
           }
 
           TextInput {
             id: input
             Layout.fillWidth: true
+            Layout.preferredHeight: 30
+            verticalAlignment: TextInput.AlignVCenter
             text: root.query
             color: Theme.brightForeground
             selectionColor: Theme.selection

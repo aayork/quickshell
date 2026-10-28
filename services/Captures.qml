@@ -50,6 +50,30 @@ Singleton {
       + "notify-send -a Screenshot -i \"$dest\" 'Screenshot saved' \"$(basename \"$dest\")\"", "sh", path, saveDir])
   }
 
+  // Anywhere, under any name, through the desktop's save dialog.
+  function saveAs(path) {
+    if (saveAsProcess.running) return
+    saveAsProcess.source = path
+    saveAsProcess.command = [Quickshell.shellDir + "/bin/pick-file", "--save",
+      "Screenshot " + Qt.formatDateTime(new Date(), "yyyy-MM-dd HH-mm-ss") + ".png",
+      "--folder", saveDir, "--title", "Save Screenshot"]
+    saveAsProcess.running = true
+  }
+
+  Process {
+    id: saveAsProcess
+    property string source: ""
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var dest = text.trim()
+        if (dest === "") return
+        Quickshell.execDetached(["sh", "-c", "cp -- \"$1\" \"$2\" && notify-send -a Screenshot -i \"$2\" 'Screenshot saved' \"$(basename \"$2\")\"",
+          "sh", saveAsProcess.source, dest])
+        root.dismiss(saveAsProcess.source)
+      }
+    }
+  }
+
   function remove(path) {
     dismiss(path)
     pins = pins.filter(p => p.path !== path)
