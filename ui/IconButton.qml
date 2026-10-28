@@ -26,7 +26,7 @@ Item {
   Label {
     anchors.centerIn: parent
     text: root.icon
-    color: mouse.containsMouse ? "#1e1e1e" : root.foreground
+    color: mouse.containsMouse && !Theme.dark ? "#1e1e1e" : root.foreground
     font.pixelSize: root.size
     elide: Text.ElideNone
   }

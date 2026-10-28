@@ -218,7 +218,7 @@ BarButton {
             Label {
               anchors.centerIn: parent
               text: Icons.glyph(sessionButton.modelData.icon)
-              color: sessionButton.armed || sessionButton.warning ? "#ffffff" : "#1e1e1e"
+              color: sessionButton.armed || sessionButton.warning || Theme.dark ? "#ffffff" : "#1e1e1e"
               font.pixelSize: Theme.iconLarge
               elide: Text.ElideNone
             }

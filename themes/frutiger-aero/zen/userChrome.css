@@ -1,0 +1,110 @@
+/* Frutiger Aero for Zen: Windows Vista / 7 dark glass chrome.
+ * Installed by bin/theme-set-zen while this theme is current (in place of
+ * the repo's flat userChrome.css). Zen only reads it at startup.
+ */
+
+:root {
+  --zen-border-radius: 6px !important;
+  --aero-glass: linear-gradient(to bottom,
+      rgba(70, 92, 112, 0.55) 0%, rgba(32, 46, 60, 0.7) 48%,
+      rgba(16, 24, 32, 0.82) 50%, rgba(10, 16, 22, 0.9) 100%);
+  --aero-selected: linear-gradient(to bottom,
+      #7fb6e6 0%, #3d84c6 49%, #2a6cb0 50%, #3f8ad0 100%);
+  --aero-hover: linear-gradient(to bottom,
+      rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 49%,
+      rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.1) 100%);
+}
+
+/* The window behind the page: smoked glass with a gloss band. */
+#navigator-toolbox,
+#zen-main-app-wrapper,
+#browser,
+#zen-appcontent-navbar-container,
+#titlebar {
+  background: var(--aero-glass) !important;
+  background-color: #0f1a24 !important;
+}
+
+/* Page frame: a thin dark edge and a soft shadow, like a Vista window. */
+#tabbrowser-tabbox,
+.browserSidebarContainer {
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Tabs. */
+.tabbrowser-tab .tab-background {
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+}
+.tabbrowser-tab:hover .tab-background {
+  background: var(--aero-hover) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+.tabbrowser-tab[selected] .tab-background,
+.tabbrowser-tab[visuallyselected] .tab-background {
+  background: var(--aero-selected) !important;
+  border-color: #1c4f86 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 6px rgba(80, 160, 240, 0.35) !important;
+}
+.tabbrowser-tab[selected] .tab-label,
+.tabbrowser-tab[visuallyselected] .tab-label {
+  color: #ffffff !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4) !important;
+}
+.tabbrowser-tab .tab-label {
+  color: #e3edf5 !important;
+}
+
+/* Address bar: the white Vista address box. */
+#urlbar-background {
+  background: linear-gradient(to bottom, #f4f6f8 0%, #ffffff 30%) !important;
+  border: 1px solid #7f9db9 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+}
+#urlbar[focused] #urlbar-background {
+  border-color: #3c7fb1 !important;
+  box-shadow: 0 0 0 2px rgba(60, 160, 240, 0.35) !important;
+}
+#urlbar-input,
+#urlbar .urlbar-input {
+  color: #1e1e1e !important;
+}
+#urlbar .urlbar-icon,
+#urlbar #identity-icon,
+#urlbar image {
+  fill: #3a4a58 !important;
+  color: #3a4a58 !important;
+}
+
+/* Toolbar buttons: flat until hovered, then a Vista toolbar face. */
+toolbarbutton.toolbarbutton-1:not([disabled]):hover > .toolbarbutton-icon,
+toolbarbutton.toolbarbutton-1:not([disabled]):hover > .toolbarbutton-badge-stack {
+  /* Vista Start menu style: glossy black lit with a blue glow. */
+  background: linear-gradient(to bottom, #6f8fb0 0%, #3e6185 49%, #16324f 50%, #2b5683 100%) !important;
+  box-shadow: inset 0 0 0 1px #0a1a2a, inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  border-radius: 3px !important;
+}
+toolbarbutton.toolbarbutton-1:not([disabled]):is([open], [checked], :hover:active) > .toolbarbutton-icon {
+  background: linear-gradient(to bottom, #5d8fc4 0%, #2f6aa6 49%, #163f6e 50%, #2a62a0 100%) !important;
+  box-shadow: inset 0 0 0 1px #06182b !important;
+}
+
+/* Menus and panels: Vista's light menus with the pale blue highlight. */
+menupopup,
+panel {
+  --panel-background: #f0f0f0 !important;
+  --panel-color: #1e1e1e !important;
+  --panel-border-color: #979797 !important;
+  --panel-border-radius: 4px !important;
+}
+menupopup menuitem:hover,
+menupopup menu:hover,
+menupopup menuitem[_moz-menuactive],
+menupopup menu[_moz-menuactive] {
+  background: linear-gradient(to bottom, #f2f8fd 0%, #dcebfc 100%) !important;
+  box-shadow: inset 0 0 0 1px #7da2ce !important;
+  border-radius: 3px !important;
+  color: #1e1e1e !important;
+}

@@ -14,13 +14,14 @@ Item {
   property real radius: 3
   signal clicked()
 
-  readonly property color ink: "#1e1e1e"
+  readonly property color ink: face.ink
 
   implicitWidth: content.implicitWidth + 20
   implicitHeight: Theme.rowHeight
   opacity: enabled ? 1 : 0.45
 
   VistaFace {
+    id: face
     anchors.fill: parent
     radius: root.radius
     hovered: mouse.containsMouse
@@ -37,7 +38,8 @@ Item {
       visible: root.icon !== ""
       anchors.verticalCenter: parent.verticalCenter
       text: root.icon
-      color: root.dimIcon ? "#5a6670" : root.selected ? "#0b4f86" : "#1f6fb2"
+      color: Theme.dark ? (root.dimIcon ? "#9aa8b4" : root.selected ? "#ffffff" : "#7cc0f5")
+        : (root.dimIcon ? "#5a6670" : root.selected ? "#0b4f86" : "#1f6fb2")
       font.pixelSize: Theme.iconSize
       elide: Text.ElideNone
     }

@@ -49,7 +49,12 @@ zen_prefs="$zen_profile_dir/prefs.js"
 # sure Zen actually loads userChrome.css/userContent.css at all (off by default).
 zen_chrome_dir="$zen_profile_dir/chrome"
 mkdir -p "$zen_chrome_dir"
-cp "$SHELL_ROOT/themed/zen/userChrome.css" "$zen_chrome_dir/userChrome.css"
+# A theme can bring its own (frutiger-aero does); otherwise the flat one.
+if [[ -f $CURRENT_THEME_DIR/zen/userChrome.css ]]; then
+  cp "$CURRENT_THEME_DIR/zen/userChrome.css" "$zen_chrome_dir/userChrome.css"
+else
+  cp "$SHELL_ROOT/themed/zen/userChrome.css" "$zen_chrome_dir/userChrome.css"
+fi
 
 set_pref() {
   local key="$1" value="$2"
@@ -58,7 +63,9 @@ set_pref() {
 }
 
 # Matches hyprland.lua's decoration.rounding = 0 (flat, TUI-inspired look).
-set_pref "zen.theme.border-radius" "0"
+radius=0
+[[ -f $CURRENT_THEME_DIR/zen/userChrome.css ]] && radius=6
+set_pref "zen.theme.border-radius" "$radius"
 # Loosely mirrors hyprland.lua's tight general.gaps_in/gaps_out.
 set_pref "zen.theme.content-element-separation" "4"
 set_pref "zen.theme.accent-color" "\"$accent\""
