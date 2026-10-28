@@ -18,18 +18,18 @@ Rectangle {
   }
 
 
-  // Gloss band, inset past the corner curve so it stays inside round shapes.
+  // Gloss over the top: the pane's own shape, fading to clear partway
+  // down, so it follows the corners exactly with no second edge.
   Rectangle {
-    readonly property real curve: Math.min(root.radius, root.height / 2)
-    x: Math.max(2, curve * 0.45)
-    y: 2
-    width: root.width - 2 * x
-    height: Math.min(parent.height * 0.45, 90)
-    radius: Math.min(height / 2, Math.max(0, curve - x * 0.5))
+    id: glossFill
+    anchors.fill: parent
+    anchors.margins: 1
+    radius: Math.max(0, root.radius - 1)
     opacity: root.shine
+    readonly property real stop: Math.max(0.01, Math.min(1, (Math.min(root.height * 0.45, 90)) / Math.max(1, root.height)))
     gradient: Gradient {
       GradientStop { position: 0; color: Theme.gloss }
-      GradientStop { position: 1; color: "transparent" }
+      GradientStop { position: glossFill.stop; color: "transparent" }
     }
   }
 

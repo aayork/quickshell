@@ -43,15 +43,27 @@ PanelWindow {
         // Seconds on screen. Critical ones stay until dealt with.
         readonly property real lifetime: critical ? 0 : modelData.expireTimeout > 0 ? modelData.expireTimeout : 6
         readonly property string icon: Notifs.iconFor(modelData)
+        // The sending app's own icon, for the caption.
+        readonly property string appIcon: {
+          var name = Notifs.appIconName(modelData)
+          return name === "" ? "" : name.charAt(0) === "/" ? "file://" + name : Quickshell.iconPath(name, true)
+        }
 
         Layout.fillWidth: true
-        implicitHeight: body.implicitHeight + 24
+        implicitHeight: caption.height + body.implicitHeight + 22 + (card.lifetime > 0 ? 8 : 0)
         border.color: critical ? Theme.red : Theme.glassBorder
+        shineHeight: 0.25
 
-        Timer {
-          interval: card.lifetime * 1000
-          running: card.lifetime > 0 && !hover.hovered
-          onTriggered: card.modelData.expire()
+        // Time left, 1 to 0, shown by the progress bar along the bottom. It
+        // stands still while the pointer is on the toast.
+        property real timeLeft: 1
+        NumberAnimation on timeLeft {
+          from: 1
+          to: 0
+          duration: card.lifetime * 1000
+          running: card.lifetime > 0
+          paused: running && hover.hovered
+          onFinished: card.modelData.expire()
         }
 
         HoverHandler { id: hover }
@@ -70,19 +82,105 @@ PanelWindow {
           }
         }
 
+        // Caption strip, like a little Windows 7 title bar: app icon and
+        // name, and a Vista close button.
+        Item {
+          id: caption
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.margins: 1
+          height: 26
+
+          Rectangle {
+            anchors.fill: parent
+            radius: Theme.radius - 1
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha("#ffffff", 0.14) }
+              GradientStop { position: 0.5; color: Theme.alpha("#ffffff", 0.05) }
+              GradientStop { position: 0.51; color: Theme.alpha("#000000", 0.08) }
+              GradientStop { position: 1; color: Theme.alpha("#000000", 0.02) }
+            }
+          }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 1
+            color: Theme.alpha("#000000", 0.3)
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 4
+            spacing: 6
+
+            AppIcon {
+              visible: card.appIcon !== ""
+              source: card.appIcon
+              Layout.preferredWidth: 14
+              Layout.preferredHeight: 14
+            }
+            Label {
+              text: card.modelData.appName || "Notification"
+              color: Theme.foreground
+              font.pixelSize: Theme.fontSmall
+              font.bold: true
+              style: Text.Raised
+              styleColor: Theme.alpha("#000000", 0.4)
+              Layout.fillWidth: true
+            }
+
+            // Vista close button: glass at rest, red gel under the pointer.
+            Item {
+              Layout.preferredWidth: 30
+              Layout.preferredHeight: 18
+              VistaFace {
+                anchors.fill: parent
+                visible: !closeMouse.containsMouse
+                opacity: hover.hovered ? 1 : 0.6
+              }
+              Gel {
+                anchors.fill: parent
+                radius: 3
+                base: "#d23a2e"
+                visible: closeMouse.containsMouse
+              }
+              Text {
+                anchors.centerIn: parent
+                text: String.fromCodePoint(0xF0156)
+                color: "#ffffff"
+                font.family: Theme.iconFamily
+                font.pixelSize: 11
+                style: Text.Raised
+                styleColor: Theme.alpha("#000000", 0.4)
+              }
+              MouseArea {
+                id: closeMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: card.modelData.dismiss()
+              }
+            }
+          }
+        }
+
         RowLayout {
           id: body
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.top: parent.top
+          anchors.top: caption.bottom
           anchors.margins: 12
-          spacing: 10
+          spacing: 12
 
-          NotificationIcon {
+          // The picture stands free with a shadow, like a Vista icon.
+          AppIcon {
             visible: card.icon !== ""
             source: card.icon
-            Layout.preferredWidth: 32
-            Layout.preferredHeight: 32
+            Layout.preferredWidth: 40
+            Layout.preferredHeight: 40
             Layout.alignment: Qt.AlignTop
           }
 
@@ -91,15 +189,12 @@ PanelWindow {
             spacing: 2
 
             Label {
-              visible: text !== ""
-              text: card.modelData.appName
-              color: Theme.dim
-              font.pixelSize: Theme.fontSmall
-              Layout.fillWidth: true
-            }
-            Label {
               text: Notifs.plain(card.modelData.summary)
               font.bold: true
+              font.pixelSize: Theme.fontLarge
+              color: Theme.brightForeground
+              style: Text.Raised
+              styleColor: Theme.alpha("#000000", 0.4)
               wrapMode: Text.Wrap
               maximumLineCount: 2
               Layout.fillWidth: true
@@ -129,6 +224,26 @@ PanelWindow {
                 }
               }
             }
+          }
+        }
+
+        // A Vista progress bar: time left before the toast goes.
+        Rectangle {
+          visible: card.lifetime > 0
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.margins: 10
+          anchors.bottomMargin: 8
+          height: 5
+          radius: 2.5
+          color: Theme.alpha("#000000", 0.35)
+          border.width: 1
+          border.color: Theme.alpha("#000000", 0.4)
+          Gel {
+            height: parent.height
+            width: Math.max(height, parent.width * card.timeLeft)
+            base: card.critical ? Theme.red : Theme.green
           }
         }
       }

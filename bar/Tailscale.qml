@@ -70,8 +70,15 @@ BarButton {
 
     Layout.fillWidth: true
     implicitHeight: 42
-    radius: Theme.controlRadius + 3
-    color: machine.self ? Theme.alpha(Theme.accent, hovered ? 0.16 : 0.1) : hovered ? Theme.hover : "transparent"
+    radius: 3
+    color: "transparent"
+
+    // Windows 7 selection: this machine always faintly lit, others on hover.
+    AeroHighlight {
+      anchors.fill: parent
+      hovered: machine.hovered || machine.self
+      selected: machine.self && machine.hovered
+    }
 
     MouseArea {
       id: mouse
@@ -87,16 +94,29 @@ BarButton {
       spacing: 10
 
       // Kind of machine, with the online dot on the tile's corner.
-      Rectangle {
+      // A glossy tile: blue gel for this machine, black Vista glass for others.
+      Item {
         implicitWidth: 30
         implicitHeight: 30
-        radius: Theme.controlRadius + 4
-        color: machine.self ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.foreground, machine.online ? 0.08 : 0.04)
+        opacity: machine.online || machine.self ? 1 : 0.55
+
+        VistaFace {
+          anchors.fill: parent
+          radius: 6
+          visible: !machine.self
+        }
+        Gel {
+          anchors.fill: parent
+          radius: 6
+          visible: machine.self
+        }
 
         Label {
           anchors.centerIn: parent
           text: root.osGlyph(machine.os)
-          color: machine.self ? Theme.accent : machine.online ? Theme.foreground : Theme.muted
+          color: "#ffffff"
+          style: Text.Raised
+          styleColor: Theme.alpha("#000000", 0.35)
           font.pixelSize: Theme.iconSize + 1
           elide: Text.ElideNone
         }
@@ -108,9 +128,12 @@ BarButton {
           width: 10
           height: 10
           radius: 5
-          color: machine.online ? Theme.green : Theme.muted
-          border.width: 2
-          border.color: Theme.background
+          color: "transparent"
+          // A little glossy LED.
+          Gel {
+            anchors.fill: parent
+            base: machine.online ? Theme.green : "#5b636b"
+          }
         }
       }
 
@@ -205,16 +228,18 @@ BarButton {
         Layout.fillWidth: true
         spacing: 10
 
-        Rectangle {
+        // The logo on a glossy tile: blue gel while connected.
+        Item {
           implicitWidth: 34
           implicitHeight: 34
-          radius: Theme.controlRadius + 5
-          color: Tailscale.active ? Theme.alpha(Theme.accent, 0.18) : Theme.alpha(Theme.foreground, 0.06)
+
+          VistaFace { anchors.fill: parent; radius: 7; visible: !Tailscale.active }
+          Gel { anchors.fill: parent; radius: 7; visible: Tailscale.active }
 
           TailscaleIcon {
             anchors.centerIn: parent
             size: 16
-            color: Tailscale.active ? Theme.accent : Theme.dim
+            color: "#ffffff"
             off: !Tailscale.active
           }
         }
@@ -226,11 +251,10 @@ BarButton {
           Label { text: "Tailscale"; font.bold: true; font.pixelSize: Theme.fontLarge; Layout.fillWidth: true }
           RowLayout {
             spacing: 5
-            Rectangle {
-              implicitWidth: 6
-              implicitHeight: 6
-              radius: 3
-              color: Tailscale.running ? Theme.green : Tailscale.needsLogin ? Theme.yellow : Theme.muted
+            Gel {
+              implicitWidth: 7
+              implicitHeight: 7
+              base: Tailscale.running ? Theme.green : Tailscale.needsLogin ? Theme.yellow : "#5b636b"
             }
             Label {
               text: Tailscale.busy ? "Working…" : Tailscale.running ? "Connected" + (Tailscale.tailnet !== "" ? " · " + Tailscale.tailnet : "") : Tailscale.status
@@ -267,12 +291,19 @@ BarButton {
         visible: Tailscale.needsOperator
         Layout.fillWidth: true
         implicitHeight: Theme.rowHeight
-        radius: Theme.controlRadius
-        color: authorizeMouse.containsMouse ? Theme.pressed : Theme.hover
+        radius: 3
+        color: "transparent"
+
+        VistaFace {
+          anchors.fill: parent
+          hovered: authorizeMouse.containsMouse
+          pressed: authorizeMouse.pressed
+        }
 
         Label {
           anchors.centerIn: parent
           text: "Let this user control Tailscale"
+          color: Theme.dark ? "#ffffff" : "#1e1e1e"
         }
 
         MouseArea {

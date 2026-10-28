@@ -127,8 +127,22 @@ Item {
 
     implicitHeight: content.implicitHeight + 20
     radius: 8
-    color: Qt.tint(Theme.background, Theme.alpha(Theme.foreground, cardHover.hovered ? 0.11 : 0.07))
-    Behavior on color { ColorAnimation { duration: 120 } }
+    // A pane of smoked glass, brighter under the pointer.
+    color: Qt.tint(Theme.background, Theme.alpha(Theme.foreground, 0.05))
+    border.width: 1
+    border.color: Theme.alpha("#000000", 0.5)
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: 1
+      radius: 7
+      gradient: Gradient {
+        GradientStop { position: 0; color: Theme.alpha("#ffffff", cardHover.hovered ? 0.2 : 0.13) }
+        GradientStop { position: 0.45; color: Theme.alpha("#ffffff", 0.02) }
+        GradientStop { position: 1; color: Theme.alpha("#ffffff", 0.04) }
+      }
+      border.width: 1
+      border.color: Theme.alpha("#ffffff", 0.1)
+    }
 
     HoverHandler { id: cardHover }
     MouseArea {

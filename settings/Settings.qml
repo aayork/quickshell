@@ -348,13 +348,13 @@ Scope {
       Layout.leftMargin: 2
     }
 
-    Rectangle {
+    // A pane of glass, like a group box in Vista's Control Panel.
+    Glass {
       Layout.fillWidth: true
       implicitHeight: body.implicitHeight + 28
-      radius: Theme.controlRadius + 4
-      color: Theme.alpha(Theme.foreground, 0.035)
-      border.width: 1
-      border.color: Theme.alpha(Theme.foreground, 0.1)
+      radius: 8
+      shine: 0.6
+      shineHeight: 0.3
 
       ColumnLayout {
         id: body
@@ -407,10 +407,29 @@ Scope {
     implicitWidth: 760
     implicitHeight: 620
     minimumSize: Qt.size(640, 420)
-    color: Theme.background
+    // Smoked glass: see-through enough for the compositor's blur to show.
+    color: Theme.alpha(Theme.background, 0.84)
 
     // Closed from outside (SUPER+W, say).
     onClosed: root.open = false
+
+    // Escape closes the window wherever the keyboard focus happens to be
+    // (a field or list inside it can hold focus, and those never passed
+    // Escape on to the window).
+    Shortcut {
+      sequences: [StandardKey.Cancel]
+      context: Qt.WindowShortcut
+      onActivated: root.hide()
+    }
+
+    // Escape closes the window wherever the keyboard focus happens to be
+    // (a field or list inside it can hold focus, and those never passed
+    // Escape on to the window).
+    Shortcut {
+      sequences: [StandardKey.Cancel]
+      context: Qt.WindowShortcut
+      onActivated: root.hide()
+    }
     onVisibleChanged: if (visible) keys.forceActiveFocus()
 
     Item {
@@ -436,6 +455,18 @@ Scope {
           else if (event.key === Qt.Key_Backtab && (event.modifiers & Qt.ControlModifier)) root.tab = root.tabs[(index + root.tabs.length - 1) % root.tabs.length].id
           else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key < Qt.Key_1 + root.tabs.length) root.tab = root.tabs[event.key - Qt.Key_1].id
           else event.accepted = false
+        }
+
+        // The task pane: glass down the left, behind the tabs, like the blue
+        // pane in Vista's Control Panel and Explorer.
+        Glass {
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.margins: 6
+          width: sidebar.width + 8
+          radius: 8
+          shineHeight: 0.18
         }
 
         // Tabs down the left.
@@ -467,8 +498,16 @@ Scope {
 
               Layout.fillWidth: true
               implicitHeight: 30
-              radius: Theme.controlRadius
-              color: current ? Theme.selection : tabMouse.containsMouse ? Theme.hover : "transparent"
+              radius: 3
+              color: "transparent"
+
+              // The current tab is a lit Vista button; others light on hover.
+              VistaFace {
+                anchors.fill: parent
+                visible: tabButton.current || tabMouse.containsMouse
+                hovered: tabMouse.containsMouse
+                lit: tabButton.current
+              }
 
               RowLayout {
                 anchors.fill: parent
@@ -479,12 +518,14 @@ Scope {
                 Label {
                   text: Icons.glyph(tabButton.modelData.glyph)
                   font.pixelSize: Theme.iconSize
-                  color: tabButton.current ? Theme.accent : Theme.dim
+                  color: tabButton.current ? "#ffffff" : Theme.accent
                   elide: Text.ElideNone
                 }
                 Label {
                   text: tabButton.modelData.label
-                  color: tabButton.current ? Theme.brightForeground : Theme.foreground
+                  color: tabButton.current ? "#ffffff" : Theme.foreground
+                  style: tabButton.current ? Text.Raised : Text.Normal
+                  styleColor: Theme.alpha("#000000", 0.35)
                   Layout.fillWidth: true
                 }
                 Label {
@@ -514,7 +555,7 @@ Scope {
           anchors.top: parent.top
           anchors.bottom: parent.bottom
           width: 1
-          color: Theme.separator
+          color: "transparent"
         }
 
         Scrollbar {

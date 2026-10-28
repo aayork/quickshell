@@ -101,10 +101,17 @@ BarButton {
     Rectangle {
       Layout.fillWidth: true
       implicitHeight: todo.where !== "" ? Theme.rowHeight + 12 : Theme.rowHeight
-      radius: Theme.controlRadius + 2
-      color: todo.open ? Theme.selection : hover.hovered ? Theme.hover : "transparent"
+      radius: 3
+      color: "transparent"
 
       HoverHandler { id: hover }
+
+      // Windows 7 Explorer selection.
+      AeroHighlight {
+        anchors.fill: parent
+        hovered: hover.hovered
+        selected: todo.open
+      }
 
       MouseArea {
         anchors.fill: parent
@@ -121,24 +128,11 @@ BarButton {
         spacing: 10
 
         // The checkbox: a small rounded square, as in Things.
-        Rectangle {
-          implicitWidth: 14
-          implicitHeight: 14
+        // A Vista check box.
+        VistaCheck {
           Layout.alignment: todo.where !== "" ? Qt.AlignTop : Qt.AlignVCenter
           Layout.topMargin: todo.where !== "" ? 7 : 0
-          radius: 3
-          color: tick.containsMouse ? Theme.alpha(Theme.accent, 0.15) : "transparent"
-          border.width: 1.5
-          border.color: tick.containsMouse ? Theme.accent : Theme.dim
-
-          Label {
-            anchors.centerIn: parent
-            visible: tick.containsMouse
-            text: Icons.glyph(0xF012C)
-            color: Theme.accent
-            font.pixelSize: 11
-            elide: Text.ElideNone
-          }
+          hovered: tick.containsMouse
 
           MouseArea {
             id: tick
@@ -379,8 +373,16 @@ BarButton {
 
             Layout.fillWidth: true
             implicitHeight: 30
-            radius: Theme.controlRadius + 2
-            color: current ? Theme.selection : tabMouse.containsMouse ? Theme.hover : "transparent"
+            radius: 3
+            color: "transparent"
+
+            // The current list is a lit Vista button; the others light on hover.
+            VistaFace {
+              anchors.fill: parent
+              visible: tab.current || tabMouse.containsMouse
+              hovered: tabMouse.containsMouse
+              lit: tab.current
+            }
 
             Row {
               anchors.centerIn: parent
@@ -396,7 +398,7 @@ BarButton {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: tab.count > 0
                 text: tab.count
-                color: tab.current ? Theme.foreground : Theme.dim
+                color: tab.current ? "#ffffff" : Theme.dim
                 font.pixelSize: Theme.fontSmall
                 elide: Text.ElideNone
               }

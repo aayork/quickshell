@@ -64,9 +64,9 @@ Item {
     anchors.fill: parent
     onPressed: function(event) { root.pick(event.x) }
     onPositionChanged: function(event) { if (pressed) root.pick(event.x) }
-    onWheel: function(event) {
-      var next = Math.max(0, Math.min(root.stops.length - 1, root.index + (event.angleDelta.y > 0 ? 1 : -1)))
-      if (root.stops.length > 0 && next !== root.index) root.moved(root.stops[next])
-    }
+    // The wheel scrolls the page, not the slider: it sits in long scrolling
+    // pages (the cursor size one), and turning the wheel while passing over
+    // it used to change the setting, blowing the cursor up to 96 px.
+    onWheel: function(event) { event.accepted = false }
   }
 }
