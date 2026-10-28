@@ -15,8 +15,8 @@ Rectangle {
     { label: "Copy", run: () => { Captures.copy(root.path); Captures.dismiss(root.path) } },
     { label: "Save", run: () => { Captures.save(root.path); Captures.dismiss(root.path) } },
     { label: "Save As…", run: () => Captures.saveAs(root.path) },
-    { label: "Annotate", run: () => Captures.edit(root.path) },
-    { label: "Pin to Screen", run: () => Captures.pin(root.path) },
+    { label: Captures.isVideo(root.path) ? "Open" : "Annotate", run: () => Captures.edit(root.path) },
+    { label: "Pin to Screen", hidden: Captures.isVideo(root.path), run: () => Captures.pin(root.path) },
     { label: "Show in Files", run: () => Quickshell.execDetached(["xdg-open", root.path.replace(/\/[^\/]*$/, "")]) },
     { label: "Move to Trash", danger: true, run: () => Captures.remove(root.path) },
     { label: "Close", run: () => Captures.dismiss(root.path) }
@@ -36,7 +36,7 @@ Rectangle {
     width: parent.width - 8
 
     Repeater {
-      model: root.items
+      model: root.items.filter(i => !i.hidden)
 
       Rectangle {
         required property var modelData

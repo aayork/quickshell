@@ -179,6 +179,8 @@ Scope {
           height: parent.height
           spacing: 0
 
+          // A recording in progress: its time, and click to stop.
+          Recording {}
           Tray { id: tray; foreground: bar.foregroundOver(row.x + tray.x, tray.width) }
           Bose { id: bose; foreground: bar.foregroundOver(row.x + bose.x, bose.width) }
           Things { id: things; foreground: bar.foregroundOver(row.x + things.x, things.width) }

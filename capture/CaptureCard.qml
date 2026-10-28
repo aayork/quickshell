@@ -19,6 +19,7 @@ Item {
 
   // Rounder than a window, as CleanShot's are.
   readonly property int radius: 14
+  readonly property bool video: Captures.isVideo(path)
   readonly property bool hovered: hover.hovered
 
   // Every card is the same size, whatever the capture's shape, as in
@@ -60,7 +61,7 @@ Item {
     Image {
       id: pic
       anchors.fill: parent
-      source: "file://" + card.path
+      source: "file://" + Captures.thumbOf(card.path)
       fillMode: Image.PreserveAspectCrop
       sourceSize.width: card.cardWidth * 2
       asynchronous: true
@@ -84,6 +85,25 @@ Item {
       anchors.fill: parent
       color: Theme.alpha("#ffffff", card.hovered ? 0.32 : 0)
       Behavior on color { ColorAnimation { duration: 160 } }
+    }
+  }
+
+  // A recording: a play mark (or GIF) in the middle while not hovered.
+  Rectangle {
+    visible: card.video && !card.hovered
+    anchors.centerIn: parent
+    width: badge.implicitWidth + 18
+    height: 30
+    radius: 15
+    color: Theme.alpha("#000000", 0.55)
+    Label {
+      id: badge
+      anchors.centerIn: parent
+      text: /\.gif$/i.test(card.path) ? "GIF" : Icons.glyph(0xF040A)
+      color: "#ffffff"
+      font.pixelSize: 13
+      font.bold: true
+      elide: Text.ElideNone
     }
   }
 
@@ -160,12 +180,14 @@ Item {
     }
     CornerButton {
       anchors { top: parent.top; right: parent.right; margins: 9 }
+      visible: !card.video
       glyph: 0xF0403
       onClicked: Captures.pin(card.path)
     }
     CornerButton {
       anchors { bottom: parent.bottom; left: parent.left; margins: 9 }
-      glyph: 0xF03EB
+      // A recording opens in the player instead.
+      glyph: card.video ? 0xF040A : 0xF03EB
       onClicked: Captures.edit(card.path)
     }
     CornerButton {

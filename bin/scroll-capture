@@ -1,7 +1,8 @@
 #!/bin/bash
 set -uo pipefail
 
-# Scrolling capture, as a toggle. The first run picks an area and starts
+# Scrolling capture, as a toggle. The first run picks an area (or takes one
+# with --region "X,Y WxH") and starts
 # grabbing it every moment; scroll the content yourself while it runs. The
 # second run stops it and hands the stitched tall picture to the shell.
 #
@@ -35,7 +36,12 @@ if [[ -f $WORK/pid ]]; then
   exit 0
 fi
 
-selection=$("$BIN/capture-region" region) || exit 0
+# The All-In-One bar passes the area it already has ("X,Y WxH").
+if [[ ${1:-} == --region && -n ${2:-} ]]; then
+  selection=$2
+else
+  selection=$("$BIN/capture-region" region) || exit 0
+fi
 [[ -n $selection ]] || exit 0
 
 rm -rf -- "$WORK"
