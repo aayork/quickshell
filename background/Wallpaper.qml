@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.services
@@ -19,6 +20,22 @@ Scope {
 
       readonly property bool primary: Quickshell.screens.length > 0 && Quickshell.screens[0].name === modelData.name
       readonly property url source: Background.source
+      // A pixel-art image with "<name>.live.json" beside it is animated
+      // (background/LivePixel.qml).
+      readonly property string livePath: Background.path ? Background.path.replace(/\.[^.\/]+$/, "") + ".live.json" : ""
+      property var live: null
+      onLivePathChanged: live = null
+
+      FileView {
+        path: panel.livePath
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+          try { panel.live = JSON.parse(text()) } catch (e) { panel.live = null }
+        }
+        onLoadFailed: panel.live = null
+      }
 
       screen: modelData
       anchors { top: true; bottom: true; left: true; right: true }
@@ -128,7 +145,20 @@ Scope {
           cache: false
           smooth: true
           mipmap: true
+          // Still loaded for the bar's colour reading, hidden under the live one.
+          visible: !liveScene.item
           onStatusChanged: probe.sample()
+        }
+
+        Loader {
+          id: liveScene
+          anchors.fill: parent
+          active: panel.live !== null && image.status === Image.Ready
+          sourceComponent: LivePixel {
+            source: panel.source
+            spec: panel.live
+            running: !Session.locked && !Session.screensaver
+          }
         }
       }
 
