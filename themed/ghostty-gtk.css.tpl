@@ -50,95 +50,108 @@ popover modelbutton:selected { background-color: {{ selection }}; color: {{ brig
 popover separator { background-color: {{ lighter_background }}; }
 popover label.accelerator { color: {{ dark_foreground }}; }
 
-/* Tab bar: flat, square, compact tabs with borders between them, like a
-   terminal multiplexer. Hyprland's rounding is 0, so nothing here is rounded.
-   libadwaita rounds and pads tabboxchild (the tab's wrapper), not just tab. */
-tabbar .box {
-  background-color: {{ darker_background }};
-  box-shadow: inset 0 -1px {{ lighter_background }};
+/* Tab bar: a see-through strip in the terminal's own colour, so it reads as
+   part of the window rather than a black band on top. Tabs share the width
+   evenly with centred titles; the active tab is a soft raised pill, the
+   others are plain text that lights up on hover. Close buttons show only on
+   the active tab and on hover. libadwaita rounds and pads tabboxchild (the
+   tab's wrapper), not just tab, so both are styled. */
+tabbar .box,
+tabbar .box:backdrop {
+  background-color: alpha({{ background }}, 0.9);
+  box-shadow: inset 0 -1px alpha({{ foreground }}, 0.06);
   padding: 0;
 }
 tabbar tabbox,
 toolbarview > .top-bar .collapse-spacing tabbar tabbox,
 toolbarview > .bottom-bar .collapse-spacing tabbar tabbox {
-  padding: 0;
-  min-height: 30px; /* whole bar is 30px tall */
+  /* Horizontal gaps come from libadwaita's own 5px spacing around every
+     tab (it is fixed in code), so tabs and the bar add none of their own:
+     both ends and every gap between tabs match. Vertically 4px clear above
+     and below the tabs; the bottom gets one more pixel for the bar's
+     hairline. */
+  padding: 4px 0 5px;
+  min-height: 26px; /* whole bar is 35px tall */
 }
-tabbar tabbox > tabboxchild { border-radius: 0; outline-offset: -1px; }
+tabbar tabbox > tabboxchild { border-radius: 7px; outline-offset: -1px; padding: 0; margin: 0; }
+/* No dividers: they would add a pixel between tabs that the ends lack. */
 tabbar tabbox > separator,
 tabbar tabbox > separator.hidden {
   margin: 0;
-  min-width: 1px;
-  opacity: 1;
-  background-color: {{ lighter_background }};
+  min-width: 0;
+  background: none;
 }
 tabbar tab,
-tabbar tabbox.single-tab tab {
-  min-height: 30px;
-  padding: 0 6px;
-  border-radius: 0;
+tabbar tab:backdrop {
+  min-height: 26px;
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 7px;
   background: none;
   box-shadow: none;
-  color: {{ dark_foreground }};
-  transition: none;
+  color: alpha({{ foreground }}, 0.55);
+  transition: background-color 120ms ease-out, color 120ms ease-out;
 }
+tabbar tab label { font-size: 0.85em; font-weight: 500; }
 tabbar tab:hover,
-tabbar tab:active { background-color: {{ dark_background }}; color: {{ foreground }}; }
+tabbar tab:active {
+  background-color: alpha({{ foreground }}, 0.06);
+  color: alpha({{ foreground }}, 0.85);
+}
 tabbar tab:selected,
 tabbar tab:selected:hover,
 tabbar tab:selected:active,
-tabbar tabbox.single-tab tab {
-  background-color: {{ background }};
+tabbar tab:selected:backdrop,
+tabbar tabbox.single-tab tab,
+tabbar tabbox.single-tab tab:backdrop {
+  background-color: alpha({{ foreground }}, 0.11);
   color: {{ bright_foreground }};
-  box-shadow: inset 0 2px {{ accent }};
+  box-shadow: inset 0 0 0 1px alpha({{ foreground }}, 0.07);
 }
-tabbar tab label { font-size: 0.85em; }
-tabbar tab button.image-button {
-  min-width: 16px;
-  min-height: 16px;
+
+/* Close button: a small round button, hidden until wanted. */
+tabbar tab button.image-button,
+tabbar tab button.image-button:backdrop {
+  min-width: 18px;
+  min-height: 18px;
   padding: 0;
   margin: 0;
-  border-radius: 0;
+  border-radius: 99px;
   background: none;
   box-shadow: none;
   color: inherit;
-  opacity: 0.5;
+  opacity: 0;
+  transition: opacity 120ms ease-out, background-color 120ms ease-out;
 }
-tabbar tab button.image-button:hover { opacity: 1; background-color: {{ lighter_background }}; }
-tabbar tab button.image-button image { -gtk-icon-size: 12px; }
-tabbar tab indicator, tabbar tabbox > revealer > indicator { border-radius: 0; background: {{ accent }}; }
+tabbar tab:hover button.image-button,
+tabbar tab:selected button.image-button { opacity: 0.6; }
+tabbar tab button.image-button:hover {
+  opacity: 1;
+  background-color: alpha({{ foreground }}, 0.14);
+}
+tabbar tab button.image-button image { -gtk-icon-size: 11px; }
+
+/* Activity dot / needs-attention line */
+tabbar tab indicator, tabbar tabbox > revealer > indicator {
+  border-radius: 99px;
+  background: {{ accent }};
+}
 tabbar .start-action, tabbar .end-action { padding: 0; }
-tabbar .start-action button, tabbar .end-action button {
-  border-radius: 0;
-  margin: 0;
-  min-height: 0;
+tabbar .start-action button, tabbar .end-action button,
+tabbar .start-action button:backdrop, tabbar .end-action button:backdrop {
+  border-radius: 7px;
+  margin: 4px 2px;
+  min-height: 26px;
+  min-width: 26px;
   background: none;
   box-shadow: none;
-  color: {{ dark_foreground }};
+  color: alpha({{ foreground }}, 0.55);
 }
 tabbar .start-action button:hover, tabbar .end-action button:hover {
-  background-color: {{ dark_background }};
+  background-color: alpha({{ foreground }}, 0.08);
   color: {{ foreground }};
 }
 tabbar undershoot { background: none; }
-
-/* Unfocused (backdrop): libadwaita swaps the tab bar to its lighter backdrop
-   colour with a more specific :backdrop rule, so the bar brightened whenever
-   the window lost focus. Keep it exactly as it is when focused. */
-tabbar .box:backdrop {
-  background-color: {{ darker_background }};
-  box-shadow: inset 0 -1px {{ lighter_background }};
-}
-tabbar tab:backdrop { background: none; color: {{ dark_foreground }}; }
-tabbar tab:selected:backdrop,
-tabbar tabbox.single-tab tab:backdrop {
-  background-color: {{ background }};
-  color: {{ bright_foreground }};
-  box-shadow: inset 0 2px {{ accent }};
-}
-tabbar .start-action button:backdrop,
-tabbar .end-action button:backdrop { background: none; color: {{ dark_foreground }}; }
-tabbar tab button.image-button:backdrop { background: none; color: inherit; }
 
 /* Dialogs: close confirmation, clipboard confirmation, config errors,
    change-title */
@@ -199,5 +212,9 @@ label.url-overlay { color: {{ accent }}; }
 entry, text { caret-color: {{ accent }}; }
 selection, text selection { background-color: {{ selection }}; color: {{ bright_foreground }}; }
 
-/* Hyprland's rounding is 0: square off every widget, popups included */
+/* Hyprland's rounding is 0: square off every widget, popups included.
+   The tab bar's pills above are the one exception. */
 * { border-radius: 0; }
+tabbar tab, tabbar tabbox > tabboxchild,
+tabbar .start-action button, tabbar .end-action button { border-radius: 7px; }
+tabbar tab button.image-button, tabbar indicator { border-radius: 99px; }
