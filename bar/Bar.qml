@@ -71,7 +71,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -181,6 +181,7 @@ Scope {
 
           // A recording in progress: its time, and click to stop.
           Recording {}
+          Jot { id: jot; foreground: bar.foregroundOver(row.x + jot.x, jot.width) }
           Tray { id: tray; foreground: bar.foregroundOver(row.x + tray.x, tray.width) }
           Bose { id: bose; foreground: bar.foregroundOver(row.x + bose.x, bose.width) }
           Things { id: things; foreground: bar.foregroundOver(row.x + things.x, things.width) }

@@ -15,6 +15,7 @@ Singleton {
   readonly property alias bar: adapter.bar
   readonly property alias windows: adapter.windows
   readonly property alias media: adapter.media
+  readonly property alias jot: adapter.jot
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -70,6 +71,41 @@ Singleton {
       property JsonObject media: JsonObject {
         // A player that starts playing pauses the others.
         property bool exclusive: false
+      }
+
+      // Jot, the scratchpad under the bar's note button.
+      property JsonObject jot: JsonObject {
+        // Antinote's note is 360 x 412.
+        property int width: 360
+        property int height: 412
+        property int fontSize: 14
+        // Where the note was dragged to, from its place under the bar button.
+        property real offsetX: 0
+        property real offsetY: 0
+        // Line height as a multiple of the font size; Antinote's is about 1.63.
+        property real lineSpacing: 1.63
+        // Behind the text: "none", "ruled" (lined), "lines" (a grid) or "dots".
+        property string paper: "none"
+        // "last" (the note you were on) or "newest".
+        property string openOn: "last"
+        // Notes untouched this many days go away; 0 keeps them.
+        property int autoDeleteDays: 30
+        property bool swipeInvert: false
+        property string exportDir: "~/Documents/Jot"
+        // Daily euro reference rates from the European Central Bank, for
+        // "32 USD to JPY". Jot's only connection, so off until switched on.
+        property bool currency: false
+        // Words that switch a note's feature on, comma-separated.
+        property JsonObject keywords: JsonObject {
+          property string math: "math, calc, calcs"
+          property string list: "list, todo"
+          property string sum: "sum, total"
+          property string avg: "avg, average"
+          property string count: "count"
+          property string timer: "timer"
+          property string stopwatch: "stopwatch"
+          property string pomodoro: "pomodoro, pomo"
+        }
       }
 
       // Hyprland window look; applied by bin/window-style.

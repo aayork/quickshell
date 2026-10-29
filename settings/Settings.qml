@@ -25,7 +25,8 @@ Scope {
     { id: "windows", label: "Windows", glyph: 0xF05AF, about: "How Hyprland draws and spaces windows" },
     { id: "network", label: "Network", glyph: 0xF0928, about: "Wi-Fi networks in range" },
     { id: "bluetooth", label: "Bluetooth", glyph: 0xF00AF, about: "Paired devices and new ones nearby" },
-    { id: "calendar", label: "Calendar", glyph: 0xF00ED, about: "Accounts whose events show in the clock popup" }
+    { id: "calendar", label: "Calendar", glyph: 0xF00ED, about: "Accounts whose events show in the clock popup" },
+    { id: "jot", label: "Jot", glyph: 0xF039B, about: "The scratchpad under the bar's note button" }
   ]
   readonly property var currentTab: tabs.find(t => t.id === tab) ?? tabs[0]
 
@@ -299,7 +300,11 @@ Scope {
   // popups use.
   Connections {
     target: PopupState
-    function onRequested(name) { if (name === "settings") root.show("") }
+    function onRequested(name) {
+      // "settings:<tab>" opens on that tab.
+      if (name === "settings") root.show("")
+      else if (name.indexOf("settings:") === 0) root.show(name.slice(9))
+    }
   }
 
   IpcHandler {
@@ -1259,6 +1264,226 @@ Scope {
               BluetoothPanel {
                 Layout.fillWidth: true
                 active: root.open && root.tab === "bluetooth"
+              }
+            }
+
+            // ------------------------------------------------ jot
+            ColumnLayout {
+              visible: root.tab === "jot"
+              Layout.fillWidth: true
+              spacing: 16
+
+              Card {
+                title: "NOTE"
+
+                Setting {
+                  glyph: 0xF004C
+                  label: "Size"
+                  note: "Width and height of the dropdown"
+                  Stepper {
+                    value: Config.jot.width
+                    from: 280
+                    to: 900
+                    step: 20
+                    suffix: " w"
+                    onMoved: function(value) { Config.jot.width = value }
+                  }
+                  Stepper {
+                    value: Config.jot.height
+                    from: 220
+                    to: 1000
+                    step: 20
+                    suffix: " h"
+                    onMoved: function(value) { Config.jot.height = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0284
+                  label: "Text size"
+                  note: "Ctrl+= and Ctrl+- in a note too"
+                  Stepper {
+                    value: Config.jot.fontSize
+                    from: 9
+                    to: 28
+                    suffix: " px"
+                    onMoved: function(value) { Config.jot.fontSize = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0B78
+                  label: "Paper"
+                  Segmented {
+                    options: [
+                      { label: "Plain", value: "none" },
+                      { label: "Lined", value: "ruled" },
+                      { label: "Grid", value: "lines" },
+                      { label: "Dots", value: "dots" }
+                    ]
+                    current: Config.jot.paper
+                    onPicked: function(value) { Config.jot.paper = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0284
+                  label: "Line spacing"
+                  Segmented {
+                    options: [
+                      { label: "Tight", value: 1.35 },
+                      { label: "Antinote", value: 1.63 },
+                      { label: "Roomy", value: 1.9 }
+                    ]
+                    current: Config.jot.lineSpacing
+                    onPicked: function(value) { Config.jot.lineSpacing = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0450
+                  label: "Position"
+                  note: Config.jot.offsetX === 0 && Config.jot.offsetY === 0 ? "Under the bar button; drag its top edge to move it"
+                    : "Moved by hand; double-click its top edge to put it back"
+                  TextButton {
+                    visible: Config.jot.offsetX !== 0 || Config.jot.offsetY !== 0
+                    text: "Put back"
+                    onClicked: {
+                      Config.jot.offsetX = 0
+                      Config.jot.offsetY = 0
+                    }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF04E1
+                  label: "Opens on"
+                  Segmented {
+                    options: [
+                      { label: "Last note", value: "last" },
+                      { label: "Newest note", value: "newest" }
+                    ]
+                    current: Config.jot.openOn
+                    onPicked: function(value) { Config.jot.openOn = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0741
+                  label: "Reverse swipe"
+                  note: "Which way a sideways swipe moves between notes"
+                  Toggle {
+                    checked: Config.jot.swipeInvert
+                    onToggled: Config.jot.swipeInvert = !Config.jot.swipeInvert
+                  }
+                }
+              }
+
+              Card {
+                title: "KEEPING NOTES"
+
+                Setting {
+                  glyph: 0xF0954
+                  label: "Delete untouched notes after"
+                  note: Config.jot.autoDeleteDays === 0 ? "Notes are kept forever" : "Days without an edit"
+                  Stepper {
+                    value: Config.jot.autoDeleteDays
+                    from: 0
+                    to: 365
+                    display: value === 0 ? "Never" : value + " d"
+                    onMoved: function(value) { Config.jot.autoDeleteDays = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF024B
+                  label: "Export folder"
+                  note: "Ctrl+S saves the note there as Markdown"
+                  Field {
+                    Layout.preferredWidth: 200
+                    text: Config.jot.exportDir
+                    onAccepted: if (text.trim() !== "") Config.jot.exportDir = text.trim()
+                    onCancelled: text = Config.jot.exportDir
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF01C1
+                  label: "Currency rates"
+                  note: "Daily ECB rates for 32 USD to JPY; Jot's only connection"
+                  Toggle {
+                    checked: Config.jot.currency
+                    onToggled: Config.jot.currency = !Config.jot.currency
+                  }
+                }
+              }
+
+              Card {
+                title: "KEYWORDS"
+
+                Label {
+                  Layout.fillWidth: true
+                  text: "A keyword on a note's first line switches its feature on. Several words: separate them with commas."
+                  color: Theme.dim
+                  font.pixelSize: Theme.fontSmall
+                  wrapMode: Text.Wrap
+                  elide: Text.ElideNone
+                }
+
+                Repeater {
+                  model: [
+                    { key: "math", about: "Live sums, variables, units" },
+                    { key: "list", about: "Checkboxes in the margin" },
+                    { key: "sum", about: "Adds up every number" },
+                    { key: "avg", about: "Averages every number" },
+                    { key: "count", about: "Lines, words and characters" },
+                    { key: "timer", about: "timer 5m, on its own line" },
+                    { key: "stopwatch", about: "Counts up" },
+                    { key: "pomodoro", about: "pomodoro 25/5" }
+                  ]
+
+                  Setting {
+                    required property var modelData
+                    glyph: 0xF030C
+                    label: modelData.key
+                    note: modelData.about
+                    Field {
+                      Layout.preferredWidth: 200
+                      text: Config.jot.keywords[modelData.key]
+                      onAccepted: Config.jot.keywords[modelData.key] = text.trim() !== "" ? text.trim() : modelData.key
+                      onCancelled: text = Config.jot.keywords[modelData.key]
+                    }
+                  }
+                }
+              }
+
+              Card {
+                title: "KEYS"
+
+                Repeater {
+                  model: [
+                    ["Alt+A", "Open and close Jot"],
+                    ["Ctrl+[  Ctrl+]", "Previous and next note (or swipe); past the newest is a new note"],
+                    ["Ctrl+Shift+]", "Newest note"],
+                    ["Ctrl+N", "New note"],
+                    ["Ctrl+K  Ctrl+F", "All notes: type to filter, arrows, Enter"],
+                    ["Ctrl+P", "Keep open"],
+                    ["Ctrl+Shift+V", "AutoPaste"],
+                    ["Ctrl+S", "Export"],
+                    ["Ctrl+Shift+C", "Copy the note"],
+                    ["Ctrl+Shift+D", "Delete the note"],
+                    ["Ctrl+Return", "Tick a list item"],
+                    ["Ctrl+click", "Open a link (Ctrl+Alt+click shortens it)"]
+                  ]
+
+                  RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: 12
+                    Label { text: modelData[1]; Layout.fillWidth: true }
+                    Label { text: modelData[0]; color: Theme.dim; elide: Text.ElideNone }
+                  }
+                }
               }
             }
           }
