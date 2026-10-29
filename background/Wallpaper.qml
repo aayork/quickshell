@@ -132,53 +132,45 @@ Scope {
         }
       }
 
-      // Hyprland's own layer blur stops in a hard line at the bar's edge.
-      // Drawn here instead, it fades out into the wallpaper. Windows sit
-      // above this layer, so they cover it as usual.
+      // The bar's frosted glass, macOS Sequoia style: a heavy blur with the
+      // colour pushed up (Apple's "vibrancy"), so the wallpaper reads only as
+      // soft colour, ending in a clean edge at the bar's bottom. Drawn here
+      // rather than by Hyprland so it stays exactly the bar's strip. A taller
+      // piece of wallpaper is blurred so the bottom edge has real colour to
+      // blend with. Windows sit above this layer, so they cover it as usual.
       Item {
         id: glass
 
         visible: Config.bar.glass
-        readonly property int fade: 40
-        readonly property int depth: Theme.barHeight + fade
+        readonly property int depth: Theme.barHeight + 48
 
         width: parent.width
-        height: depth
+        height: Theme.barHeight
+        clip: true
 
-        ShaderEffectSource {
-          id: strip
-          anchors.fill: parent
-          sourceItem: wallpaper
-          sourceRect: Qt.rect(0, 0, glass.width, glass.height)
-          visible: false
-        }
+        Item {
+          width: parent.width
+          height: glass.depth
 
-        Rectangle {
-          id: fadeMask
-          anchors.fill: parent
-          visible: false
-          layer.enabled: true
-          gradient: Gradient {
-            GradientStop { position: 0; color: "white" }
-            GradientStop { position: Theme.barHeight * 0.2 / glass.depth; color: "white" }
-            GradientStop { position: 1; color: "transparent" }
+          ShaderEffectSource {
+            id: strip
+            anchors.fill: parent
+            sourceItem: wallpaper
+            sourceRect: Qt.rect(0, 0, glass.width, glass.depth)
+            visible: false
           }
-        }
 
-        MultiEffect {
-          anchors.fill: parent
-          source: strip
-          autoPaddingEnabled: false
-          blurEnabled: true
-          blurMax: 64
-          // A light blur, as on Windows Vista's taskbar: the wallpaper still
-          // reads through the glass.
-          blur: 0.45
-          maskEnabled: true
-          maskSource: fadeMask
-          // Centred so the fade spans the whole gradient; at 0 the edge is hard.
-          maskThresholdMin: 0.5
-          maskSpreadAtMin: 1
+          MultiEffect {
+            anchors.fill: parent
+            source: strip
+            autoPaddingEnabled: false
+            blurEnabled: true
+            blurMax: 64
+            blur: 1
+            blurMultiplier: 0.6
+            saturation: 0.4
+            brightness: 0.04
+          }
         }
       }
 

@@ -122,48 +122,10 @@ Scope {
           color: Theme.alpha(Theme.background, bar.fullscreen ? 1 : Services.Config.bar.glass ? Services.Config.bar.tint : 0)
         }
 
-        // Background effects on: Windows Vista taskbar glass over the blur.
-        // The upper half is lifted by a sheen that ends in a soft step at the
-        // middle, and faint diagonal streaks of reflected light cross it. No
-        // hard edge lines. Off, none of this: the bar stays fully clear.
-        Item {
-          anchors.fill: parent
-          id: vistaGlass
-          visible: Services.Config.bar.glass || bar.fullscreen
-          clip: true
-
-          readonly property bool dark: Theme.luminance(Theme.background) < 0.25
-
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Math.round(parent.height * 0.5)
-            gradient: Gradient {
-              GradientStop { position: 0; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.34 : 0.53) }
-              GradientStop { position: 0.85; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.15 : 0.27) }
-              GradientStop { position: 1; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.09 : 0.18) }
-            }
-          }
-          Repeater {
-            // Streaks: x as a share of the width, and how wide.
-            model: [[0.06, 90], [0.11, 26], [0.37, 140], [0.44, 34], [0.68, 110], [0.9, 60]]
-            Rectangle {
-              required property var modelData
-              x: parent.width * modelData[0]
-              y: -parent.height
-              width: modelData[1]
-              height: parent.height * 3
-              rotation: 28
-              gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0; color: Theme.alpha("#ffffff", 0) }
-                GradientStop { position: 0.5; color: Theme.alpha("#ffffff", vistaGlass.dark ? 0.18 : 0.22) }
-                GradientStop { position: 1; color: Theme.alpha("#ffffff", 0) }
-              }
-            }
-          }
-        }
+        // Background effects on: macOS Sequoia frosted glass. The blur itself
+        // is drawn under the bar by background/Wallpaper.qml; the tint above
+        // is the only layer here, so no sheen or highlights. Off, the bar
+        // stays fully clear.
 
         Workspaces {
           id: workspaces
