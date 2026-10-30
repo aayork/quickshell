@@ -64,7 +64,7 @@ fd "${args[@]}" -- "$query" "${roots[@]}" 2>/dev/null |
       --arg art "file://$path" --arg d "$dimensions" --arg a "$human" \
       --arg e "xdg-open $(printf '%q' "$path")" \
       --arg copy "wl-copy < $(printf '%q' "$path")" \
-      --arg reveal "nautilus --select $(printf '%q' "$path")" \
+      --arg reveal "omacast-reveal $(printf '%q' "$path")" \
       --arg path "$path" \
       --argjson sc "$((mtime % 90000))" \
       '{

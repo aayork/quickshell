@@ -32,6 +32,8 @@ Singleton {
   // Set by the dropdown while it has the keyboard, so AutoPaste leaves
   // copies made inside Jot alone.
   property bool editorFocused: false
+  // The note's text colour in the current theme, for ui/JotLabel.qml.
+  property color ink: "#36312e"
 
   readonly property string welcome: "Hi, this is Jot.\n\n"
     + "Jot is for the scraps: numbers, links, lists, half-thoughts. No titles, no folders. "

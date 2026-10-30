@@ -11,6 +11,9 @@ import qs.ui
 BarButton {
   id: root
 
+  visible: Things.enabled
+  onVisibleChanged: if (!visible) popup.close()
+
   readonly property alias popup: popup
   property string view: "today"
   // uuid of the to-do whose details are open.

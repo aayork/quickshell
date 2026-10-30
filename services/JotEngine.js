@@ -512,6 +512,12 @@ function formatUnit(value, unit) {
 // ------------------------------------------------------------------ math notes
 
 var ASSIGN_RE = /^(\s*)([^:=\d\s][^:=]*?)\s*:\s*(.*)$/
+// "rent = 1200": a name nobody has defined yet, "=", then a value. Read as
+// "rent: 1200" rather than asking for rent's value and wiping the 1200.
+var EQ_ASSIGN_RE = /^(\s*)([A-Za-z_\u00C0-\uFFFF][\w \u00C0-\uFFFF'\u2019]*?)\s*=\s*(\S.*)$/
+// Text after "=" that Jot wrote itself (a number it formatted, perhaps with
+// a unit), which it may take away again; anything else was typed and stays.
+var RESULT_RE = /^-?[\d,]+\.\d{2}(\s+\S+)?$|^-?\d(\.\d+)?e[+-]?\d+(\s+\S+)?$|^-?[\d,]+( \d+\/\d+)?(\s+\S+)?$/i
 
 // Read a math note top to bottom; line 0 is the keyword line. Per line:
 // { name: [a, b] | null, colon, refs: [[a, b]], result: [a, b] | null,
@@ -521,6 +527,18 @@ function analyse(lines) {
   var infos = lines.map(() => ({ name: null, colon: -1, refs: [], result: null, newText: null }))
   for (var i = 1; i < lines.length; i++) {
     var line = lines[i], info = infos[i]
+    var eqAssign = EQ_ASSIGN_RE.exec(line)
+    if (eqAssign && line.indexOf("=") === line.lastIndexOf("=") && line.indexOf("//") === -1
+        && evaluate(eqAssign[2], variables) === null) {
+      var assigned = evaluate(eqAssign[3], variables)
+      if (assigned !== null) {
+        var at = line.length - eqAssign[3].length
+        info.name = [eqAssign[1].length, eqAssign[1].length + eqAssign[2].length]
+        info.refs = assigned.refs.map(r => [r[0] + at, r[1] + at])
+        variables[eqAssign[2].trim().toLowerCase()] = assigned.value
+        continue
+      }
+    }
     var eq = line.lastIndexOf("=")
     var lhs = eq < 0 ? line : line.slice(0, eq)
     var expr = lhs, offset = 0, name = null
@@ -544,8 +562,12 @@ function analyse(lines) {
         var text = result.unit ? formatUnit(result.value, result.unit) : formatNumber(result.value)
         desired = head + " = " + text
         info.result = [head.length + 3, desired.length]
-      } else {
+      } else if (RESULT_RE.test(line.slice(eq + 1).trim())) {
+        // An answer Jot wrote earlier that no longer works out: take it away.
         desired = head + " ="
+      } else {
+        // Whatever was typed after the "=" (or is being typed) stays.
+        desired = line
       }
       if (desired !== line) info.newText = desired
     }

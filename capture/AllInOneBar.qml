@@ -20,12 +20,18 @@ Item {
 
   width: content.width
   height: content.height
-  // As CleanShot places it: inside the area, centred, a little below the
-  // middle. An area too small to hold it gets it underneath (or above).
+  // Bottom centre of the screen when the picker opens; once the area is
+  // moved, resized or redrawn, it follows the area as CleanShot places it:
+  // inside, centred, a little below the middle, or under (or above) an area
+  // too small to hold it.
+  readonly property bool follows: area.barFollows
   readonly property bool fitsInside: r && r.w > width + 40 && r.h > height + 60
-  x: r ? Math.max(8, Math.min(area.width - width - 8, r.x + r.w / 2 - width / 2)) : 0
+  x: {
+    if (!r || !follows) return Math.round((area.width - width) / 2)
+    return Math.max(8, Math.min(area.width - width - 8, r.x + r.w / 2 - width / 2))
+  }
   y: {
-    if (!r) return 0
+    if (!r || !follows) return Math.round(area.height - height - 40)
     if (fitsInside) return Math.round(r.y + r.h * 0.62 - height / 2)
     if (r.y + r.h + gap + height < area.height - 8) return r.y + r.h + gap
     if (r.y - gap - height > 8) return r.y - gap - height

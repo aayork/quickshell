@@ -1,0 +1,144 @@
+#!/usr/bin/python3 -I
+# Details of one network interface for the network popup, as JSON.
+#
+#   net-info <iface>
+#
+# Wi-Fi link (signal, band, channel, width, standard, rates) from `iw`, the
+# security from nmcli, addresses/router/DNS from nmcli, byte counters from
+# sysfs (the shell turns two readings into a speed) and the router's ping time.
+
+import json
+import re
+import subprocess
+import sys
+
+
+def run(*cmd, timeout=3):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def read_int(path):
+    try:
+        with open(path) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def channel(freq):
+    if 2412 <= freq <= 2472:
+        return (freq - 2407) // 5
+    if freq == 2484:
+        return 14
+    if 5150 <= freq <= 5925:
+        return (freq - 5000) // 5
+    if 5955 <= freq <= 7115:
+        return (freq - 5950) // 5
+    return None
+
+
+def band(freq):
+    if freq < 3000:
+        return "2.4 GHz"
+    if freq < 5950:
+        return "5 GHz"
+    return "6 GHz"
+
+
+def standard(bitrate_line):
+    # The MCS family in iw's bitrate line names the Wi-Fi generation.
+    for tag, name in (("EHT-", "Wi-Fi 7"), ("HE-", "Wi-Fi 6"), ("VHT-", "Wi-Fi 5"), ("MCS", "Wi-Fi 4")):
+        if tag in bitrate_line:
+            return name
+    return ""
+
+
+def wifi(iface, out):
+    link = run("iw", "dev", iface, "link")
+    if not link.startswith("Connected"):
+        return
+    m = re.search(r"freq: ([\d.]+)", link)
+    if m:
+        freq = int(float(m.group(1)))
+        out["frequency"] = freq
+        out["band"] = band(freq)
+        out["channel"] = channel(freq)
+    m = re.search(r"signal: (-?\d+) dBm", link)
+    if m:
+        out["dbm"] = int(m.group(1))
+    m = re.search(r"Connected to ([0-9a-f:]{17})", link)
+    if m:
+        out["bssid"] = m.group(1)
+    for key in ("rx", "tx"):
+        m = re.search(key + r" bitrate: ([\d.]+) MBit/s(.*)", link)
+        if m:
+            out[key + "Rate"] = float(m.group(1))
+            w = re.search(r"(\d+)MHz", m.group(2))
+            if w:
+                out["width"] = int(w.group(1))
+            out["standard"] = out.get("standard") or standard(m.group(2))
+    for line in run("nmcli", "-t", "-f", "IN-USE,SECURITY", "dev", "wifi", "list",
+                    "ifname", iface, "--rescan", "no").splitlines():
+        if line.startswith("*:"):
+            out["security"] = line[2:].replace("\\:", ":") or "Open"
+            break
+
+
+def addresses(iface, out):
+    show = run("nmcli", "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS,GENERAL.HWADDR",
+               "dev", "show", iface)
+    dns, ip6 = [], []
+    for line in show.splitlines():
+        key, _, value = line.partition(":")
+        value = value.replace("\\:", ":")
+        if not value or value == "--":
+            continue
+        if key.startswith("IP4.ADDRESS") and "ip4" not in out:
+            out["ip4"] = value.split("/")[0]
+        elif key == "IP4.GATEWAY":
+            out["gateway"] = value
+        elif key.startswith("IP4.DNS"):
+            dns.append(value)
+        elif key.startswith("IP6.ADDRESS"):
+            ip6.append(value.split("/")[0])
+        elif key == "GENERAL.HWADDR":
+            out["mac"] = value
+    out["dns"] = dns
+    # A global address, not a link-local or private (fd..) one.
+    public = [a for a in ip6 if not a.lower().startswith(("fe80", "fd", "fc"))]
+    if public:
+        out["ip6"] = public[0]
+
+
+def ping(host):
+    m = re.search(r"time=([\d.]+) ms", run("ping", "-n", "-c1", "-W1", host))
+    return float(m.group(1)) if m else None
+
+
+def main():
+    if len(sys.argv) != 2 or "/" in sys.argv[1]:
+        print("usage: net-info <iface>", file=sys.stderr)
+        return 2
+    iface = sys.argv[1]
+    out = {"iface": iface}
+    stats = "/sys/class/net/%s/statistics/" % iface
+    out["rxBytes"] = read_int(stats + "rx_bytes")
+    out["txBytes"] = read_int(stats + "tx_bytes")
+    if iface.startswith("wl"):
+        wifi(iface, out)
+    else:
+        speed = read_int("/sys/class/net/%s/speed" % iface)
+        if speed and speed > 0:
+            out["linkSpeed"] = speed
+    addresses(iface, out)
+    if out.get("gateway"):
+        out["latency"] = ping(out["gateway"])
+    print(json.dumps(out))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

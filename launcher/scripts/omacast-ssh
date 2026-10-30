@@ -178,7 +178,7 @@ flush() {
        # opened and read to choose between, while Enter already connects.
        actions: [
          { title: "Connect", shortcut: "↵", exec: $e },
-         { title: "Open SFTP", exec: ("setsid uwsm-app -- nautilus " + (("sftp://" + $id) | @sh)) },
+         { title: "Open SFTP", exec: ("setsid uwsm-app -- strata " + (("sftp://" + $id) | @sh)) },
          { title: "Edit Config", exec: ("launch-editor " + ($fileAbs | @sh)) }
        ]
      }'

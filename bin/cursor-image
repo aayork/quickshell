@@ -1,0 +1,96 @@
+#!/usr/bin/python3 -I
+# Saves one shape from the current cursor theme as a PNG, so the shell can
+# draw it at a size of its own (the area picker shows the theme's crosshair
+# smaller than the compositor would).
+#
+#   cursor-image <shape> <out.png>
+#
+# Prints "<width> <height> <hotspot x> <hotspot y>" of the image saved, the
+# largest one in the theme's file. Exits 1 when the shape is not found.
+import os
+import re
+import struct
+import sys
+import zlib
+
+shape, out = sys.argv[1], sys.argv[2]
+home = os.path.expanduser("~")
+
+
+def theme_name():
+    state = os.path.join(home, ".local/state/aayork-quickshell/cursor.lua")
+    try:
+        m = re.search(r'XCURSOR_THEME",\s*"([^"]+)"', open(state).read())
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    return os.environ.get("XCURSOR_THEME", "default")
+
+
+def find(theme, seen=()):
+    dirs = [os.path.join(home, ".local/share/icons"), os.path.join(home, ".icons"), "/usr/share/icons"]
+    for d in dirs:
+        path = os.path.join(d, theme, "cursors", shape)
+        if os.path.isfile(path):
+            return path
+    # Follow the theme's Inherits= line.
+    for d in dirs:
+        try:
+            text = open(os.path.join(d, theme, "index.theme")).read()
+        except OSError:
+            continue
+        m = re.search(r"^Inherits\s*=\s*(.+)$", text, re.M)
+        if m:
+            for parent in m.group(1).split(","):
+                parent = parent.strip()
+                if parent and parent not in seen:
+                    found = find(parent, seen + (theme,))
+                    if found:
+                        return found
+    return None
+
+
+path = find(theme_name()) or find("Adwaita")
+if not path:
+    sys.exit(1)
+
+data = open(path, "rb").read()
+if data[:4] != b"Xcur":
+    sys.exit(1)
+count = struct.unpack("<I", data[12:16])[0]
+best = None
+for i in range(count):
+    kind, nominal, pos = struct.unpack("<III", data[16 + 12 * i:28 + 12 * i])
+    if kind != 0xFFFD0002:
+        continue
+    w, h, hx, hy = struct.unpack("<IIII", data[pos + 16:pos + 32])
+    if not best or w > best[0]:
+        best = (w, h, hx, hy, pos + 36)
+if not best:
+    sys.exit(1)
+
+w, h, hx, hy, start = best
+# Xcursor pixels are premultiplied ARGB, little endian (B G R A in memory).
+rows = []
+for y in range(h):
+    row = bytearray(b"\0")
+    for x in range(w):
+        b, g, r, a = data[start + 4 * (y * w + x):start + 4 * (y * w + x) + 4]
+        if a:
+            r, g, b = (min(255, c * 255 // a) for c in (r, g, b))
+        row += bytes((r, g, b, a))
+    rows.append(bytes(row))
+
+
+def chunk(tag, body):
+    return struct.pack(">I", len(body)) + tag + body + struct.pack(">I", zlib.crc32(tag + body))
+
+
+png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+png += chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b"")
+tmp = out + ".tmp"
+with open(tmp, "wb") as f:
+    f.write(png)
+os.replace(tmp, out)
+print(w, h, hx, hy)

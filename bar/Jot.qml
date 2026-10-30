@@ -6,6 +6,8 @@ import Quickshell.Io
 import qs.services
 import qs.theme
 import qs.ui
+import "../services/JotThemes.js" as JotThemes
+import "../ui/Squircle.js" as Squircle
 
 // Jot, a scratchpad that drops from the bar (Antinote-style). Notes have no
 // titles; a keyword on the first line switches a feature on (math, list,
@@ -56,16 +58,14 @@ BarButton {
 
   // Antinote's default look, sampled from its own screenshots. The note is
   // the same whatever the desktop theme.
-  readonly property var pal: ({
-    bg: "#fdfdfd", fg: "#36312e", dim: "#9a9a9a", accent: "#1e7e7a",
-    caret: "#113b51", selection: "#cfe3f5",
-    keyword: "#103345", listKeyword: "#b353e2",
-    variable: "#1e7e7a", colon: "#9848bc", reference: "#3f9aa3", result: "#449921",
-    link: "#004a8a", check: "#4f4c4b", checkDone: "#dab3ec", done: "#ababab", doneMark: "#d6d6d6",
-    timer: "#9a9a9a", railOn: "#9848bc", railOff: "#e2e2e2",
-    toastBg: "#302d26", toastFg: "#ffffff", badgeBg: "#2c2c2c", edge: "#fde9cc",
-    clip: "#5cb85c", icon: "#8a8a8a", border: "#1a000000"
-  })
+  // Antinote's default look or one of its themes (services/JotThemes.js).
+  readonly property var pal: JotThemes.palette(Config.jot.theme)
+  Binding { target: JotStore; property: "ink"; value: root.pal.fg }
+
+  function cycleTheme(step) {
+    Config.jot.theme = JotThemes.next(Config.jot.theme, step)
+    showToast(JotThemes.NAMES[Config.jot.theme])
+  }
   readonly property string paper: Config.jot.paper
   // The keyword takes its feature's colour, as in Antinote: navy for math,
   // purple for lists.
@@ -73,6 +73,13 @@ BarButton {
     keyword: pal.keyword, colon: pal.colon, variable: pal.variable, reference: pal.reference,
     result: pal.result, link: pal.link, done: pal.done, doneMark: pal.doneMark
   })
+  // Settings › Jot, as the active window: close the note first (even pinned)
+  // so it lets go of the keyboard.
+  function openSettings() {
+    popup.close()
+    PopupState.request("settings:jot")
+  }
+
   function colorsFor(mode) {
     return mode === "list" ? Object.assign({}, colors, { keyword: pal.listKeyword }) : colors
   }
@@ -82,7 +89,7 @@ BarButton {
   text: Icons.glyph(0xF039B)
   active: popup.open
   onClicked: function(button) {
-    if (button === Qt.RightButton) PopupState.request("settings:jot")
+    if (button === Qt.RightButton) root.openSettings()
     else popup.toggle()
   }
 
@@ -452,7 +459,7 @@ BarButton {
   }
 
   function flash(direction) {
-    edge.x = direction > 0 ? body.width - edge.width : 0
+    edge.side = direction > 0 ? 1 : 0
     edgeFade.restart()
   }
 
@@ -550,7 +557,12 @@ BarButton {
       else if (k === Qt.Key_BracketRight && !shift) JotStore.go(1)
       else if (k === Qt.Key_BraceRight || (k === Qt.Key_BracketRight && shift)) JotStore.goFront(false)
       else if (k === Qt.Key_BraceLeft) JotStore.goOldest()
-      else if (k === Qt.Key_N) JotStore.newNote("")
+      else if (k === Qt.Key_N) {
+        // Only this shortcut announces the new note.
+        var before = JotStore.notes.length
+        JotStore.newNote("")
+        if (JotStore.notes.length > before) { toastTimer.stop(); createdTimer.restart() }
+      }
       else if (k === Qt.Key_Z) undo(shift)
       else if (k === Qt.Key_Y) undo(true)
       else if (k === Qt.Key_S) exportNote()
@@ -569,7 +581,8 @@ BarButton {
       else if (k === Qt.Key_F || k === Qt.Key_K) openSearch()
       else if (k === Qt.Key_D && shift) JotStore.deleteNote()
       else if (k === Qt.Key_Return || k === Qt.Key_Enter) toggleDone(cursorLine().index)
-      else if (k === Qt.Key_Comma) PopupState.request("settings:jot")
+      else if (k === Qt.Key_Comma) root.openSettings()
+      else if (k === Qt.Key_T) cycleTheme(shift ? -1 : 1)
       else if (k === Qt.Key_Equal || k === Qt.Key_Plus) zoom(1)
       else if (k === Qt.Key_Minus) zoom(-1)
       else if (k === Qt.Key_0) zoom(0)
@@ -646,7 +659,9 @@ BarButton {
     cardColor: root.pal.bg
     borderColor: root.pal.border
     borderWidth: 1
-    cornerRadius: 12
+    // Shaped like a macOS Tahoe window's corners.
+    cornerRadius: 16
+    cornerSmoothing: 0.6
     shadow: true
     // Dragged by its top strip, as Antinote's window is; remembered.
     offsetX: chromeDrag.pressed ? chromeDrag.liveX : Config.jot.offsetX
@@ -705,8 +720,7 @@ BarButton {
             var ctx = getContext("2d")
             ctx.reset()
             if (!visible) return
-            ctx.beginPath()
-            ctx.roundedRect(0, 0, width, height, 11, 11)
+            Squircle.trace(ctx, width, height, popup.cornerRadius, popup.cornerSmoothing, 1)
             ctx.clip()
             var pitch = pitchProbe.pitch
             var baseline = root.padTop + rowMetrics.ascent - flick.contentY
@@ -1026,34 +1040,48 @@ BarButton {
         }
 
         // Which way the notes moved.
-        Rectangle {
+        // A 5 px strip down one side, cut to the note's corners.
+        Canvas {
           id: edge
-          y: 0
-          width: 5
-          height: parent.height
-          color: root.pal.edge
+          anchors.fill: parent
+          property int side: 0
+          readonly property var look: [side, width, height, root.pal.edge]
+          onLookChanged: requestPaint()
+          onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            Squircle.trace(ctx, width, height, popup.cornerRadius, popup.cornerSmoothing, 1)
+            ctx.clip()
+            ctx.fillStyle = root.pal.edge
+            ctx.fillRect(side ? width - 5 : 0, 0, 5, height)
+          }
           opacity: 0
           NumberAnimation on opacity { id: edgeFade; running: false; from: 1; to: 0; duration: 420; easing.type: Easing.OutCubic }
         }
 
-        // An empty note goes away when you leave it; Antinote marks it so.
+        // "New note created": a flat blue pill in the note's font.
         Rectangle {
+          id: createdPill
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.bottom: parent.bottom
-          anchors.bottomMargin: 8
-          visible: editor.length === 0 && JotStore.notes.length > 1 && !toastTimer.running && !root.searching
-          width: 30
-          height: 22
-          radius: 6
-          color: root.pal.badgeBg
+          anchors.bottomMargin: 10
+          width: createdLabel.implicitWidth + 28
+          height: createdLabel.implicitHeight + 12
+          radius: height / 2
+          color: "#8ec5e2"
+          opacity: createdTimer.running && editor.length === 0 && !toastTimer.running && !root.searching ? 1 : 0
+          visible: opacity > 0
+          Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
           JotLabel {
+            id: createdLabel
             anchors.centerIn: parent
-            text: Icons.glyph(0xF0B5C)
-            color: root.pal.toastFg
-            font.pixelSize: Theme.fontSize
-            elide: Text.ElideNone
+            text: "New note created"
+            color: "#27333b"
+            font.pixelSize: Theme.fontSmall
+            font.letterSpacing: 0.5
           }
         }
+        Timer { id: createdTimer; interval: 1800 }
 
         Rectangle {
           anchors.horizontalCenter: parent.horizontalCenter
@@ -1336,15 +1364,29 @@ BarButton {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 1
-        radius: 11
-        height: root.padTop - 6
-        color: root.pal.bg
+        height: root.padTop - 5
+        color: "transparent"
         opacity: content.chromeShown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
         HoverHandler { id: chromeHover }
+
+        // The note's own background over the text, following its corners
+        // (inside the 1 px border).
+        Canvas {
+          anchors.fill: parent
+          readonly property var look: [width, height, root.pal.bg, content.width, content.height]
+          onLookChanged: requestPaint()
+          onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            Squircle.trace(ctx, content.width, content.height, popup.cornerRadius, popup.cornerSmoothing, 1)
+            ctx.clip()
+            ctx.fillStyle = root.pal.bg
+            ctx.fillRect(0, 0, width, height)
+          }
+        }
 
         // Drag the strip to move the note; double-click to put it back
         // under the bar button. Pointer positions are taken in screen
@@ -1362,14 +1404,14 @@ BarButton {
           onPressed: function(mouse) {
             popup.regrab()
             start = mapToGlobal(mouse.x, mouse.y)
-            startX = liveX = Config.jot.offsetX
-            startY = liveY = Config.jot.offsetY
+            startX = liveX = popup.clampOffsetX(Config.jot.offsetX)
+            startY = liveY = popup.clampOffsetY(Config.jot.offsetY)
           }
           onPositionChanged: function(mouse) {
             if (!pressed) return
             var p = mapToGlobal(mouse.x, mouse.y)
-            liveX = startX + p.x - start.x
-            liveY = Math.max(0, startY + p.y - start.y)
+            liveX = popup.clampOffsetX(startX + p.x - start.x)
+            liveY = popup.clampOffsetY(startY + p.y - start.y)
           }
           onReleased: {
             Config.jot.offsetX = Math.round(liveX)
@@ -1393,7 +1435,7 @@ BarButton {
           JotIcon {
             kind: "settings"
             color: root.pal.icon
-            onClicked: PopupState.request("settings:jot")
+            onClicked: root.openSettings()
           }
           JotIcon {
             kind: "search"

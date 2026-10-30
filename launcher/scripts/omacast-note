@@ -404,7 +404,7 @@ note_actions() {
       | if length > 0 then (.[0].shortcut = "↵") else . end )
     + [ { title: "Copy Contents", exec: ("wl-copy < " + $q) },
         { title: "Copy Path", exec: ("printf %s " + $q + " | wl-copy") },
-        { title: "Reveal in Files", exec: ("nautilus --select " + $q) },
+        { title: "Reveal in Files", exec: ("omacast-reveal " + $q) },
         { title: "Move to Wastebasket", exec: ("omacast-note --trash " + $q) } ]
   ' "${EDITORS[@]}"
 }
@@ -586,9 +586,9 @@ if ((${#out[@]} == 0)); then
   # The subtitle is drawn hard against the right edge where a date would be, so
   # it has to be short: anything longer than a date elides to nothing useful.
   out+=("$(row "empty" "No notes yet" "Type to write one" \
-    "$dir" "" 0 "empty" "nautilus $quoted_dir" 99000 \
+    "$dir" "" 0 "empty" "xdg-open $quoted_dir" 99000 \
     "$(jq -cn --arg d "$quoted_dir" \
-      '[{title: "Open Notes Folder", shortcut: "↵", exec: ("nautilus " + $d)}]')")")
+      '[{title: "Open Notes Folder", shortcut: "↵", exec: ("xdg-open " + $d)}]')")")
   tally=""
 fi
 

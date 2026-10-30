@@ -2,10 +2,12 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import qs.services
 import qs.theme
 import qs.ui
+import "../services/JotThemes.js" as JotThemes
 
 // Settings: how things look, how the shell behaves, how windows are drawn,
 // and the network and Bluetooth panels.
@@ -64,6 +66,14 @@ Scope {
     if (tabs.some(t => t.id === which)) tab = which
     load()
     open = true
+    // Make it the active window, also when it was already open behind others.
+    focusTimer.restart()
+  }
+
+  Timer {
+    id: focusTimer
+    interval: 60
+    onTriggered: Hyprland.dispatch("hl.dsp.focus({ window = \"title:^Settings$\" })")
   }
 
   function hide() {
@@ -417,9 +427,34 @@ Scope {
   // A real window, not a layer over the screen, so the desktop's file chooser
   // can open on top of it. Hyprland floats, centres and dims around it by a
   // rule in hyprland.lua that matches this title.
+  // Clicking anywhere outside the window closes it. Started a beat after the
+  // window maps (an early grab is dropped), and let go while the file
+  // chooser is up so clicks in it don't count as clicking away.
+  property bool grabReady: false
+  onOpenChanged: if (open) grabDelay.restart(); else grabReady = false
+  Timer {
+    id: grabDelay
+    interval: 250
+    onTriggered: root.grabReady = root.open
+  }
+  HyprlandFocusGrab {
+    active: root.open && root.grabReady && !browseProcess.running && !pictureBrowse.running
+    windows: [settingsWindow]
+    onCleared: root.hide()
+  }
+
   FloatingWindow {
+    id: settingsWindow
     title: "Settings"
     visible: root.open
+
+    // Escape closes from anywhere in the window, text fields included.
+    Shortcut {
+      sequences: ["Escape"]
+      context: Qt.WindowShortcut
+      enabled: root.open
+      onActivated: root.hide()
+    }
     implicitWidth: 760
     implicitHeight: 620
     minimumSize: Qt.size(640, 420)
@@ -960,6 +995,41 @@ Scope {
               }
 
               Card {
+              title: "EXTRAS"
+
+              Setting {
+                glyph: 0xF00AF
+                label: "Bose headphones"
+                note: "Battery, noise control and EQ on the bar while connected"
+                Toggle {
+                  checked: Config.features.bose
+                  onToggled: Config.features.bose = !Config.features.bose
+                }
+              }
+
+              Setting {
+                glyph: 0xF037D
+                label: "Razer mouse"
+                note: "DPI and polling rate in the launcher (needs OpenRazer)"
+                Toggle {
+                  checked: Config.features.mouse
+                  onToggled: Config.features.mouse = !Config.features.mouse
+                }
+              }
+
+              Setting {
+                glyph: 0xF04CE
+                label: "Things 3"
+                note: "Your to-dos on the bar (needs things-cli)"
+                Toggle {
+                  checked: Config.features.things
+                  onToggled: Config.features.things = !Config.features.things
+                }
+              }
+
+              }
+
+              Card {
               title: "SCREENSAVER"
 
               Setting {
@@ -1308,6 +1378,166 @@ Scope {
                     to: 28
                     suffix: " px"
                     onMoved: function(value) { Config.jot.fontSize = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF03D8
+                  label: "Theme"
+                  note: "Ctrl+T in a note cycles them"
+                  Select {
+                    id: jotThemeSelect
+                    Layout.preferredWidth: 200
+                    Layout.maximumWidth: 200
+                    floating: true
+                    options: JotThemes.ORDER.map(function(k) {
+                      var p = JotThemes.palette(k)
+                      return { label: JotThemes.NAMES[k], value: k, colors: [p.bg, p.variable, p.result, p.colon] }
+                    })
+                    current: Config.jot.theme
+                    onPicked: function(value) { Config.jot.theme = value }
+                  }
+                }
+
+                // A small note in the theme under the pointer (or the chosen
+                // one), drawn by Jot's own highlighter.
+                Rectangle {
+                  id: jotPreview
+                  readonly property string theme: jotThemeSelect.hoveredValue !== null ? jotThemeSelect.hoveredValue : Config.jot.theme
+                  readonly property var pal: JotThemes.palette(theme)
+                  // Jot's line height: a multiple of the font size.
+                  readonly property string block: "margin:0; white-space:pre-wrap; line-height:"
+                    + Math.round(Config.jot.lineSpacing * 12 / Math.max(1, previewMetrics.height) * 100) + "%"
+                  readonly property real pitch: previewMath.contentHeight / 4
+                  readonly property real firstBaseline: previewRow.y + previewMath.y + previewMath.baselineOffset
+
+                  FontMetrics {
+                    id: previewMetrics
+                    font.family: "GeistMono Nerd Font Mono"
+                    font.pixelSize: 12
+                  }
+
+                  // The paper picked below, laid out from the text as in Jot:
+                  // grid squares half a line tall with a line on every
+                  // baseline, dots on the baseline, rules along it.
+                  Canvas {
+                    id: previewPaper
+                    anchors.fill: parent
+                    readonly property var look: [Config.jot.paper, width, height, jotPreview.pitch, jotPreview.firstBaseline, jotPreview.pal.fg]
+                    onLookChanged: requestPaint()
+                    onPaint: {
+                      var ctx = getContext("2d")
+                      ctx.reset()
+                      var paper = Config.jot.paper, pitch = jotPreview.pitch
+                      if (pitch <= 0 || (paper !== "ruled" && paper !== "lines" && paper !== "dots")) return
+                      ctx.beginPath()
+                      ctx.roundedRect(1, 1, width - 2, height - 2, 11, 11)
+                      ctx.clip()
+                      var baseline = jotPreview.firstBaseline, left = previewRow.x
+                      function from(at, step) { return at - Math.ceil(at / step) * step }
+                      if (paper === "ruled") {
+                        ctx.fillStyle = Theme.alpha(jotPreview.pal.fg, 0.1)
+                        for (var ry = from(baseline, pitch); ry < height; ry += pitch) ctx.fillRect(0, Math.round(ry), width, 1)
+                      } else if (paper === "lines") {
+                        var cell = pitch / 2
+                        ctx.fillStyle = Theme.alpha(jotPreview.pal.fg, 0.07)
+                        for (var gy = from(baseline, cell); gy < height; gy += cell) ctx.fillRect(0, Math.round(gy), width, 1)
+                        for (var gx = from(left, cell); gx < width; gx += cell) ctx.fillRect(Math.round(gx), 0, 1, height)
+                      } else {
+                        ctx.fillStyle = Theme.alpha(jotPreview.pal.fg, 0.16)
+                        for (var dy = from(baseline, pitch); dy < height; dy += pitch)
+                          for (var dx = from(left, pitch); dx < width; dx += pitch) ctx.fillRect(Math.round(dx) - 1, Math.round(dy) - 1, 2, 2)
+                      }
+                    }
+                  }
+
+                  Layout.fillWidth: true
+                  Layout.leftMargin: 34
+                  implicitHeight: previewRow.implicitHeight + 32
+                  radius: 12
+                  color: pal.bg
+                  border.width: 1
+                  border.color: Theme.alpha(Theme.foreground, 0.15)
+
+                  RowLayout {
+                    id: previewRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 16
+                    anchors.leftMargin: 22
+                    spacing: 24
+
+                    Text {
+                      id: previewMath
+                      Layout.fillWidth: true
+                      Layout.alignment: Qt.AlignTop
+                      textFormat: Text.RichText
+                      font.family: "GeistMono Nerd Font Mono"
+                      font.pixelSize: 12
+                      color: jotPreview.pal.fg
+                      text: JotStore.engine().highlight("math\nrent: 1200\nfood: 340\nrent + food = 1,540", jotPreview.pal, jotPreview.block)
+                    }
+
+                    // A list note: its boxes sit in the margin, as in Jot.
+                    Text {
+                      id: previewList
+                      Layout.fillWidth: true
+                      Layout.alignment: Qt.AlignTop
+                      Layout.leftMargin: 18
+                      textFormat: Text.RichText
+                      font.family: "GeistMono Nerd Font Mono"
+                      font.pixelSize: 12
+                      color: jotPreview.pal.fg
+                      text: JotStore.engine().highlight("list\nmilk /x\neggs\nbread",
+                        Object.assign({}, jotPreview.pal, { keyword: jotPreview.pal.listKeyword }), jotPreview.block)
+
+                      Repeater {
+                        model: [true, false, false]
+                        Rectangle {
+                          required property bool modelData
+                          required property int index
+                          // On the item's baseline, left of the text, as in Jot.
+                          x: -width - 7
+                          y: (index + 1) * jotPreview.pitch + previewMath.baselineOffset - height + 1
+                          width: 11
+                          height: 11
+                          radius: 2.5
+                          color: "transparent"
+                          border.width: 1.2
+                          border.color: modelData ? jotPreview.pal.checkDone : jotPreview.pal.check
+                          Canvas {
+                            anchors.fill: parent
+                            visible: parent.modelData
+                            readonly property color ink: jotPreview.pal.checkDone
+                            onInkChanged: requestPaint()
+                            onPaint: {
+                              var c = getContext("2d")
+                              c.reset()
+                              c.strokeStyle = ink
+                              c.lineWidth = 1.2
+                              c.lineCap = "round"
+                              c.lineJoin = "round"
+                              c.beginPath()
+                              c.moveTo(3, 5.8)
+                              c.lineTo(4.9, 7.7)
+                              c.lineTo(8.1, 3.6)
+                              c.stroke()
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  Text {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 8
+                    anchors.rightMargin: 12
+                    text: JotThemes.NAMES[jotPreview.theme] || ""
+                    font.pixelSize: Theme.fontSmall - 1
+                    color: jotPreview.pal.dim
                   }
                 }
 

@@ -185,7 +185,7 @@ printf '%s\n' "${rows[@]}" |
         { title: "Open", shortcut: "↵", exec: ("xdg-open " + .[7]) },
         { title: "Copy Path", exec: ("printf %s " + .[7] + " | wl-copy") },
         { title: "Open Folder", exec: ("xdg-open " + .[9]) },
-        { title: "Reveal in Files", exec: ("nautilus --select " + .[7]) }
+        { title: "Reveal in Files", exec: ("omacast-reveal " + .[7]) }
       ]
     }'
 

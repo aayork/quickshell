@@ -1,7 +1,9 @@
 import QtQuick
+import qs.services
 
-// Text inside Jot's note: Antinote's font and ink, whatever the shell uses.
+// Text inside Jot's note: Antinote's font, and the note theme's ink,
+// whatever the shell uses.
 Label {
-  color: "#36312e"
+  color: JotStore.ink
   font.family: "GeistMono Nerd Font Mono"
 }

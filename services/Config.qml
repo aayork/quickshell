@@ -16,6 +16,7 @@ Singleton {
   readonly property alias windows: adapter.windows
   readonly property alias media: adapter.media
   readonly property alias jot: adapter.jot
+  readonly property alias features: adapter.features
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -58,7 +59,7 @@ Singleton {
       property JsonObject clock: JsonObject {
         property string format: "ddd MMM d h:mm AP"
         // Other places shown in the clock popup: [{ zone, label }].
-        property var zones: [{ zone: "Asia/Seoul", label: "Seoul" }]
+        property var zones: []
       }
 
       property JsonObject bar: JsonObject {
@@ -66,6 +67,17 @@ Singleton {
         property bool glass: true
         // How much of the theme background the bar keeps, 0 (clear) to 1.
         property real tint: 0
+        // Right-hand icons, left to right, as dragged on the bar. Names as in
+        // bar/Bar.qml's defaultOrder; empty or missing ones fall back to it.
+        property var order: []
+      }
+
+      // Widgets for particular hardware or accounts, off unless turned on:
+      // Bose headphones, a Razer mouse (OpenRazer), Things 3 (things-cli).
+      property JsonObject features: JsonObject {
+        property bool bose: false
+        property bool mouse: false
+        property bool things: false
       }
 
       property JsonObject media: JsonObject {
@@ -75,15 +87,17 @@ Singleton {
 
       // Jot, the scratchpad under the bar's note button.
       property JsonObject jot: JsonObject {
-        // Antinote's note is 360 x 412.
-        property int width: 360
-        property int height: 412
+        // 20% smaller than Antinote's 360 x 412 note.
+        property int width: 288
+        property int height: 330
         property int fontSize: 14
         // Where the note was dragged to, from its place under the bar button.
         property real offsetX: 0
         property real offsetY: 0
         // Line height as a multiple of the font size; Antinote's is about 1.63.
         property real lineSpacing: 1.63
+        // Colours: "antinote" or one of Antinote's themes (services/JotThemes.js).
+        property string theme: "antinote"
         // Behind the text: "none", "ruled" (lined), "lines" (a grid) or "dots".
         property string paper: "none"
         // "last" (the note you were on) or "newest".

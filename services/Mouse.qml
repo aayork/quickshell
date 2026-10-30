@@ -23,7 +23,8 @@ Singleton {
   // The mouse itself answering, not just its dongle being plugged in; from
   // the watcher, which reads the mouse every half second.
   property bool online: false
-  readonly property bool connected: present && online
+  readonly property bool enabled: Config.features.mouse
+  readonly property bool connected: enabled && present && online
   readonly property string name: state ? state.name : ""
   readonly property int battery: state && state.battery !== undefined ? state.battery : -1
   readonly property bool charging: state ? state.charging === true : false
@@ -40,7 +41,7 @@ Singleton {
   property var queued: ({})
 
   function refresh() {
-    if (busy) return
+    if (!enabled || busy) return
     statusProcess.running = true
   }
 
@@ -83,7 +84,7 @@ Singleton {
 
   Timer {
     interval: root.watching ? 10000 : 60000
-    running: true
+    running: root.enabled
     repeat: true
     onTriggered: root.refresh()
   }
@@ -120,7 +121,7 @@ Singleton {
   // them, and puts the saved DPI back after the mouse or daemon resets.
   Process {
     id: watchProcess
-    running: true
+    running: root.enabled
     command: [root.helper, "watch"]
     stdout: SplitParser {
       onRead: function(line) {
@@ -146,7 +147,7 @@ Singleton {
   Timer {
     id: watchRestart
     interval: 10000
-    onTriggered: watchProcess.running = true
+    onTriggered: watchProcess.running = root.enabled
   }
 
   Component.onCompleted: refresh()

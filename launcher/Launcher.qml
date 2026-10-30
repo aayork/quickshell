@@ -62,7 +62,7 @@ Scope {
     { id: "mouse", title: "Mouse", subtitle: "Razer DPI, polling and speed", keyword: "mouse",
       aliases: ["razer", "dpi", "pointer", "sensitivity", "acceleration"], glyph: Icons.glyph(0xF037D), minChars: 0, debounceMs: 0, maxRows: 1, panel: "mouse" }
   ]
-  readonly property var scopes: builtins.concat(extensions)
+  readonly property var scopes: builtins.filter(b => b.id !== "mouse" || Config.features.mouse).concat(extensions)
 
   // "keyword: rest" where keyword belongs to a scope.
   readonly property var scoped: {
@@ -699,6 +699,9 @@ Scope {
     id: window
 
     screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
+    // Real pixels per point. Screen.devicePixelRatio rounds 1.6 up to 2, but
+    // the window itself is drawn at the monitor's fractional scale.
+    readonly property real pixelScale: Hyprland.focusedMonitor?.scale ?? Screen.devicePixelRatio
     visible: root.open
     anchors { top: true; bottom: true; left: true; right: true }
     // No dimming: like Raycast, it floats over whatever is there.
@@ -957,14 +960,14 @@ Scope {
                 anchors.leftMargin: 34
                 anchors.verticalCenter: parent.verticalCenter
 
-                // Asked for at exactly the pixels it is drawn at (Qt draws this
-                // screen at 2x), so nothing gets rescaled and it stays sharp.
+                // Asked for at exactly the pixels it is drawn at (the monitor's
+                // fractional scale), so nothing gets rescaled and it stays sharp.
                 Image {
                   anchors.fill: parent
                   visible: row.modelData.icon !== ""
                   source: row.modelData.icon
-                  sourceSize.width: Math.round(parent.width * Screen.devicePixelRatio)
-                  sourceSize.height: Math.round(parent.height * Screen.devicePixelRatio)
+                  sourceSize.width: Math.ceil(parent.width * window.pixelScale)
+                  sourceSize.height: Math.ceil(parent.height * window.pixelScale)
                   fillMode: Image.PreserveAspectFit
                   asynchronous: true
                 }

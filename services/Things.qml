@@ -19,7 +19,8 @@ Singleton {
 
   // "ready", "no-cli", "no-login", or "" before the first check.
   property string setup: ""
-  readonly property bool ready: setup === "ready"
+  readonly property bool enabled: Config.features.things
+  readonly property bool ready: enabled && setup === "ready"
 
   // The synced copy: uuid -> task / checklist item / area, as the CLI keeps them.
   property var tasks: ({})
@@ -113,7 +114,7 @@ Singleton {
   }
 
   function check() {
-    if (!status.running) status.running = true
+    if (enabled && !status.running) status.running = true
   }
 
   function refresh() {
@@ -218,7 +219,7 @@ Singleton {
 
   Process {
     id: status
-    running: true
+    running: root.enabled
     command: [root.bin, "status"]
     stdout: StdioCollector {
       onStreamFinished: root.setup = text.trim()

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Show a file's folder in the file manager (Strata can't select a file, so
+# this opens the folder it is in).
+target=$1
+[[ -d $target ]] || target=$(dirname -- "$target")
+exec setsid uwsm-app -- strata "$target" >/dev/null 2>&1

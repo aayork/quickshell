@@ -67,6 +67,7 @@ Scope {
   }
 
   function start() {
+    cursorImage.running = true
     surface.reset()
     recordPanel = false
     if (aio) surface.initKept()
@@ -163,6 +164,22 @@ Scope {
     }
   }
 
+  // The cursor theme's crosshair, saved as an image each time the picker
+  // opens, so it can be drawn smaller than the theme's own cursor size.
+  // Until it is there (or when the theme has none) the real cursor shows.
+  readonly property string crossFile: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/aayork-crosshair.png"
+  property var cross: null
+  Process {
+    id: cursorImage
+    command: [Quickshell.shellDir + "/bin/cursor-image", "crosshair", root.crossFile]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var v = text.trim().split(" ").map(Number)
+        root.cross = v.length === 4 && v[0] > 0 ? { w: v[0], h: v[1], hx: v[2], hy: v[3], stamp: Date.now() } : null
+      }
+    }
+  }
+
   // Monitors and windows, read once each time the picker opens.
   Process {
     id: layout
@@ -234,6 +251,9 @@ Scope {
       property var kept: null
       property string editOp: ""
       property var editFrom: null
+      // The All-In-One bar sits at the bottom centre until the area is
+      // moved, resized or redrawn; then it follows the area.
+      property bool barFollows: false
       property var editEdges: ({ l: false, r: false, t: false, b: false })
 
       function reset() {
@@ -243,6 +263,7 @@ Scope {
         seen = false
         kept = null
         editOp = ""
+        barFollows = false
       }
 
       function initKept() {
@@ -445,48 +466,58 @@ Scope {
         border.color: Theme.alpha(Theme.accent, 0.8)
       }
 
-      // The pointer: a small crosshair with a ring, black with a white halo
-      // so it shows on any picture, and beside it the coordinates (or, while
-      // dragging, the size) in two short lines.
+      // The pointer: the cursor theme's own crosshair, drawn a little
+      // smaller than the theme's size (its crosshair fills the whole cursor
+      // box, so at the same size as the arrow it looks huge), and beside it
+      // a label with the coordinates (or, while dragging, the size).
       Item {
         id: crosshair
         visible: surface.seen && !surface.moving && pointer.cursorShape === Qt.BlankCursor
         x: Math.round(surface.cx)
         y: Math.round(surface.cy)
 
-        Repeater {
-          // Halo first, then the black lines over it.
-          model: [{ c: Theme.alpha("#ffffff", 0.85), w: 3 }, { c: "#000000", w: 1 }]
-          Item {
-            required property var modelData
-            Rectangle { x: -11; y: -modelData.w / 2; width: 22; height: modelData.w; color: modelData.c }
-            Rectangle { x: -modelData.w / 2; y: -11; width: modelData.w; height: 22; color: modelData.c }
-            Rectangle {
-              x: -6; y: -6; width: 12; height: 12; radius: 6
-              color: "transparent"
-              border.width: modelData.w
-              border.color: modelData.c
-            }
-          }
+        // Size of the cursor box on screen, in points.
+        readonly property real size: 16
+
+        Image {
+          readonly property var c: root.cross
+          visible: !!c
+          source: c ? "file://" + root.crossFile + "?" + c.stamp : ""
+          cache: false
+          smooth: true
+          mipmap: true
+          width: crosshair.size
+          height: crosshair.size
+          sourceSize.width: crosshair.size * Screen.devicePixelRatio
+          sourceSize.height: crosshair.size * Screen.devicePixelRatio
+          x: c ? 0.5 - (c.hx + 0.5) * crosshair.size / c.w : 0
+          y: c ? 0.5 - (c.hy + 0.5) * crosshair.size / c.h : 0
         }
 
-        Column {
-          x: 12
-          y: 6
-          spacing: -2
-          Repeater {
-            model: surface.dragging && surface.selection
-              ? [String(Math.round(surface.selection.w * surface.ratio)), String(Math.round(surface.selection.h * surface.ratio))]
-              : [String(Math.round(surface.cx * surface.ratio)), String(Math.round(surface.cy * surface.ratio))]
-            Text {
-              required property string modelData
-              text: modelData
-              color: "#000000"
-              style: Text.Outline
-              styleColor: Theme.alpha("#ffffff", 0.85)
-              font.family: Theme.fontFamily
-              font.pixelSize: 11
-            }
+        // The label, below and to the right, flipped near the screen's edges.
+        Rectangle {
+          id: readout
+          readonly property bool sizing: surface.dragging && !!surface.selection
+          readonly property real off: 16
+          width: readoutText.implicitWidth + 12
+          height: readoutText.implicitHeight + 6
+          radius: 5
+          x: surface.cx + off + width > surface.width ? -off - width : off
+          y: surface.cy + off + height > surface.height ? -off - height : off
+          color: Theme.alpha("#1e1e20", 0.88)
+          border.width: 1 / Screen.devicePixelRatio
+          border.color: Theme.alpha("#ffffff", 0.14)
+
+          Text {
+            id: readoutText
+            anchors.centerIn: parent
+            text: readout.sizing
+              ? Math.round(surface.selection.w * surface.ratio) + " × " + Math.round(surface.selection.h * surface.ratio)
+              : Math.round(surface.cx * surface.ratio) + ", " + Math.round(surface.cy * surface.ratio)
+            color: "#ffffff"
+            font.family: Theme.fontFamily
+            font.pixelSize: 11
+            font.features: { "tnum": 1 }
           }
         }
       }
@@ -570,13 +601,13 @@ Scope {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         // Over the kept area's handles or inside it, the pointer says what a
-        // drag would do; elsewhere the crosshair stands in for it.
+        // drag would do; elsewhere the theme's crosshair, drawn by the picker.
         readonly property var overEdges: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" ? surface.edgesAt(surface.cx, surface.cy) : null
         readonly property bool overInside: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" && !overEdges && surface.inside(surface.cx, surface.cy)
         cursorShape: {
           if (surface.editOp === "move" || overInside) return Qt.SizeAllCursor
           var e = surface.editOp === "resize" ? surface.editEdges : overEdges
-          if (!e) return Qt.BlankCursor
+          if (!e) return root.cross ? Qt.BlankCursor : Qt.CrossCursor
           if ((e.l && e.t) || (e.r && e.b)) return Qt.SizeFDiagCursor
           if ((e.r && e.t) || (e.l && e.b)) return Qt.SizeBDiagCursor
           if (e.l || e.r) return Qt.SizeHorCursor
@@ -615,6 +646,7 @@ Scope {
           if (root.mode === "windows") return surface.pickPoint()
           if (surface.editOp !== "") {
             surface.editOp = ""
+            surface.barFollows = true
             return
           }
           var sel = surface.selection
@@ -623,7 +655,7 @@ Scope {
           if (root.aio) {
             // All-In-One keeps the new area for the bar to act on; a click
             // keeps the old one.
-            if (sel && sel.w >= 4 && sel.h >= 4) surface.kept = sel
+            if (sel && sel.w >= 4 && sel.h >= 4) { surface.kept = sel; surface.barFollows = true }
             return
           }
           // A click rather than a drag takes the window under it.

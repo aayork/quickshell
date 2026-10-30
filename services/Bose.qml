@@ -30,7 +30,8 @@ Singleton {
     ? (Bluetooth.devices.values.find(d => d.address.toUpperCase() === info.address) ?? null)
     : null
   readonly property bool present: info !== null
-  readonly property bool connected: bluetoothDevice !== null && bluetoothDevice.connected
+  readonly property bool enabled: Config.features.bose
+  readonly property bool connected: enabled && bluetoothDevice !== null && bluetoothDevice.connected
   readonly property string name: info ? info.name : ""
 
   // Last answer from the headphones; null until one arrives.
@@ -55,7 +56,7 @@ Singleton {
   }
 
   function scan() {
-    if (!scanProcess.running) scanProcess.running = true
+    if (enabled && !scanProcess.running) scanProcess.running = true
   }
 
   function refresh() {
@@ -188,5 +189,6 @@ Singleton {
     }
   }
 
+  onEnabledChanged: if (enabled) scan(); else devices = []
   Component.onCompleted: scan()
 }

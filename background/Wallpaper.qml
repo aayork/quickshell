@@ -162,47 +162,8 @@ Scope {
         }
       }
 
-      // The bar's frosted glass, macOS Sequoia style: a heavy blur with the
-      // colour pushed up (Apple's "vibrancy"), so the wallpaper reads only as
-      // soft colour, ending in a clean edge at the bar's bottom. Drawn here
-      // rather than by Hyprland so it stays exactly the bar's strip. A taller
-      // piece of wallpaper is blurred so the bottom edge has real colour to
-      // blend with. Windows sit above this layer, so they cover it as usual.
-      Item {
-        id: glass
-
-        visible: Config.bar.glass
-        readonly property int depth: Theme.barHeight + 48
-
-        width: parent.width
-        height: Theme.barHeight
-        clip: true
-
-        Item {
-          width: parent.width
-          height: glass.depth
-
-          ShaderEffectSource {
-            id: strip
-            anchors.fill: parent
-            sourceItem: wallpaper
-            sourceRect: Qt.rect(0, 0, glass.width, glass.depth)
-            visible: false
-          }
-
-          MultiEffect {
-            anchors.fill: parent
-            source: strip
-            autoPaddingEnabled: false
-            blurEnabled: true
-            blurMax: 64
-            blur: 1
-            blurMultiplier: 0.6
-            saturation: 0.4
-            brightness: 0.04
-          }
-        }
-      }
+      // The bar's glass band is drawn by bar/Bar.qml, in the bar's own layer,
+      // so windows dragged up under the bar are covered by it.
 
       // At login the wallpaper fades in from black, carrying on from the
       // login screen's fade-out. Only the first load: later wallpaper changes
