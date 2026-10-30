@@ -67,8 +67,14 @@ Scope {
   }
 
   function start() {
-    cursorImage.running = true
     surface.reset()
+    // Checked against the monitor: the window may not have its size yet.
+    var p = root.startPos, m = root.monitorInfo
+    if (p && m && p.x >= 0 && p.y >= 0 && p.x < m.width / m.scale && p.y < m.height / m.scale) {
+      surface.cx = p.x
+      surface.cy = p.y
+      surface.seen = true
+    }
     recordPanel = false
     if (aio) surface.initKept()
     open = true
@@ -147,7 +153,7 @@ Scope {
     var w = Math.max(1, Math.round(rect.w * ratio)), h = Math.max(1, Math.round(rect.h * ratio))
     open = false
     Captures.picking = false
-    crop.command = ["sh", "-c", "magick \"$1\" -crop \"$3\" +repage \"$2\" && rm -f -- \"$1\"", "sh",
+    crop.command = ["sh", "-c", "magick \"$1\" -crop \"$3\" +repage -define png:compression-level=1 \"$2\" && rm -f -- \"$1\"", "sh",
       frozen, out, w + "x" + h + "+" + x + "+" + y]
     crop.running = true
   }
@@ -164,26 +170,29 @@ Scope {
     }
   }
 
-  // The cursor theme's crosshair, saved as an image each time the picker
-  // opens, so it can be drawn smaller than the theme's own cursor size.
-  // Until it is there (or when the theme has none) the real cursor shows.
-  readonly property string crossFile: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/aayork-crosshair.png"
-  property var cross: null
-  Process {
-    id: cursorImage
-    command: [Quickshell.shellDir + "/bin/cursor-image", "crosshair", root.crossFile]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        var v = text.trim().split(" ").map(Number)
-        root.cross = v.length === 4 && v[0] > 0 ? { w: v[0], h: v[1], hx: v[2], hy: v[3], stamp: Date.now() } : null
-      }
-    }
+  // The pointer is the cursor theme's own crosshair (Qt.CrossCursor), drawn
+  // by Hyprland at the size picked in Settings. An earlier version hid the
+  // cursor and drew the crosshair itself, which flickered back to the arrow
+  // until the mouse moved. The size, read from what bin/cursor-set writes,
+  // only places the coordinate label clear of it.
+  readonly property real crossSize: {
+    var m = /XCURSOR_SIZE",\s*"(\d+)"/.exec(cursorConfig.text() || "")
+    return m ? Number(m[1]) : 24
   }
+  FileView {
+    id: cursorConfig
+    path: Theme.stateDir + "/cursor.lua"
+    watchChanges: true
+    onFileChanged: reload()
+  }
+  // Where the pointer was when the picker was asked for, in this screen's
+  // points, so the label starts there rather than waiting for a move.
+  property var startPos: null
 
   // Monitors and windows, read once each time the picker opens.
   Process {
     id: layout
-    command: ["sh", "-c", "hyprctl monitors -j; printf '\\n\\036\\n'; hyprctl clients -j"]
+    command: ["sh", "-c", "hyprctl monitors -j; printf '\\n\\036\\n'; hyprctl clients -j; printf '\\n\\036\\n'; hyprctl cursorpos -j"]
     stdout: StdioCollector {
       onStreamFinished: {
         try {
@@ -201,8 +210,11 @@ Scope {
             return fa - fb || a.focusHistoryID - b.focusHistoryID
           })
           root.windows = list.map(c => ({ x: c.at[0] - mon.x, y: c.at[1] - mon.y, w: c.size[0], h: c.size[1] }))
+          var pos = JSON.parse(parts[2])
+          root.startPos = { x: pos.x - mon.x, y: pos.y - mon.y }
         } catch (e) {
           root.windows = []
+          root.startPos = null
         }
         root.start()
       }
@@ -466,39 +478,22 @@ Scope {
         border.color: Theme.alpha(Theme.accent, 0.8)
       }
 
-      // The pointer: the cursor theme's own crosshair, drawn a little
-      // smaller than the theme's size (its crosshair fills the whole cursor
-      // box, so at the same size as the arrow it looks huge), and beside it
-      // a label with the coordinates (or, while dragging, the size).
+      // Beside the pointer, a label with the coordinates (or, while
+      // dragging, the size).
       Item {
         id: crosshair
-        visible: surface.seen && !surface.moving && pointer.cursorShape === Qt.BlankCursor
+        visible: surface.seen && !surface.moving && pointer.cursorShape === Qt.CrossCursor
         x: Math.round(surface.cx)
         y: Math.round(surface.cy)
 
-        // Size of the cursor box on screen, in points.
-        readonly property real size: 16
-
-        Image {
-          readonly property var c: root.cross
-          visible: !!c
-          source: c ? "file://" + root.crossFile + "?" + c.stamp : ""
-          cache: false
-          smooth: true
-          mipmap: true
-          width: crosshair.size
-          height: crosshair.size
-          sourceSize.width: crosshair.size * Screen.devicePixelRatio
-          sourceSize.height: crosshair.size * Screen.devicePixelRatio
-          x: c ? 0.5 - (c.hx + 0.5) * crosshair.size / c.w : 0
-          y: c ? 0.5 - (c.hy + 0.5) * crosshair.size / c.h : 0
-        }
+        // Size of the cursor on screen, in points.
+        readonly property real size: root.crossSize
 
         // The label, below and to the right, flipped near the screen's edges.
         Rectangle {
           id: readout
           readonly property bool sizing: surface.dragging && !!surface.selection
-          readonly property real off: 16
+          readonly property real off: crosshair.size / 2 + 3
           width: readoutText.implicitWidth + 12
           height: readoutText.implicitHeight + 6
           radius: 5
@@ -601,13 +596,13 @@ Scope {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         // Over the kept area's handles or inside it, the pointer says what a
-        // drag would do; elsewhere the theme's crosshair, drawn by the picker.
+        // drag would do; elsewhere the theme's crosshair.
         readonly property var overEdges: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" ? surface.edgesAt(surface.cx, surface.cy) : null
         readonly property bool overInside: root.aio && root.mode !== "windows" && !surface.dragging && surface.editOp === "" && !overEdges && surface.inside(surface.cx, surface.cy)
         cursorShape: {
           if (surface.editOp === "move" || overInside) return Qt.SizeAllCursor
           var e = surface.editOp === "resize" ? surface.editEdges : overEdges
-          if (!e) return root.cross ? Qt.BlankCursor : Qt.CrossCursor
+          if (!e) return Qt.CrossCursor
           if ((e.l && e.t) || (e.r && e.b)) return Qt.SizeFDiagCursor
           if ((e.r && e.t) || (e.l && e.b)) return Qt.SizeBDiagCursor
           if (e.l || e.r) return Qt.SizeHorCursor

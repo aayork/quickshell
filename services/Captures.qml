@@ -155,7 +155,7 @@ Singleton {
     onTriggered: {
       var file = root.newPath()
       timedGrab.file = file
-      timedGrab.command = ["grim", "-g", root.countdownGeo, file]
+      timedGrab.command = ["grim", "-l", "1", "-g", root.countdownGeo, file]
       timedGrab.running = true
     }
   }

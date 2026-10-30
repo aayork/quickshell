@@ -3,10 +3,13 @@
 # draw it at a size of its own (the area picker shows the theme's crosshair
 # smaller than the compositor would).
 #
-#   cursor-image <shape> <out.png>
+#   cursor-image <shape> <out.png> [size]
 #
-# Prints "<width> <height> <hotspot x> <hotspot y>" of the image saved, the
-# largest one in the theme's file. Exits 1 when the shape is not found.
+# Saves the smallest bitmap at least `size` pixels wide (the largest when
+# none is, or when no size is given), so the drawing is the theme's own at
+# that size rather than a big one shrunk. Prints "<width> <height>
+# <hotspot x> <hotspot y>" of the image saved. Exits 1 when the shape is
+# not found.
 import os
 import re
 import struct
@@ -14,6 +17,7 @@ import sys
 import zlib
 
 shape, out = sys.argv[1], sys.argv[2]
+want = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 home = os.path.expanduser("~")
 
 
@@ -59,16 +63,17 @@ data = open(path, "rb").read()
 if data[:4] != b"Xcur":
     sys.exit(1)
 count = struct.unpack("<I", data[12:16])[0]
-best = None
+images = []
 for i in range(count):
     kind, nominal, pos = struct.unpack("<III", data[16 + 12 * i:28 + 12 * i])
     if kind != 0xFFFD0002:
         continue
     w, h, hx, hy = struct.unpack("<IIII", data[pos + 16:pos + 32])
-    if not best or w > best[0]:
-        best = (w, h, hx, hy, pos + 36)
-if not best:
+    images.append((w, h, hx, hy, pos + 36))
+if not images:
     sys.exit(1)
+images.sort()
+best = next((i for i in images if i[0] >= want), images[-1]) if want else images[-1]
 
 w, h, hx, hy, start = best
 # Xcursor pixels are premultiplied ARGB, little endian (B G R A in memory).

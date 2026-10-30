@@ -432,12 +432,12 @@ Scope {
       if (actions.length === 0 && row.exec) actions = [{ title: "Open", exec: String(row.exec), keepOpen: row.keepOpen === true }]
       // A short subtitle is a label and goes on the right. A long one is a
       // sentence and gets its own line. Key chips already say a shortcut.
-      var long = subtitle.length > 36
+      var isLong = subtitle.length > 36
       return {
         key: "ext:" + extension.keyword + ":" + (row.id || index),
         title: String(row.title || ""),
-        detail: long ? subtitle : "",
-        subtitle: long || keys.length > 0 ? "" : subtitle,
+        detail: isLong ? subtitle : "",
+        subtitle: isLong || keys.length > 0 ? "" : subtitle,
         icon: icon === "" ? "" : icon.charAt(0) === "/" ? "file://" + icon : Quickshell.iconPath(icon, true),
         glyph: String(row.glyph || extension.glyph || ""),
         chip: String(row.accessory || ""),
