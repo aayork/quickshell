@@ -16,14 +16,16 @@ BUILD_ROOT=${BUILD_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/aayork-desktop-build}
 JOBS=${JOBS:-$(nproc)}
 
 V_CMAKE=3.31.12
+V_GCC=16.2.0
 V_LUA=5.5.1
 V_WAYLAND=1.24.0
 V_WAYLAND_PROTOCOLS=1.49
 V_XKBCOMMON=1.13.1
 V_LIBINPUT=1.31.3
 V_DISPLAY_INFO=0.3.0
-V_QT=6.8.3
-V_CPPTRACE=v1.0.4
+V_XCB_ERRORS=1.0.1
+V_QT=6.10.2
+V_CPPTRACE=v1.0.4-unwind
 V_HYPRWAYLAND_SCANNER=v0.4.6
 V_HYPRLAND_PROTOCOLS=v0.7.0
 V_HYPRUTILS=v0.14.3
@@ -51,20 +53,54 @@ build_env() {
   mkdir -p "$BUILD_ROOT/src" "$BUILD_ROOT/tools"
 }
 
-# The newest GCC the release offers; Hyprland needs C++26 (GCC 14+).
+# Hyprland 0.56 uses C++23/26 library features (vector::append_range,
+# ranges::starts_with...) that only GCC 16's libstdc++ has. Use the system
+# GCC if it is 16+, else the g++-16 package (Ubuntu 26.04), else GCC 16
+# built once into $PREFIX/toolchain (Debian 13, Ubuntu 24.04).
+gcc_major() { "$1" -dumpversion 2>/dev/null | cut -d. -f1; }
+
+need_gcc() {
+  local v; v=$(gcc_major g++)
+  [[ -n $v ]] && ((v >= 16)) && return 1
+  have g++-16 && (( $(gcc_major g++-16) >= 16 )) && return 1
+  [[ -x $PREFIX/toolchain/bin/g++ ]] && (( $(gcc_major "$PREFIX/toolchain/bin/g++") >= 16 )) && return 1
+  return 0
+}
+build_gcc() {
+  progress "This one takes a while (20 minutes to over an hour, depending on the machine)."
+  local src; src=$(fetch_tar gcc "https://ftp.gnu.org/gnu/gcc/gcc-$1/gcc-$1.tar.xz")
+  mkdir -p "$src/build"
+  # Built by the system compiler, with none of the $PREFIX link flags.
+  (cd "$src/build" && env -u LDFLAGS -u CC -u CXX ../configure --prefix="$PREFIX/toolchain" \
+    --enable-languages=c,c++ --disable-multilib --disable-bootstrap --disable-libsanitizer \
+    --disable-nls --with-system-zlib >/dev/null)
+  env -u LDFLAGS make -C "$src/build" -j "$JOBS" >/dev/null
+  as_root env -u LDFLAGS make -C "$src/build" install >/dev/null
+}
+
 pick_compiler() {
-  local v
-  v=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
-  if [[ -n $v ]] && ((v >= 14)); then
+  local v; v=$(gcc_major g++)
+  if [[ -n $v ]] && ((v >= 16)); then
     export CC=gcc CXX=g++
-  elif have g++-15; then
-    export CC=gcc-15 CXX=g++-15
-  elif have g++-14; then
-    export CC=gcc-14 CXX=g++-14
+  elif have g++-16 && (( $(gcc_major g++-16) >= 16 )); then
+    export CC=gcc-16 CXX=g++-16
+  elif [[ -x $PREFIX/toolchain/bin/g++ ]]; then
+    export CC="$PREFIX/toolchain/bin/gcc" CXX="$PREFIX/toolchain/bin/g++"
   else
-    die "Hyprland needs GCC 14 or newer, and this release offers no g++-14 package."
+    die "No GCC 16 to build Hyprland with."
   fi
   info "Compiler: $($CXX --version | head -1)"
+  # Programs built by it need its libstdc++ at run time: put a copy beside
+  # them in $PREFIX/lib, where their RUNPATH looks first. Everything else on
+  # the system keeps using the distro's own.
+  local dir lib
+  dir=$(dirname "$($CXX -print-file-name=libstdc++.so.6)")
+  as_root mkdir -p "$PREFIX/lib"
+  for lib in "$dir"/libstdc++.so.6* "$dir"/libgcc_s.so.1; do
+    [[ -e $lib && $lib != *.py ]] && as_root cp -a "$lib" "$PREFIX/lib/"
+  done
+  # Build-time helpers run from the build tree before they are installed.
+  export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 }
 
 # Recorded so a re-run skips what is already built at the same version.
@@ -87,11 +123,31 @@ fetch_tar() { # name url
   echo "$dir"
 }
 
+# CMake's pkg-config lookup can resolve a library to the distro's copy even
+# when pkg-config names ours (a system -L from another module comes first).
+# Point any such cache entry at the copy in $PREFIX/lib. Returns 0 if it
+# changed something, so the caller knows to configure again.
+prefer_prefix_libs() { # builddir
+  local cache="$1/CMakeCache.txt" line var path lib changed=1
+  [[ -f $cache ]] || return 1
+  while IFS= read -r line; do
+    var=${line%%:FILEPATH=*}; path=${line#*:FILEPATH=}
+    lib=$(basename "$path")
+    if [[ $path != "$PREFIX"/* && -e $PREFIX/lib/$lib ]]; then
+      sed -i "s|^$var:FILEPATH=.*|$var:FILEPATH=$PREFIX/lib/$lib|" "$cache"
+      changed=0
+    fi
+  done < <(grep -E '^pkgcfg_lib_[^:]+:FILEPATH=/' "$cache")
+  return $changed
+}
+
 cmake_build() { # srcdir [cmake args...]
   local src=$1; shift
-  cmake -S "$src" -B "$src/build" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_INSTALL_LIBDIR=lib \
-    -DCMAKE_INSTALL_RPATH="$PREFIX/lib" -DCMAKE_PREFIX_PATH="$PREFIX" -DBUILD_TESTING=OFF "$@" >/dev/null
+  local args=(-S "$src" -B "$src/build" -G Ninja
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_INSTALL_LIBDIR=lib
+    -DCMAKE_INSTALL_RPATH="$PREFIX/lib" -DCMAKE_PREFIX_PATH="$PREFIX" -DBUILD_TESTING=OFF "$@")
+  cmake "${args[@]}" >/dev/null
+  if prefer_prefix_libs "$src/build"; then cmake "${args[@]}" >/dev/null; fi
   cmake --build "$src/build" -j "$JOBS"
   as_root env PATH="$PATH" cmake --install "$src/build" >/dev/null
 }
@@ -104,6 +160,9 @@ meson_build() { # srcdir [meson args...]
   as_root env PATH="$PATH" ninja -C "$src/build" install >/dev/null
 }
 
+# A line on the terminal from inside a build (whose output goes to its log).
+progress() { printf '    %s\n' "$*" >&3; }
+
 # One component: skip it if the system or an earlier run already has it.
 component() { # name version need-check-function build-function
   local name=$1 version=$2 needed=$3 builder=$4
@@ -113,10 +172,14 @@ component() { # name version need-check-function build-function
   local log="$BUILD_ROOT/logs/$name.log" rc
   mkdir -p "$BUILD_ROOT/logs"
   # Not inside an || list, so set -e still stops the build at the first error.
+  # The ERR trap would report the subshell's failure a second time.
+  trap - ERR
   set +e
-  ( set -e; "$builder" "$version" ) >"$log" 2>&1
+  # fd 3 stays on the terminal for progress lines; the rest goes to the log.
+  ( set -e; "$builder" "$version" ) 3>&1 >"$log" 2>&1
   rc=$?
   set -e
+  trap "$ERR_TRAP" ERR
   if ((rc != 0)); then
     tail -n 25 "$log" >&2
     die "Building $name $version failed. Full log: $log"
@@ -202,30 +265,40 @@ build_display_info() {
   meson_build "$src"
 }
 
-need_qt() {
-  local v
-  v=$(pkg-config --modversion Qt6Core 2>/dev/null || qmake6 -query QT_VERSION 2>/dev/null || echo 0)
-  ! version_ge "$v" 6.6
+# The shell needs Qt 6.9+ (RectangularShadow, among others).
+qt_version() { pkg-config --modversion Qt6Core 2>/dev/null || qmake6 -query QT_VERSION 2>/dev/null || echo 0; }
+# Hyprland's X11 support; Ubuntu 24.04 does not package it.
+need_xcb_errors() { ! pkg-config --exists xcb-errors; }
+build_xcb_errors() {
+  local src; src=$(fetch_tar xcb-util-errors "https://xorg.freedesktop.org/releases/individual/lib/xcb-util-errors-$1.tar.xz")
+  (cd "$src" && ./configure --prefix="$PREFIX" --libdir="$PREFIX/lib" >/dev/null)
+  make -C "$src" -j "$JOBS" >/dev/null
+  as_root make -C "$src" install >/dev/null
 }
+
+need_qt() { ! version_ge "$(qt_version)" 6.9; }
 build_qt() {
-  # Only the modules Quickshell uses. Takes a while (20-60 minutes).
+  # Only the modules Quickshell uses. Takes a while (20-60 minutes). Built
+  # with the distro's own compiler, which Qt's release was tested with.
   local m src base="https://download.qt.io/archive/qt/${1%.*}/$1/submodules"
   for m in qtbase qtshadertools qtsvg qtdeclarative qtwayland qtimageformats; do
-    info "Qt: $m"
+    progress "Qt: $m ($(date +%H:%M))"
     src=$(fetch_tar "qt-$m" "$base/$m-everywhere-src-$1.tar.xz")
     if [[ $m == qtbase ]]; then
-      cmake_build "$src" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF -DFEATURE_sql=OFF \
-        -DFEATURE_printsupport=OFF -DFEATURE_xcb=OFF -DFEATURE_xlib=OFF -DINPUT_opengl=desktop
+      CC=gcc CXX=g++ cmake_build "$src" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF -DFEATURE_sql=OFF \
+        -DFEATURE_printsupport=OFF -DFEATURE_xcb=OFF -DFEATURE_xlib=OFF -DINPUT_opengl=desktop \
+        -DFEATURE_system_textmarkdownreader=OFF -DCMAKE_DISABLE_FIND_PACKAGE_md4c=ON  # Ubuntu 24.04's md4c CMake files are broken; use Qt's copy
     else
-      cmake_build "$src" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF
+      CC=gcc CXX=g++ cmake_build "$src" -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF
     fi
   done
 }
 
-need_cpptrace() { [[ ! -e $PREFIX/lib/cmake/cpptrace ]] && ! pkg-config --exists cpptrace 2>/dev/null; }
+# No Debian or Ubuntu release packages cpptrace, so it is always ours.
 build_cpptrace() {
-  local src; src=$(fetch_git cpptrace https://github.com/jeremy-rifkin/cpptrace.git "$1")
-  cmake_build "$src" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+  local src; src=$(fetch_git cpptrace https://github.com/jeremy-rifkin/cpptrace.git "${1%-unwind}")
+  # Quickshell's crash handler needs it to unwind with libunwind.
+  cmake_build "$src" -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCPPTRACE_UNWIND_WITH_LIBUNWIND=ON
 }
 
 # ---- The Hyprland stack (always ours on Debian/Ubuntu) -------------------
@@ -263,15 +336,17 @@ can_xdph() { pc_ge libpipewire-0.3 1.1.82 && pc_ge sdbus-c++ 2.0.0; }
 build_xdph() { hypr_cmake xdg-desktop-portal-hyprland "$1" -DCMAKE_INSTALL_LIBEXECDIR=lib; }
 
 build_quickshell() {
-  local src; src=$(fetch_git quickshell https://git.outfoxxed.me/quickshell/quickshell.git "$1")
+  local src; src=$(fetch_git quickshell https://git.outfoxxed.me/quickshell/quickshell.git "${1%%-qt*}")
   cmake_build "$src" -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DDISTRIBUTOR="aayork-quickshell installer (source build)" -DINSTALL_QML_PREFIX=lib/qt6/qml
+    -DDISTRIBUTOR="aayork-quickshell installer (source build)" -DINSTALL_QML_PREFIX=lib/qt6/qml \
+    -DX11=OFF  # X11 panels only; this desktop is Wayland (and our Qt is built without xcb)
 }
 
 need_gsr() { ! have gpu-screen-recorder; }
 build_gsr() {
   local src; src=$(fetch_git gpu-screen-recorder https://repo.dec05eba.com/gpu-screen-recorder "$1")
-  meson_build "$src" -Dsystemd=false -Dnvidia_suspend_fix=false -Dcapabilities=true
+  # Plain C; the distro's compiler is fine and more forgiving than GCC 16.
+  CC=gcc CXX=g++ meson_build "$src" -Dsystemd=false -Dnvidia_suspend_fix=false -Dcapabilities=true
 }
 
 # ---- Placing the results where the rest of the system looks --------------
@@ -325,18 +400,20 @@ EOF
 
 build_all() {
   build_env
-  pick_compiler
   as_root mkdir -p "$PREFIX"
 
   cmake_tool
+  component gcc               "$V_GCC"               need_gcc               build_gcc
+  pick_compiler
   component lua               "$V_LUA"               need_lua               build_lua
   component wayland           "$V_WAYLAND"           need_wayland           build_wayland
   component wayland-protocols "$V_WAYLAND_PROTOCOLS" need_wayland_protocols build_wayland_protocols
   component libxkbcommon      "$V_XKBCOMMON"         need_xkbcommon         build_xkbcommon
   component libinput          "$V_LIBINPUT"          need_libinput          build_libinput
   component libdisplay-info   "$V_DISPLAY_INFO"      need_display_info      build_display_info
+  component xcb-util-errors   "$V_XCB_ERRORS"        need_xcb_errors        build_xcb_errors
   component qt                "$V_QT"                need_qt                build_qt
-  component cpptrace          "$V_CPPTRACE"          need_cpptrace          build_cpptrace
+  component cpptrace          "$V_CPPTRACE"          always                 build_cpptrace
 
   component hyprwayland-scanner "$V_HYPRWAYLAND_SCANNER" always build_hyprwayland_scanner
   component hyprland-protocols  "$V_HYPRLAND_PROTOCOLS"  always build_hyprland_protocols
@@ -355,7 +432,8 @@ build_all() {
     info "PipeWire or sdbus-c++ is too old for the Hyprland portal; using xdg-desktop-portal-wlr."
     USE_XDPW=true
   fi
-  component quickshell          "$V_QUICKSHELL"          always build_quickshell
+  # Quickshell uses Qt's private API, so it is rebuilt whenever Qt changes.
+  component quickshell          "$V_QUICKSHELL-qt$(qt_version)" always build_quickshell
   component gpu-screen-recorder "$V_GSR"                 need_gsr build_gsr
 
   place_files

@@ -23,8 +23,8 @@ unless you pass `--overwrite-config` (which backs each one up first).
 | --- | --- |
 | Arch, CachyOS, EndeavourOS, Manjaro… | pacman (AUR only for anything the repos lack) |
 | Ubuntu 26.04 and distros based on it | apt, plus Hyprland and Quickshell built from source |
-| Debian 13+ | apt, plus Hyprland, Quickshell and a few newer libraries built from source |
-| Ubuntu 24.04 bases: Zorin OS 18, Linux Mint 22, Pop!_OS 24.04… | apt, plus the above and Qt built from source (long first install) |
+| Debian 13+ | apt, plus Hyprland, Quickshell, GCC, Qt and a few libraries built from source (an hour or more the first time) |
+| Ubuntu 24.04 bases: Zorin OS 18, Linux Mint 22, Pop!_OS 24.04… | apt, plus Hyprland, Quickshell, GCC, Qt and several libraries built from source (a few hours the first time) |
 
 On Debian and Ubuntu the source builds go into `/opt/aayork-desktop`, linked so
 that they never replace the system's own libraries. `./install.sh --remove-builds`

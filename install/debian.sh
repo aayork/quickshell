@@ -96,9 +96,7 @@ install_debian() {
   apt_install "${pkgs[@]}"
 
   step "Installing build tools and libraries"
-  # On newer releases a compiler new enough for C++26 is the default; on
-  # 24.04 it is the g++-14 package.
-  apt_install "${DEB_BUILD_PKGS[@]}" g++-14 libpugixml-dev libexpat1-dev libxml2-dev xkb-data
+  apt_install "${DEB_BUILD_PKGS[@]}" libpugixml-dev libexpat1-dev libxml2-dev xkb-data
 
   step "Installing Ghostty"
   install_ghostty
@@ -107,6 +105,21 @@ install_debian() {
   if ! have fd && have fdfind; then
     mkdir -p "$HOME/.local/bin"
     ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+  fi
+
+  # Ubuntu 24.04 ships ImageMagick 6: same tools, but no "magick" front command.
+  if ! have magick && have convert; then
+    mkdir -p "$HOME/.local/bin"
+    cat >"$HOME/.local/bin/magick" <<'EOF_MAGICK'
+#!/bin/sh
+# ImageMagick 7's "magick" on top of ImageMagick 6 (added by the aayork-quickshell installer).
+case "$1" in
+  identify|mogrify|composite|compare|montage|stream|import|display|animate|conjure) tool=$1; shift; exec "$tool" "$@" ;;
+esac
+exec convert "$@"
+EOF_MAGICK
+    chmod +x "$HOME/.local/bin/magick"
+    ok "added a magick command for ImageMagick 6"
   fi
 
   if ((${#SKIPPED_PKGS[@]})); then

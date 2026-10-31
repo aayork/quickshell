@@ -13,7 +13,8 @@
 
 set -Eeuo pipefail
 # Any unexpected stop says where, instead of exiting silently.
-trap 'rc=$?; printf "\n\e[31merror:\e[0m the installer stopped at %s line %s (exit %s)\n" "$(basename "${BASH_SOURCE[0]}")" "$LINENO" "$rc" >&2' ERR
+ERR_TRAP='rc=$?; printf "\n\e[31merror:\e[0m the installer stopped at %s line %s (exit %s)\n" "$(basename "${BASH_SOURCE[0]}")" "$LINENO" "$rc" >&2'
+trap "$ERR_TRAP" ERR
 
 REPO_URL=${REPO_URL:-https://github.com/aayork/quickshell.git}
 DEFAULT_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/aayork-quickshell
@@ -28,8 +29,8 @@ then sets up your user: font, icons, Hyprland config, app configs, theme.
 Supported: Arch and Arch-based (CachyOS, EndeavourOS, Manjaro...),
 Debian 13+, Ubuntu 24.04+ and distros built on them (Zorin OS, Linux Mint,
 Pop!_OS...). On Debian/Ubuntu, Hyprland and Quickshell are built from source
-into /opt/aayork-desktop, which takes a while (longest on 24.04-based
-releases, where Qt is built too).
+into /opt/aayork-desktop, which takes a while (longest on Debian 13 and
+24.04-based releases, where GCC and Qt are built too).
 
 Extras, off unless asked for:
   --with-bose         Bose headphone controls on the bar
@@ -101,8 +102,7 @@ detect_distro
 
 if $ONLY_CHECK; then
   [[ -d /opt/aayork-desktop ]] && export PATH="/opt/aayork-desktop/bin:$PATH"
-  check_all
-  exit
+  if check_all; then exit 0; else exit 1; fi
 fi
 
 if $REMOVE_BUILDS; then
@@ -122,7 +122,7 @@ ${c_bold}aayork-quickshell installer${c_off}
   Extras:  $( $WITH_BOSE && printf 'bose '; $WITH_RAZER && printf 'razer '; $WITH_THINGS && printf 'things '; $WITH_TAILSCALE && printf 'tailscale '; $WITH_GREETER && printf 'greeter '; true)
 EOF
 if [[ $DISTRO_FAMILY == debian ]] && ! $SKIP_PACKAGES; then
-  echo "  Note:    Hyprland and Quickshell get built from source; this can take 15 to 90 minutes."
+  echo "  Note:    Hyprland and Quickshell get built from source; this can take from 15 minutes to a few hours."
 fi
 if ! $ASSUME_YES; then
   read -r -p "Continue? [Y/n] " answer

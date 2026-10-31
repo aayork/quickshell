@@ -116,12 +116,14 @@ DEB_PKGS=(
   # Apps and look
   nautilus fonts-noto-core fonts-noto-color-emoji adwaita-icon-theme
   # Libraries the source-built programs link against at runtime
-  libqt6svg6 qt6-wayland
+  libqt6svg6 qt6-wayland qt6-image-formats-plugins
 )
 
 # Everything needed to compile the pieces build.sh may have to build.
 DEB_BUILD_PKGS=(
   build-essential pkg-config ninja-build meson cmake git curl ca-certificates xz-utils
+  # GCC 16 (packaged on newer releases, built from source on the rest)
+  g++-16 libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev
   python3-pip python3-setuptools bison flex
   # Hyprland and its libraries
   libwayland-dev wayland-protocols libxkbcommon-dev libinput-dev libudev-dev libevdev-dev libmtdev-dev
@@ -129,8 +131,9 @@ DEB_BUILD_PKGS=(
   libseat-dev libdisplay-info-dev hwdata libliftoff-dev
   libxcb1-dev libxcb-composite0-dev libxcb-errors-dev libxcb-icccm4-dev libxcb-render0-dev
   libxcb-res0-dev libxcb-xfixes0-dev libxcb-ewmh-dev libxcb-util-dev libxcb-present-dev libxcursor-dev libx11-xcb-dev
+  xcb-proto python3-xcbgen
   libtomlplusplus-dev libzip-dev librsvg2-dev libmagic-dev libjpeg-dev libpng-dev libwebp-dev libheif-dev libjxl-dev
-  libre2-dev libmuparser-dev liblcms2-dev glslang-dev glslang-tools libffi-dev uuid-dev libgtest-dev
+  libre2-dev libmuparser-dev liblcms2-dev glslang-dev glslang-tools libffi-dev uuid-dev libgtest-dev libreadline-dev
   liblua5.5-dev libeis-dev libpipewire-0.3-dev libspa-0.2-dev libsdbus-c++-dev libglib2.0-dev
   libgles2-mesa-dev libvulkan-dev
   # Quickshell
@@ -142,7 +145,7 @@ DEB_BUILD_PKGS=(
   libfontconfig1-dev libfreetype-dev libharfbuzz-dev libdbus-1-dev libssl-dev libicu-dev
   libxkbcommon-x11-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev
   libxcb-shm0-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xinerama0-dev
-  libxcb-xkb-dev libxcb-render-util0-dev libxcb-xinput-dev libmd4c-dev libdouble-conversion-dev libpcre2-dev
+  libxcb-xkb-dev libxcb-render-util0-dev libxcb-xinput-dev libdouble-conversion-dev libpcre2-dev
   # gpu-screen-recorder
   libavcodec-dev libavformat-dev libavfilter-dev libavutil-dev libswresample-dev libva-dev libcap-dev
   libpulse-dev libxcomposite-dev libxrandr-dev libxfixes-dev libxdamage-dev libdbus-1-dev
