@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Plays a folder of videos full screen, shuffled, one mpv per monitor. Started by
-# the shell's idle module. mpv's own input config quits on any key or mouse
-# movement, and the idle module notices the window closing.
+# the shell's idle module. mpv's own input config quits on any key, and
+# screensaver-guard.lua quits on real mouse movement; then the idle module
+# notices the window closing.
 #
 # hyprland.lua has a fullscreen rule matching this window class.
 CLASS=org.aayork.screensaver
@@ -25,6 +26,8 @@ focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
 for monitor in $(hyprctl monitors -j | jq -r '.[] | select(.disabled == false) | .name'); do
   hyprctl dispatch "hl.dsp.focus({ monitor = \"$monitor\" })" >/dev/null
 
+  # target-colorspace-hint=no: the videos are SDR; advertising a color space
+  # makes Hyprland's auto-HDR switch the monitor mode, which blanks it.
   # panscan crops the 16:9 videos to fill a screen that is not 16:9. setsid
   # puts mpv in its own session so it outlives this script.
   setsid -f mpv \
@@ -34,10 +37,12 @@ for monitor in $(hyprctl monitors -j | jq -r '.[] | select(.disabled == false) |
     --osd-level=0 \
     --panscan=1.0 \
     --input-conf="$HOME/.config/mpv/screensaver-input.conf" \
+    --script="$(dirname "$(readlink -f "$0")")/screensaver-guard.lua" \
     --loop-playlist=inf \
     --shuffle \
     --mute="$([[ $sound == yes ]] && echo no || echo yes)" \
     --stop-screensaver=no \
+    --target-colorspace-hint=no \
     --cursor-autohide=always \
     --really-quiet \
     --idle=no \

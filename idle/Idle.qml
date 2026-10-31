@@ -29,7 +29,35 @@ Scope {
   // overlays are gone before mpv maps; one closing over mpv would put the
   // pointer on it, which mpv takes as movement and quits.
   property bool saverStarting: false
-  onSaverCountChanged: if (saverCount > 0) saverStarting = false
+  onSaverCountChanged: {
+    if (saverCount > 0) {
+      saverStarting = false
+      reveal.restart()
+    } else {
+      // mpv quit: drop the veil at once so the desktop is right there.
+      reveal.stop()
+      veilInstant = true
+      veiled = false
+      veilInstant = false
+    }
+  }
+
+  // A black layer over every screen. The desktop fades into it, mpv starts
+  // underneath (hiding its first unfullscreened frame), then it fades away to
+  // show the video.
+  readonly property int fadeInMs: 800
+  readonly property int fadeOutMs: 1200
+  property bool veiled: false
+  property bool veilInstant: false
+
+  readonly property bool cursorHidden: veiled || saverCount > 0
+  onCursorHiddenChanged: setCursorHidden(cursorHidden)
+  // Hide the pointer while the screensaver is up. Reset on start in case the
+  // shell restarted with it hidden.
+  function setCursorHidden(hidden) {
+    Quickshell.execDetached(["hyprctl", "eval", "hl.config({ cursor = { invisible = " + hidden + " } })"])
+  }
+  Component.onCompleted: setCursorHidden(false)
   Binding {
     target: Session
     property: "screensaver"
@@ -48,20 +76,69 @@ Scope {
 
   function launchScreensaver() {
     saverStarting = true
+    veiled = true
     saverLaunch.restart()
     saverGiveUp.restart()
   }
 
+  // Input while the screen is still fading to black: back out before mpv runs.
+  function abortLaunch() {
+    saverLaunch.stop()
+    saverGiveUp.stop()
+    saverStarting = false
+    veiled = false
+  }
+
+  // mpv starts once the screen is black.
   Timer {
     id: saverLaunch
-    interval: 400
+    interval: root.fadeInMs
     onTriggered: Quickshell.execDetached([Quickshell.shellDir + "/bin/screensaver", Config.screensaver.folder, Config.screensaver.sound ? "yes" : "no"])
   }
   // No window came up (no videos, mpv failed): let the shell show again.
   Timer {
     id: saverGiveUp
     interval: 6000
-    onTriggered: root.saverStarting = false
+    onTriggered: {
+      root.saverStarting = false
+      if (root.saverCount === 0) root.veiled = false
+    }
+  }
+  // Time for mpv to go fullscreen and show a frame before the veil lifts.
+  Timer {
+    id: reveal
+    interval: 700
+    onTriggered: root.veiled = false
+  }
+
+  Variants {
+    model: Quickshell.screens
+    PanelWindow {
+      required property var modelData
+      screen: modelData
+      visible: root.veiled || veil.opacity > 0
+      anchors { top: true; bottom: true; left: true; right: true }
+      color: "transparent"
+      exclusionMode: ExclusionMode.Ignore
+      mask: Region {}
+      WlrLayershell.namespace: "aayork-screensaver-veil"
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+      Rectangle {
+        id: veil
+        anchors.fill: parent
+        color: "black"
+        opacity: root.veiled ? 1 : 0
+        Behavior on opacity {
+          enabled: !root.veilInstant
+          NumberAnimation {
+            duration: root.veiled ? root.fadeInMs : root.fadeOutMs
+            easing.type: Easing.InOutQuad
+          }
+        }
+      }
+    }
   }
 
   function start() {
@@ -109,6 +186,11 @@ Scope {
       }
       recheck.stop()
       root.inhibitedBy = ""
+      if (saverLaunch.running) {
+        root.abortLaunch()
+        root.cancel("activity")
+        return
+      }
       // The screensaver appearing can itself read as activity. Once it is up
       // (or still starting), only its window closing ends the cycle.
       if (root.cycling && root.saverCount === 0 && !grace.running) root.cancel("activity")
