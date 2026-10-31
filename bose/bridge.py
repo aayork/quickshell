@@ -440,6 +440,14 @@ def panel_status(device, identity, mac):
         # mirroring equalizer_status, never fail the whole snapshot.
         cnc_level, cnc_max, cancellation = -1, 0, -1
 
+    # Some headphones (QC45) only take a new level inside a custom mode;
+    # in their presets the level is fixed by the mode.
+    noise_editable = noise_available and (
+        device.has_feature("audio_settings")
+        or bool(device._feature("cnc").get("builder"))
+        or (device.has_feature("mode_config") and current_id == "" and bool(normalized_mode))
+    )
+
     return {
         "schemaVersion": SCHEMA_VERSION,
         "device": {
@@ -461,6 +469,7 @@ def panel_status(device, identity, mac):
             "available": noise_available and cnc_level >= 0,
             "level": cancellation,
             "maximum": cnc_max,
+            "editable": bool(noise_editable),
         },
         "multipoint": multipoint_status(device),
         "equalizer": equalizer_status(device),

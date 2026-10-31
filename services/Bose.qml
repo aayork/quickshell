@@ -41,11 +41,19 @@ Singleton {
 
   readonly property int battery: state && state.battery ? state.battery.level : -1
   readonly property var modes: state && state.mode ? state.mode.options : []
-  readonly property string mode: state && state.mode ? state.mode.currentId : ""
+  // A mode just picked shows as current until the headphones confirm it:
+  // some apply the switch a moment after acknowledging it.
+  property string pendingMode: ""
+  readonly property string mode: pendingMode !== "" ? pendingMode : state && state.mode ? state.mode.currentId : ""
+  // Name of a custom mode the presets do not cover.
+  readonly property string modeLabel: state && state.mode ? state.mode.currentLabel : ""
   readonly property bool hasNoiseControl: state !== null && state.noiseControl.available
   readonly property int noiseLevel: hasNoiseControl ? state.noiseControl.level : 0
   readonly property int noiseMaximum: hasNoiseControl ? state.noiseControl.maximum : 0
+  // False where the level is fixed by the current mode.
+  readonly property bool noiseEditable: hasNoiseControl && state.noiseControl.editable !== false
   readonly property var bands: state && state.equalizer.available ? state.equalizer.bands : []
+  readonly property bool multipoint: state !== null && !!state.multipoint && state.multipoint.available && state.multipoint.enabled
 
   // Changes wait here while another command is on the wire. Only the newest
   // value per kind is kept, so dragging a slider sends where it ended up.
@@ -86,11 +94,15 @@ Singleton {
     delete next[kinds[0]]
     queued = next
     error = ""
+    actionProcess.kind = kinds[0]
     actionProcess.command = bridgeCommand(args)
     actionProcess.running = true
   }
 
   function setMode(id) {
+    if (id === mode) return
+    pendingMode = id
+    pendingExpiry.restart()
     send("mode", ["mode", id])
   }
 
@@ -110,7 +122,27 @@ Singleton {
 
   onConnectedChanged: {
     if (connected) settle.restart()
-    else state = null
+    else {
+      state = null
+      pendingMode = ""
+    }
+  }
+
+  // Gives up on a mode the headphones never reported.
+  Timer {
+    id: pendingExpiry
+    interval: 6000
+    onTriggered: {
+      root.pendingMode = ""
+      root.refresh()
+    }
+  }
+
+  // Reads the mode back once a switch has had time to land.
+  Timer {
+    id: modeSettle
+    interval: 1200
+    onTriggered: root.refresh()
   }
   onWatchingChanged: if (watching) refresh()
 
@@ -167,6 +199,12 @@ Singleton {
         try {
           root.state = JSON.parse(statusOut.text)
           root.error = ""
+          if (root.pendingMode !== "" && root.state.mode && root.state.mode.currentId === root.pendingMode) {
+            root.pendingMode = ""
+            pendingExpiry.stop()
+          } else if (root.pendingMode !== "") {
+            modeSettle.restart()
+          }
         } catch (e) {
           root.error = "Unreadable answer from the headphones"
         }
@@ -179,12 +217,17 @@ Singleton {
 
   Process {
     id: actionProcess
+    property string kind: ""
     stderr: StdioCollector {
       id: actionError
     }
     onExited: function(code) {
-      if (code !== 0) root.error = root.lastLine(actionError.text) || "The headphones refused that"
+      if (code !== 0) {
+        root.error = root.lastLine(actionError.text) || "The headphones refused that"
+        if (kind === "mode") root.pendingMode = ""
+      }
       if (Object.keys(root.queued).length > 0) root.drain()
+      else if (kind === "mode" && code === 0) modeSettle.restart()
       else root.refresh()
     }
   }

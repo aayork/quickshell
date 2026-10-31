@@ -50,148 +50,17 @@ BarButton {
     }
   }
 
-  // One equalizer band: label, slider across its own range, value.
-  component Band: RowLayout {
-    id: band
-    required property var modelData
-    signal changed(int value)
-
-    Layout.fillWidth: true
-    spacing: Theme.spacing
-
-    Label { text: band.modelData.label; Layout.preferredWidth: 48 }
-    Slider {
-      Layout.fillWidth: true
-      value: (band.modelData.value - band.modelData.minimum) / (band.modelData.maximum - band.modelData.minimum)
-      step: 1 / (band.modelData.maximum - band.modelData.minimum)
-      onMoved: function(value) {
-        band.changed(Math.round(band.modelData.minimum + value * (band.modelData.maximum - band.modelData.minimum)))
-      }
-    }
-    Label {
-      text: (band.modelData.value > 0 ? "+" : "") + band.modelData.value
-      color: Theme.dim
-      font.pixelSize: Theme.fontSmall
-      horizontalAlignment: Text.AlignRight
-      Layout.preferredWidth: 24
-    }
-  }
-
   Popup {
     id: popup
     anchorItem: root
     contentWidth: 320
-    contentHeight: column.implicitHeight
+    contentHeight: settings.implicitHeight
 
     onOpenChanged: Bose.watching = open
 
-    ColumnLayout {
-      id: column
+    BoseSettings {
+      id: settings
       width: parent.width
-      spacing: 12
-
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Theme.spacing
-
-        Label { text: Bose.name; font.bold: true; Layout.fillWidth: true }
-        Label {
-          text: Bose.battery >= 0 ? Bose.battery + "%" : Bose.busy ? "Reading…" : ""
-          color: Bose.battery >= 0 && Bose.battery <= 15 ? Theme.red : Theme.dim
-        }
-      }
-
-      Label {
-        visible: Bose.error !== ""
-        text: Bose.error
-        color: Theme.red
-        wrapMode: Text.Wrap
-        elide: Text.ElideNone
-        Layout.fillWidth: true
-      }
-
-      SectionHeader { text: "MODE"; visible: modes.visible }
-
-      Flow {
-        id: modes
-        visible: Bose.modes.length > 0
-        Layout.fillWidth: true
-        spacing: 6
-
-        Repeater {
-          model: Bose.modes
-
-          TextButton {
-            required property var modelData
-            text: modelData.label
-            selected: modelData.id === Bose.mode
-            onClicked: Bose.setMode(modelData.id)
-          }
-        }
-      }
-
-      SectionHeader { text: "NOISE CANCELLATION"; visible: noise.visible }
-
-      RowLayout {
-        id: noise
-        visible: Bose.hasNoiseControl
-        Layout.fillWidth: true
-        spacing: Theme.spacing
-
-        Slider {
-          Layout.fillWidth: true
-          value: Bose.noiseMaximum > 0 ? Bose.noiseLevel / Bose.noiseMaximum : 0
-          step: Bose.noiseMaximum > 0 ? 1 / Bose.noiseMaximum : 0.1
-          onMoved: function(value) { Bose.setNoiseLevel(value * Bose.noiseMaximum) }
-        }
-        Label {
-          text: Bose.noiseLevel + "/" + Bose.noiseMaximum
-          color: Theme.dim
-          font.pixelSize: Theme.fontSmall
-          horizontalAlignment: Text.AlignRight
-          Layout.preferredWidth: 34
-        }
-      }
-
-      RowLayout {
-        visible: equalizer.visible
-        Layout.fillWidth: true
-        SectionHeader { text: "EQUALIZER"; Layout.fillWidth: true }
-        Label {
-          text: "Reset"
-          color: resetMouse.containsMouse ? Theme.foreground : Theme.dim
-          font.pixelSize: Theme.fontSmall
-          MouseArea {
-            id: resetMouse
-            anchors.fill: parent
-            anchors.margins: -6
-            hoverEnabled: true
-            onClicked: Bose.setEqualizer({ bass: 0, mid: 0, treble: 0 })
-          }
-        }
-      }
-
-      ColumnLayout {
-        id: equalizer
-        visible: Bose.bands.length === 3
-        Layout.fillWidth: true
-        spacing: 2
-
-        function values(id, value) {
-          var next = {}
-          for (var i = 0; i < Bose.bands.length; i++) next[Bose.bands[i].id] = Bose.bands[i].value
-          next[id] = value
-          return next
-        }
-
-        Repeater {
-          model: Bose.bands
-
-          Band {
-            onChanged: function(value) { Bose.setEqualizer(equalizer.values(modelData.id, value)) }
-          }
-        }
-      }
     }
   }
 }
