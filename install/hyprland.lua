@@ -332,6 +332,15 @@ hl.window_rule({
     suppress_event = "fullscreen",
 })
 
+-- Ghostty fades a little when unfocused. Done here rather than in Ghostty so
+-- the tab bar and terminal shift together (libadwaita's own unfocused fade
+-- only touched the tab bar and made it look lighter than the terminal).
+hl.window_rule({
+    name    = "ghostty-inactive-fade",
+    match   = { class = "^com\\.mitchellh\\.ghostty$" },
+    opacity = "1.0 0.93",
+})
+
 -- The shell's Settings window: floating, centred, the rest dimmed, and
 -- pinned so it follows you between workspaces.
 hl.window_rule({

@@ -153,6 +153,18 @@ tabbar .start-action button:hover, tabbar .end-action button:hover {
 }
 tabbar undershoot { background: none; }
 
+/* Unfocused window: libadwaita fades the whole top bar to 50% opacity,
+   which halves the bar's tint and lets the wallpaper glare through, so it
+   looks lighter than the terminal. Keep the bar solid and dim only the
+   tab contents instead. */
+toolbarview > .top-bar:backdrop > windowhandle,
+tabbar .box:backdrop > scrolledwindow,
+tabbar .box:backdrop > .start-action,
+tabbar .box:backdrop > .end-action { filter: none; }
+tabbar .box:backdrop > scrolledwindow,
+tabbar .box:backdrop > .start-action,
+tabbar .box:backdrop > .end-action { opacity: 0.6; }
+
 /* Dialogs: close confirmation, clipboard confirmation, config errors,
    change-title */
 dialog.alert .dialog-contents,
