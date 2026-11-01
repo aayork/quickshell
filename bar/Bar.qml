@@ -35,6 +35,11 @@ Scope {
       readonly property var monitor: Hyprland.monitorFor(screen)
       readonly property bool fullscreen: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.hasFullscreen === true : false
       property bool peeking: false
+      // Steam games (and other Wine/Proton windows) keep the bar tucked: some
+      // show a free cursor that would keep hitting the edge. The bar keybinds
+      // still bring it out.
+      readonly property string activeAppId: ToplevelManager.activeToplevel ? (ToplevelManager.activeToplevel.appId || "") : ""
+      readonly property bool gameFullscreen: fullscreen && /^steam_app_\d+$|\.exe$/i.test(activeAppId)
       readonly property bool tucked: fullscreen && (!peeking || Services.Session.screensaver)
       readonly property bool peekHeld: slideHover.hovered || edgeHover.hovered || PopupState.active !== null
 
@@ -100,7 +105,7 @@ Scope {
 
         HoverHandler {
           id: edgeHover
-          enabled: bar.fullscreen
+          enabled: bar.fullscreen && !bar.gameFullscreen
           onHoveredChanged: if (hovered) bar.peeking = true
         }
       }
