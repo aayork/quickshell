@@ -166,6 +166,8 @@ Scope {
   function applyIconTheme(name) {
     iconTheme = name
     Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", name])
+    // Remembered so a theme change does not swap it back (bin/theme-set-gnome).
+    Quickshell.execDetached(["sh", "-c", "mkdir -p \"$HOME/.local/state/aayork-quickshell\" && printf '%s\\n' \"$1\" > \"$HOME/.local/state/aayork-quickshell/icon-theme\"", "sh", name])
   }
 
   // ---------------------------------------------------------------- windows

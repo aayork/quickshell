@@ -29,9 +29,12 @@ else
   gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
 fi
 
-# Change gnome icon theme color
+# Icon theme: the one picked in Settings wins over the theme's own.
+ICON_CHOICE=$HOME/.local/state/aayork-quickshell/icon-theme
 GNOME_ICONS_THEME=$HOME/.local/state/aayork-quickshell/current/theme/icons.theme
-if [[ -f $GNOME_ICONS_THEME ]]; then
+if [[ -s $ICON_CHOICE ]]; then
+  gsettings set org.gnome.desktop.interface icon-theme "$(<$ICON_CHOICE)"
+elif [[ -f $GNOME_ICONS_THEME ]]; then
   gsettings set org.gnome.desktop.interface icon-theme "$(<$GNOME_ICONS_THEME)"
 else
   gsettings set org.gnome.desktop.interface icon-theme "Yaru-blue"

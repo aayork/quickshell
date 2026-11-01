@@ -1,4 +1,4 @@
-//@ pragma IconTheme Colloid
+//@ pragma IconTheme Numix-Square
 import Quickshell
 import qs.background
 import qs.bar
