@@ -55,8 +55,15 @@ cat >"$fontconfig_file" <<XML
       <string>$font_name</string>
     </edit>
   </match>
+  <!-- The shell's icon set (bin/icons-set); absent means Nerd Font icons. -->
+  <include ignore_missing="yes">~/.local/state/aayork-quickshell/fontconfig/icons.conf</include>
 </fontconfig>
 XML
+
+# The Fluent icon rule names the text font, so write it again.
+if [[ $("$(dirname "$(readlink -f "$0")")/icons-set" status) == fluent ]]; then
+  "$(dirname "$(readlink -f "$0")")/icons-set" fluent --no-restart
+fi
 
 # Keep the login screen in step (no-op until bin/greeter-install has run).
 "$(dirname "$(readlink -f "$0")")/greeter-sync" --quiet >/dev/null 2>&1 &

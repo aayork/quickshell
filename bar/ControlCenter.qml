@@ -30,14 +30,15 @@ BarButton {
   }
 
   // The two-switch icon is its own one-glyph font (assets/build-glyph.py), so
-  // the text renderer pixel-snaps it like the Nerd Font icons beside it.
+  // the text renderer pixel-snaps it like the Nerd Font icons beside it. With
+  // the Fluent icon set on (bin/icons-set), that font's sliders glyph is used.
   FontLoader {
     id: glyphFont
     source: Qt.resolvedUrl("../assets/control-center.otf")
   }
 
-  text: ""
-  fontFamily: glyphFont.name
+  text: "\ue000"
+  fontFamily: Qt.fontFamilies().indexOf("aayork Fluent Icons") >= 0 ? "aayork Fluent Icons" : glyphFont.name
   fontSize: 13
   active: popup.open
 

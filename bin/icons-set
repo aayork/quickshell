@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Switches the shell's icon set: icons-set fluent | nerd
+#
+# fluent: assets/fluent-icons/fluent-icons.otf (Fluent shapes at the Nerd Font
+# codepoints) goes in front of "monospace" for the shell only, through a
+# fontconfig rule that fonts.conf includes (see bin/font-set). Other apps and
+# terminals keep the Nerd Font. nerd: the rule is removed.
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+
+FONT="$SHELL_ROOT/assets/fluent-icons/fluent-icons.otf"
+FONT_LINK="$HOME/.local/share/fonts/aayork-fluent-icons.otf"
+RULE="$HOME/.local/state/aayork-quickshell/fontconfig/icons.conf"
+
+case "$1" in
+  fluent)
+    [[ -f $FONT ]] || { echo "Missing $FONT (run assets/fluent-icons/build.py)" >&2; exit 1; }
+    mkdir -p "$(dirname "$FONT_LINK")" "$(dirname "$RULE")"
+    ln -sfn "$FONT" "$FONT_LINK"
+    # The text font chosen in Settings (bin/font-set writes it into fonts.conf).
+    text_font=$(sed -n 's:.*<string>\(.*\)</string>.*:\1:p' "$HOME/.config/fontconfig/fonts.conf" | grep -vx monospace | head -1)
+    text_font=${text_font:-monospace}
+    # Two rules. The first puts the icons in front of "monospace". Qt then
+    # treats the icon font as the font and asks fontconfig what to fall back
+    # to for *that* family, which would be some stock monospace; the second
+    # rule makes the answer the text font, so letters look as they did.
+    cat >"$RULE" <<XML
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <match target="pattern">
+    <test name="prgname"><string>quickshell</string></test>
+    <test name="family" qual="any"><string>monospace</string></test>
+    <edit name="family" mode="prepend_first" binding="strong">
+      <string>aayork Fluent Icons</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test name="prgname"><string>quickshell</string></test>
+    <test name="family" qual="first"><string>aayork Fluent Icons</string></test>
+    <edit name="family" mode="append" binding="strong">
+      <string>$text_font</string>
+    </edit>
+  </match>
+</fontconfig>
+XML
+    ;;
+  nerd)
+    rm -f "$RULE" "$FONT_LINK"
+    ;;
+  ""|status)
+    [[ -f $RULE ]] && echo fluent || echo nerd
+    exit 0
+    ;;
+  *)
+    echo "usage: icons-set fluent|nerd|status" >&2
+    exit 1
+    ;;
+esac
+
+fc-cache -f "$(dirname "$FONT_LINK")" >/dev/null 2>&1
+
+# Qt reads fontconfig once at startup.
+[[ ${2:-} == --no-restart ]] || restart
