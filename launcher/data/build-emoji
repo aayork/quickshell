@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# Builds launcher/data/emoji.json, the emoji picker's data, from Unicode's
+# emoji-test.txt (names, categories, order, skin tones) plus extra search
+# keywords (aliases like "lol" or "tada") kept from the last build.
+#
+#   curl -o /tmp/emoji-test.txt https://unicode.org/Public/emoji/latest/emoji-test.txt
+#   launcher/data/build-emoji /tmp/emoji-test.txt
+#
+# Emoji newer than MAX_VERSION are left out: the emoji fonts installed here
+# draw them as empty boxes. Raise it once the fonts catch up.
+#
+# Output: { "groups": [names], "emoji": [{ e, n, g, k?, t? }] }
+#   e  the character        n  its name ("face with tears of joy")
+#   g  index into groups    k  extra search words
+#   t  the five skin tone variants, light to dark, when it has them
+
+import json
+import os
+import re
+import sys
+
+MAX_VERSION = (17, 0)
+HERE = os.path.dirname(os.path.abspath(__file__))
+TONES = ["light skin tone", "medium-light skin tone", "medium skin tone",
+         "medium-dark skin tone", "dark skin tone"]
+# Shorter headings than Unicode's, so the category bar can name them.
+GROUP_NAMES = {
+    "Smileys & Emotion": "Smileys",
+    "People & Body": "People",
+    "Animals & Nature": "Nature",
+    "Food & Drink": "Food",
+    "Travel & Places": "Travel",
+    "Activities": "Activities",
+    "Objects": "Objects",
+    "Symbols": "Symbols",
+    "Flags": "Flags",
+}
+
+
+def bare(text):
+    return text.replace("️", "")
+
+
+def main(test_path, keywords_path):
+    # Extra keywords: from the given list, else from the last build, so the
+    # aliases survive a rebuild.
+    old = {}
+    if not os.path.exists(keywords_path):
+        keywords_path = os.path.join(HERE, "emoji.json")
+    if os.path.exists(keywords_path):
+        loaded = json.load(open(keywords_path, encoding="utf-8"))
+        for item in loaded["emoji"] if isinstance(loaded, dict) else loaded:
+            old[bare(item["e"])] = item.get("k", "").replace("_", " ").lower().split()
+
+    groups, emoji, by_name = [], [], {}
+    group = None
+    line_re = re.compile(r"^([0-9A-F ]+?)\s*; fully-qualified\s*# (\S+) E(\d+)\.(\d+) (.+)$")
+    for line in open(test_path, encoding="utf-8"):
+        if line.startswith("# group:"):
+            name = line.split(":", 1)[1].strip()
+            group = GROUP_NAMES.get(name)
+            if group and group not in groups:
+                groups.append(group)
+            continue
+        m = line_re.match(line.strip())
+        if not m or group is None:
+            continue
+        char, name = m.group(2), m.group(5).strip()
+        if (int(m.group(3)), int(m.group(4))) > MAX_VERSION:
+            continue
+
+        # "thumbs up: medium skin tone" is a variant of "thumbs up". Mixed
+        # tones ("kiss: light skin tone, dark skin tone") are left out.
+        base, _, tone = name.partition(": ")
+        if tone in TONES and base in by_name:
+            entry = by_name[base]
+            entry.setdefault("t", []).append(char)
+            continue
+        if any(t in name for t in TONES):
+            continue
+
+        entry = {"e": char, "n": name, "g": groups.index(group)}
+        name_words = set(re.split(r"[\s:,\-]+", name.lower()))
+        extra = []
+        for word in old.get(bare(char), []):
+            if word not in name_words and word not in extra:
+                extra.append(word)
+        if extra:
+            entry["k"] = " ".join(extra)
+        by_name[name] = entry
+        emoji.append(entry)
+
+    # Only complete sets of five; anything else is a half-built variant list.
+    for entry in emoji:
+        if "t" in entry and len(entry["t"]) != 5:
+            del entry["t"]
+
+    out = os.path.join(HERE, "emoji.json")
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump({"groups": groups, "emoji": emoji}, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"{len(emoji)} emoji in {len(groups)} groups -> {out}")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        sys.exit("usage: build-emoji <emoji-test.txt> [keywords.json]")
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "emojis.json"))

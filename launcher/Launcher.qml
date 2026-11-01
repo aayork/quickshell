@@ -58,6 +58,9 @@ Scope {
       aliases: ["clipboard", "clip", "paste", "copied", "history"], glyph: Icons.glyph(0xF014D), minChars: 0, debounceMs: 0, maxRows: 100, provider: clipboard },
     { id: "shots", title: "Capture History", subtitle: "Screenshots you took", keyword: "shots",
       aliases: ["screenshots", "screenshot", "captures", "capture"], glyph: Icons.glyph(0xF02E9), minChars: 0, debounceMs: 0, maxRows: 100, provider: shots },
+    // Drawn as a grid of tiles (EmojiGrid.qml) instead of the list.
+    { id: "emoji", title: "Emoji", subtitle: "Find and paste an emoji", keyword: "emoji",
+      aliases: ["emojis", "e", "smiley", "symbol"], glyph: Icons.glyph(0xF01F5), minChars: 0, debounceMs: 0, maxRows: 2500, provider: emoji, grid: true },
     // Shows the mouse settings panel in place of a list.
     { id: "mouse", title: "Mouse", subtitle: "Razer DPI, polling and speed", keyword: "mouse",
       aliases: ["razer", "dpi", "pointer", "sensitivity", "acceleration"], glyph: Icons.glyph(0xF037D), minChars: 0, debounceMs: 0, maxRows: 1, panel: "mouse" }
@@ -76,6 +79,7 @@ Scope {
   Displays { id: displays }
   ClipboardSource { id: clipboard }
   ShotsSource { id: shots }
+  EmojiSource { id: emoji }
 
   // Things the shell does itself. A command with the same id as an extension
   // keyword steps aside for the extension.
@@ -119,6 +123,8 @@ Scope {
   // Rows that carry a preview get a pane beside the list.
   readonly property bool split: rows.some(r => r.preview !== undefined)
   readonly property var currentActions: currentRow && !currentRow.hint ? currentRow.actions : []
+  // A grid scope (emoji) with something to show; a hint row uses the list.
+  readonly property bool gridMode: scoped !== null && scoped.extension.grid === true && rows.length > 0 && !rows[0].hint
 
   // Second and later things the current row can do (Ctrl+K).
   property bool actionsOpen: false
@@ -180,7 +186,8 @@ Scope {
       key: "app:" + entry.id,
       favorite: isFavorite("app:" + entry.id),
       title: entry.name,
-      subtitle: entry.genericName || entry.comment || "",
+      // A plain kind, like Raycast: the long descriptions made a ragged column.
+      subtitle: "Application",
       icon: Quickshell.iconPath(entry.icon, "application-x-executable"),
       glyph: "",
       chip: "",
@@ -484,7 +491,8 @@ Scope {
   }
 
   function remember(key) {
-    if (key === "calc" || key.indexOf("fallback:") === 0) return
+    // Emoji keep their own recents (EmojiSource).
+    if (key === "calc" || key.indexOf("fallback:") === 0 || key.indexOf("emoji:") === 0) return
     var next = Object.assign({}, frecency)
     var entry = next[key] || { count: 0, last: 0 }
     next[key] = { count: entry.count + 1, last: Date.now() }
@@ -747,7 +755,8 @@ Scope {
       y: Math.round(parent.height * 0.2)
       // Translucent: Hyprland blurs what is behind it (a layer rule for
       // aayork-launcher in hyprland.lua).
-      color: Theme.alpha(Theme.background, 0.8)
+      // Opaque enough that a bright page behind does not show through.
+      color: Theme.alpha(Theme.background, 0.9)
       border.width: 1
       border.color: Theme.alpha(Theme.foreground, 0.14)
       radius: root.corner
@@ -760,22 +769,25 @@ Scope {
         width: parent.width
         spacing: 0
 
-        // The magnifier sits in the rows' icon column and the text starts
-        // where the row titles do, so the search lines up with the list.
+        // Starts at the card's edge, in line with the footer below; the
+        // rows' extra indent is for their numbers, which this has none of.
         RowLayout {
           Layout.fillWidth: true
-          Layout.leftMargin: 34
+          Layout.leftMargin: 16
           Layout.rightMargin: 14
           Layout.topMargin: 12
           Layout.bottomMargin: 12
-          spacing: 10
+          spacing: 6
 
+          // Centred on the text line, close to the text like the footer's.
           Label {
             text: Icons.glyph(0xF0349)
             font.pixelSize: Theme.iconLarge
-            color: Theme.dim
+            color: input.text === "" ? Theme.dim : Theme.foreground
             horizontalAlignment: Text.AlignHCenter
-            Layout.preferredWidth: 20
+            verticalAlignment: Text.AlignVCenter
+            Layout.preferredHeight: 30
+            Layout.alignment: Qt.AlignVCenter
             elide: Text.ElideNone
           }
 
@@ -783,22 +795,48 @@ Scope {
             id: input
             Layout.fillWidth: true
             Layout.preferredHeight: 30
+            Layout.alignment: Qt.AlignVCenter
             verticalAlignment: TextInput.AlignVCenter
             text: root.query
             color: Theme.brightForeground
             selectionColor: Theme.selection
             selectedTextColor: Theme.brightForeground
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontLarge + 3
+            font.pixelSize: Theme.fontLarge + 1
             clip: true
             onTextEdited: root.query = text
 
+            // A slim accent caret, about the height of the letters.
+            cursorDelegate: Rectangle {
+              width: 2
+              height: input.font.pixelSize + 4
+              radius: 1
+              color: Theme.accent
+              visible: input.activeFocus && blink.on
+
+              QtObject { id: blink; property bool on: true }
+              Timer {
+                interval: 530
+                repeat: true
+                running: input.activeFocus
+                onTriggered: blink.on = !blink.on
+              }
+              Connections {
+                target: input
+                function onTextChanged() { blink.on = true }
+                function onCursorPositionChanged() { blink.on = true }
+              }
+            }
+
+            // Starts a hair right of the caret so the two do not touch.
             Label {
               anchors.fill: parent
+              leftPadding: 3
+              verticalAlignment: Text.AlignVCenter
               visible: input.text === ""
               text: "Search apps and commands"
               color: Theme.dim
-              font.pixelSize: Theme.fontLarge + 3
+              font.pixelSize: input.font.pixelSize
             }
 
             Keys.onPressed: function(event) {
@@ -821,6 +859,15 @@ Scope {
               } else if (event.key === Qt.Key_Escape) {
                 if (root.query !== "") root.query = ""
                 else root.hide()
+              } else if (root.gridMode && !control && (event.key === Qt.Key_Left || event.key === Qt.Key_Right
+                  || event.key === Qt.Key_Up || event.key === Qt.Key_Down || event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown)) {
+                // Arrows walk the grid; Page keys move four lines.
+                var dx = event.key === Qt.Key_Left ? -1 : event.key === Qt.Key_Right ? 1 : 0
+                var dy = event.key === Qt.Key_Up ? -1 : event.key === Qt.Key_Down ? 1 : event.key === Qt.Key_PageUp ? -4 : event.key === Qt.Key_PageDown ? 4 : 0
+                root.cursor = emojiGrid.step(root.cursor, dx, dy)
+              } else if (root.gridMode && (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)) {
+                // Tab and Shift+Tab hop between categories.
+                root.cursor = emojiGrid.jump(root.cursor, event.key === Qt.Key_Tab ? 1 : -1)
               } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab || (control && event.key === Qt.Key_N)) {
                 root.move(1)
               } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab || (control && event.key === Qt.Key_P)) {
@@ -856,7 +903,19 @@ Scope {
           }
         }
 
-        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible }
+        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible || root.gridMode }
+
+        EmojiGrid {
+          id: emojiGrid
+          visible: root.gridMode
+          Layout.fillWidth: true
+          Layout.bottomMargin: 4
+          rows: root.gridMode ? root.rows : []
+          cursor: root.cursor
+          groupIcons: emoji.groupIcons
+          onHovered: index => root.cursor = index
+          onActivated: index => { root.cursor = index; root.activate(index) }
+        }
 
         // The `mouse:` keyword's panel, the same one the bar used to open.
         MouseSettings {
@@ -869,6 +928,7 @@ Scope {
 
         RowLayout {
           Layout.fillWidth: true
+          visible: !root.gridMode
           spacing: 0
 
         ListView {
@@ -886,6 +946,22 @@ Scope {
           model: root.rows
           currentIndex: root.cursor
           highlightMoveDuration: 0
+          // A soft fade over the last row when there is more below, instead
+          // of a hard cut.
+          Rectangle {
+            parent: list
+            z: 2
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 28
+            visible: !list.atYEnd
+            gradient: Gradient {
+              GradientStop { position: 0; color: Theme.alpha(Theme.background, 0) }
+              GradientStop { position: 1; color: Theme.alpha(Theme.background, 0.85) }
+            }
+          }
+
           // A new answer starts back at the top.
           onModelChanged: positionViewAtBeginning()
           onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
@@ -911,8 +987,8 @@ Scope {
                 anchors.leftMargin: 34
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 4
-                text: row.modelData.header.toUpperCase()
-                font.bold: true
+                text: row.modelData.header
+                font.letterSpacing: 0
               }
             }
 
@@ -954,8 +1030,8 @@ Scope {
 
               Item {
                 id: icon
-                width: 20
-                height: 20
+                width: 22
+                height: 22
                 anchors.left: parent.left
                 anchors.leftMargin: 34
                 anchors.verticalCenter: parent.verticalCenter
@@ -974,15 +1050,15 @@ Scope {
                 TailscaleIcon {
                   anchors.centerIn: parent
                   visible: row.modelData.mark === "tailscale"
-                  size: 14
-                  color: row.current ? Theme.foreground : Theme.dim
+                  size: 13
+                  color: row.current ? Theme.brightForeground : Theme.foreground
                 }
                 Label {
                   anchors.centerIn: parent
                   visible: row.modelData.icon === "" && !row.modelData.mark
                   text: row.modelData.glyph
                   font.pixelSize: Theme.iconSize
-                  color: row.armed ? Theme.red : row.current ? Theme.foreground : Theme.dim
+                  color: row.armed ? Theme.red : row.modelData.hint ? Theme.dim : row.current ? Theme.brightForeground : Theme.foreground
                   elide: Text.ElideNone
                 }
               }
@@ -1172,17 +1248,32 @@ Scope {
             anchors.rightMargin: 12
             spacing: 6
 
+            // In the emoji grid: the one under the cursor, with its name and
+            // category, since the tiles carry no text.
+            Text {
+              visible: root.gridMode && root.currentRow !== null
+              text: visible ? root.currentRow.glyph : ""
+              font.pixelSize: 20
+            }
             Label {
+              visible: !root.gridMode
               text: root.scoped ? (root.scoped.extension.glyph || Icons.glyph(0xF0349)) : Icons.glyph(0xF0349)
               color: Theme.dim
               font.pixelSize: Theme.iconSize
               elide: Text.ElideNone
             }
             Label {
-              text: root.scoped ? root.scoped.extension.title : "Search"
+              text: root.gridMode && root.currentRow ? root.currentRow.title : root.scoped ? root.scoped.extension.title : "Search"
+              color: root.gridMode ? Theme.foreground : Theme.dim
+              font.pixelSize: Theme.fontSmall
+              Layout.maximumWidth: root.gridMode ? 300 : 200
+            }
+            Label {
+              visible: root.gridMode && root.currentRow !== null
+              text: visible ? root.currentRow.subtitle : ""
               color: Theme.dim
               font.pixelSize: Theme.fontSmall
-              Layout.maximumWidth: 200
+              Layout.maximumWidth: 120
             }
 
             Item { Layout.fillWidth: true }
