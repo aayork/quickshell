@@ -65,7 +65,10 @@ REQUIRED_PY=(
 
 # Fonts and themes the shell expects.
 REQUIRED_FONT="BlexMono Nerd Font"
-REQUIRED_ICON_THEME="Colloid"
+# App icons (shell.qml's IconTheme pragma and the GTK setting).
+REQUIRED_ICON_THEME="Numix-Square"
+# The shell's own icons: Fluent shapes in front of the Nerd Font (bin/icons-set).
+ICON_FONT_FAMILY="aayork Fluent Icons"
 MIN_HYPRLAND=0.56.0
 MIN_QUICKSHELL=0.3.0
 

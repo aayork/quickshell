@@ -25,6 +25,12 @@ check_all() {
   font_installed || missing+=("font: $REQUIRED_FONT")
   [[ -d $HOME/.local/share/icons/$REQUIRED_ICON_THEME || -d /usr/share/icons/$REQUIRED_ICON_THEME ]] \
     || missing+=("icon theme: $REQUIRED_ICON_THEME")
+  if [[ $("$SHELL_DIR/bin/icons-set" status) == fluent ]]; then
+    local families
+    families=$(fc-list : family 2>/dev/null)
+    [[ $'\n'$families$'\n' == *$'\n'"$ICON_FONT_FAMILY"$'\n'* ]] \
+      || missing+=("icon font: $ICON_FONT_FAMILY (run bin/icons-set fluent)")
+  fi
 
   # Versions that matter: the config is Lua (Hyprland 0.56+).
   local v

@@ -1,0 +1,16 @@
+<svg version="1.1" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <linearGradient id="bg" x2="0" y1="1" y2="47" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#c88b54" offset="0"/>
+   <stop stop-color="#b97c46" offset="1"/>
+  </linearGradient>
+  <g id="glyph" stroke-width="3"><path d="M22.00 31.00L10.58 23.25Q9.84 17.33 15.79 17.86Q16.95 12.63 21.31 15.74Q24.00 11.32 26.69 15.74Q31.05 12.63 32.21 17.86Q38.16 17.33 37.42 23.25L26.00 31.00Z" stroke="none"/><rect x="19.5" y="32.3" width="9" height="3.4" rx="1.2" stroke="none"/><path d="M24.00 29.50L16.58 19.13M24.00 29.50L21.57 17.21M24.00 29.50L26.43 17.21M24.00 29.50L31.42 19.13" stroke="#c0844d" stroke-width="1.6" stroke-linecap="round" fill="none"/></g>
+ </defs>
+ <path d="m1 43v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4zm0 0.5v0.5c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.5c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.02"/>
+ <path d="m1 43.25v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.05"/>
+ <path d="m1 43v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.1"/>
+ <rect x="1" y="1" width="46" height="46" rx="4" style="fill:url(#bg)"/>
+ <path d="m1 39v4c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-4c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.1"/>
+ <use xlink:href="#glyph" transform="translate(0 1)" fill="#000" stroke="#000" opacity=".1"/>
+ <use xlink:href="#glyph" fill="#f9f9f9" stroke="#f9f9f9"/>
+</svg>

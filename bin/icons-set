@@ -13,6 +13,8 @@ PATH="$SHELL_ROOT/bin:$PATH"
 FONT="$SHELL_ROOT/assets/fluent-icons/fluent-icons.otf"
 FONT_LINK="$HOME/.local/share/fonts/aayork-fluent-icons.otf"
 RULE="$HOME/.local/state/aayork-quickshell/fontconfig/icons.conf"
+# The last choice, so the installer leaves a deliberate "nerd" alone.
+CHOICE="$HOME/.local/state/aayork-quickshell/icon-font"
 
 case "$1" in
   fluent)
@@ -46,9 +48,12 @@ case "$1" in
   </match>
 </fontconfig>
 XML
+    echo fluent >"$CHOICE"
     ;;
   nerd)
     rm -f "$RULE" "$FONT_LINK"
+    mkdir -p "$(dirname "$CHOICE")"
+    echo nerd >"$CHOICE"
     ;;
   ""|status)
     [[ -f $RULE ]] && echo fluent || echo nerd

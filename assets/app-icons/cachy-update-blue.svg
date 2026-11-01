@@ -1,0 +1,16 @@
+<svg version="1.1" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <linearGradient id="bg" x2="0" y1="1" y2="47" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#38b26b" offset="0"/>
+   <stop stop-color="#2fa35f" offset="1"/>
+  </linearGradient>
+  <g id="glyph" stroke-width="3"><path d="M33.87 20.41A10.5 10.5 0 0 0 14.91 18.75" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path stroke="none" d="M12.81 22.39L12.00 17.07L17.82 20.43Z"/><path d="M14.13 27.59A10.5 10.5 0 0 0 33.09 29.25" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path stroke="none" d="M35.19 25.61L36.00 30.93L30.18 27.57Z"/></g>
+ </defs>
+ <path d="m1 43v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4zm0 0.5v0.5c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.5c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.02"/>
+ <path d="m1 43.25v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.05"/>
+ <path d="m1 43v0.25c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-0.25c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.1"/>
+ <rect x="1" y="1" width="46" height="46" rx="4" style="fill:url(#bg)"/>
+ <path d="m1 39v4c0 2.216 1.784 4 4 4h38c2.216 0 4-1.784 4-4v-4c0 2.216-1.784 4-4 4h-38c-2.216 0-4-1.784-4-4z" style="opacity:.1"/>
+ <use xlink:href="#glyph" transform="translate(0 1)" fill="#000" stroke="#000" opacity=".1"/>
+ <use xlink:href="#glyph" fill="#f9f9f9" stroke="#f9f9f9"/>
+</svg>

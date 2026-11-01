@@ -2,7 +2,9 @@
 # config, app configs, the shell's settings, a starting theme, and the
 # system services the shell talks to. Sourced by install.sh.
 
-V_COLLOID=2026-08-10
+# Numix has no releases; these are the commits the shell was set up with.
+V_NUMIX=c876b63326530034e3ac3f9cc66a13b445aca230
+V_NUMIX_SQUARE=ab83a4e21246353b1b96f176de13cc9eda8397a3
 V_NERD_FONTS=v3.4.0
 
 STAMP=$(date +%Y%m%d-%H%M%S)
@@ -51,23 +53,71 @@ setup_font() {
       <string>'"$REQUIRED_FONT"'</string>
     </edit>
   </match>
+  <!-- The shell'"'"'s icon set (bin/icons-set); absent means Nerd Font icons. -->
+  <include ignore_missing="yes">~/.local/state/aayork-quickshell/fontconfig/icons.conf</include>
 </fontconfig>' && fc-cache -f >/dev/null || true
+  setup_icon_font
 }
 
+# The shell's own icons. Fluent on a first install; a re-run keeps whatever
+# was chosen since (bin/icons-set records it).
+setup_icon_font() {
+  local conf="$HOME/.config/fontconfig/fonts.conf"
+  # A fonts.conf the installer kept still needs the include for the icon rule.
+  if [[ -f $conf ]] && ! grep -q 'aayork-quickshell/fontconfig/icons.conf' "$conf"; then
+    if grep -q '</fontconfig>' "$conf"; then
+      sed -i 's|</fontconfig>|  <include ignore_missing="yes">~/.local/state/aayork-quickshell/fontconfig/icons.conf</include>\n</fontconfig>|' "$conf"
+      ok "added the shell icon include to $conf"
+    else
+      warn "$conf has no </fontconfig>; the Fluent icons need its include line (see bin/font-set)"
+    fi
+  fi
+  local choice
+  choice=$(cat "$HOME/.local/state/aayork-quickshell/icon-font" 2>/dev/null || echo fluent)
+  if "$SHELL_DIR/bin/icons-set" "$choice" --no-restart; then
+    ok "shell icons: $choice (switch with bin/icons-set fluent|nerd)"
+  else
+    warn "bin/icons-set $choice failed"
+  fi
+}
+
+# Numix Square (it inherits from Numix, so both), plus the icons in
+# assets/app-icons for apps it has none for.
 setup_icons() {
   step "Icon theme: $REQUIRED_ICON_THEME"
-  if [[ -d $HOME/.local/share/icons/$REQUIRED_ICON_THEME || -d /usr/share/icons/$REQUIRED_ICON_THEME ]]; then
+  local icons="$HOME/.local/share/icons"
+  if [[ -d $icons/$REQUIRED_ICON_THEME || -d /usr/share/icons/$REQUIRED_ICON_THEME ]]; then
     ok "already installed"
-    return
+  else
+    local tmp
+    tmp=$(mktemp -d)
+    curl -fsSL "https://codeload.github.com/numixproject/numix-icon-theme/tar.gz/$V_NUMIX" \
+      | tar -xz -C "$tmp" --strip-components=1 --wildcards '*/Numix/*'
+    curl -fsSL "https://codeload.github.com/numixproject/numix-icon-theme-square/tar.gz/$V_NUMIX_SQUARE" \
+      | tar -xz -C "$tmp" --strip-components=1 --wildcards '*/Numix-Square/*'
+    mkdir -p "$icons"
+    rm -rf "$icons/Numix" "$icons/Numix-Square"
+    mv "$tmp/Numix" "$tmp/Numix-Square" "$icons/"
+    rm -rf "$tmp"
+    ok "installed Numix and Numix-Square to ~/.local/share/icons"
   fi
-  local tmp
-  tmp=$(mktemp -d)
-  git -c advice.detachedHead=false clone -q --depth 1 --branch "$V_COLLOID" \
-    https://github.com/vinceliuice/Colloid-icon-theme.git "$tmp/colloid"
-  mkdir -p "$HOME/.local/share/icons"
-  (cd "$tmp/colloid" && ./install.sh -d "$HOME/.local/share/icons" >/dev/null)
-  rm -rf "$tmp"
-  ok "installed to ~/.local/share/icons"
+
+  local theme=$icons/$REQUIRED_ICON_THEME size
+  if [[ -d $theme ]]; then
+    for size in 48 48@2x; do
+      [[ -d $theme/$size/apps ]] && cp "$SHELL_DIR"/assets/app-icons/*.svg "$theme/$size/apps/"
+    done
+    have gtk-update-icon-cache && gtk-update-icon-cache -q -f "$theme" 2>/dev/null
+    ok "added $(ls "$SHELL_DIR"/assets/app-icons/*.svg | wc -l) app icons it lacks"
+  fi
+
+  # The icon theme Settings shows as chosen; theme-set-gnome applies it on
+  # every theme change. Kept if one was picked already.
+  local choice="$HOME/.local/state/aayork-quickshell/icon-theme"
+  if [[ ! -s $choice ]]; then
+    mkdir -p "$(dirname "$choice")"
+    echo "$REQUIRED_ICON_THEME" >"$choice"
+  fi
 }
 
 setup_hyprland_config() {
@@ -143,7 +193,8 @@ setup_theme() {
   mkdir -p "$state"
   "$SHELL_DIR/bin/theme-set" "$THEME" >/dev/null 2>&1 || warn "theme-set $THEME reported a problem"
   [[ -e $state/current/theme/colors.toml ]] && ok "$THEME" || warn "No theme applied; pick one in Settings › Appearance."
-  gsettings set org.gnome.desktop.interface icon-theme "$REQUIRED_ICON_THEME" 2>/dev/null || true
+  gsettings set org.gnome.desktop.interface icon-theme \
+    "$(cat "$state/icon-theme" 2>/dev/null || echo "$REQUIRED_ICON_THEME")" 2>/dev/null || true
 }
 
 setup_services() {
