@@ -46,8 +46,12 @@ BarButton {
 
   TailscaleIcon {
     anchors.centerIn: parent
+    // 11 draws about as big as the font icons around it.
+    size: 11
     color: root.foreground
     off: !Tailscale.active
+    hovered: root.hovered
+    busy: Tailscale.busy || Tailscale.pending !== -1
   }
 
   // One machine: its kind in a tile with an online dot, name over address,
