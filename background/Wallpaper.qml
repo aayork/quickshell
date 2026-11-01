@@ -67,6 +67,8 @@ Scope {
 
         function sample() {
           if (!panel.primary || image.status !== Image.Ready || panel.width <= 0 || panel.height <= 0) return
+          // Already read for this wallpaper and screen: the cache has it.
+          if (colorCache.key === panel.cacheKey) return
           // The plain file URL: the canvas does not load one with a query on
           // it, and it is unloaded after every reading so nothing goes stale.
           loaded = "file://" + Background.path
@@ -129,6 +131,44 @@ Scope {
           var lightContrast = (probe.luminance(light.r, light.g, light.b) + 0.05) / (behind + 0.05)
           Theme.barForeground = darkContrast > lightContrast ? dark : light
           unloadImage(loaded)
+          colorCache.save()
+        }
+      }
+
+      // The last reading, saved so the bar has its colours the moment the
+      // shell starts instead of only its tint while the wallpaper decodes.
+      // Read again only when the wallpaper or the screen size changes.
+      readonly property string cacheKey: [source, width + "x" + height, Theme.barHeight,
+        Theme.background, Theme.brightForeground].join("|")
+      onCacheKeyChanged: probe.sample()
+
+      FileView {
+        id: colorCache
+        property string key: ""
+        path: Theme.stateDir + "/bar-colors.json"
+        blockLoading: true
+        printErrors: false
+        atomicWrites: true
+        onLoaded: {
+          if (!panel.primary) return
+          try {
+            var saved = JSON.parse(text())
+            if (!Array.isArray(saved.strip) || saved.strip.length === 0) return
+            Theme.wallpaperStrip = saved.strip.map(c => Qt.color(c))
+            Theme.wallpaperTop = Qt.color(saved.top)
+            Theme.barForeground = Qt.color(saved.foreground)
+            key = saved.key
+          } catch (e) {}
+        }
+
+        function save() {
+          key = panel.cacheKey
+          setText(JSON.stringify({
+            key: key,
+            top: String(Theme.wallpaperTop),
+            foreground: String(Theme.barForeground),
+            strip: Theme.wallpaperStrip.map(c => String(c))
+          }))
         }
       }
 
