@@ -557,6 +557,9 @@ BarButton {
       else if (k === Qt.Key_BracketRight && !shift) JotStore.go(1)
       else if (k === Qt.Key_BraceRight || (k === Qt.Key_BracketRight && shift)) JotStore.goFront(false)
       else if (k === Qt.Key_BraceLeft) JotStore.goOldest()
+      // As Antinote: Ctrl+1 jumps to the front, Ctrl+Shift+1 promotes.
+      else if (k === Qt.Key_Exclam || (k === Qt.Key_1 && shift)) JotStore.promote()
+      else if (k === Qt.Key_1) JotStore.goFront(false)
       else if (k === Qt.Key_N) {
         // Only this shortcut announces the new note.
         var before = JotStore.notes.length
@@ -696,6 +699,9 @@ BarButton {
       // pointer comes to the top edge (or a panel of theirs is open).
       readonly property bool chromeShown: (topHover.hovered && topHover.point.position.y < root.padTop + 6)
         || chromeHover.hovered || chromeDrag.pressed || root.picking || root.searching
+      // The bottom bar, likewise, at the bottom edge.
+      readonly property bool footShown: (topHover.hovered && topHover.point.position.y > height - root.padBottom - 6)
+        || footHover.hovered
       HoverHandler { id: topHover }
 
       Item {
@@ -1452,6 +1458,82 @@ BarButton {
             kind: root.pinned ? "pinned" : "pin"
             color: root.pinned ? root.pal.accent : root.pal.icon
             onClicked: root.pinned = !root.pinned
+          }
+        }
+      }
+
+      // Antinote's bottom bar: promote on the left, the note's date, then
+      // back, forward, jump to the front and export on the right.
+      Rectangle {
+        id: foot
+        objectName: "jotFoot"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: root.padBottom - 5
+        color: "transparent"
+        opacity: content.footShown && !root.searching ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+        HoverHandler { id: footHover }
+
+        Canvas {
+          anchors.fill: parent
+          readonly property var look: [width, height, root.pal.bg, content.width, content.height]
+          onLookChanged: requestPaint()
+          onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            ctx.translate(0, height - content.height)
+            Squircle.trace(ctx, content.width, content.height, popup.cornerRadius, popup.cornerSmoothing, 1)
+            ctx.clip()
+            ctx.fillStyle = root.pal.bg
+            ctx.fillRect(0, content.height - height, width, height)
+          }
+        }
+
+        // Eats clicks between the buttons so they don't land in the note.
+        MouseArea { anchors.fill: parent }
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: 10
+          anchors.rightMargin: 10
+          spacing: 6
+
+          JotIcon {
+            kind: "promote"
+            color: root.pal.icon
+            onClicked: JotStore.promote()
+          }
+          Text {
+            Layout.fillWidth: true
+            Layout.leftMargin: 4
+            text: JotStore.note ? Qt.formatDate(new Date(JotStore.note.created * 1000), "MMM d, yyyy") : ""
+            color: root.pal.dim
+            font.pixelSize: Theme.fontSmall
+            elide: Text.ElideRight
+          }
+          JotIcon {
+            kind: "back"
+            color: root.pal.icon
+            onClicked: JotStore.go(-1)
+          }
+          JotIcon {
+            kind: "forward"
+            color: root.pal.icon
+            onClicked: JotStore.go(1)
+          }
+          JotIcon {
+            kind: "front"
+            color: root.pal.icon
+            onClicked: JotStore.goFront(false)
+          }
+          JotIcon {
+            kind: "export"
+            color: root.pal.icon
+            onClicked: root.exportNote()
           }
         }
       }

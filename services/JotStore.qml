@@ -126,6 +126,17 @@ Singleton {
     open(id, quiet ? 0 : 1)
   }
 
+  // Antinote's Promote: this note moves to the front and becomes the newest.
+  function promote() {
+    var n = note
+    if (!n) return
+    if (index === notes.length - 1) { toast("Already the newest note"); return }
+    n.modified = Date.now() / 1000
+    notes = notes.filter(x => x !== n).concat([n])
+    save()
+    toast("Moved to the front")
+  }
+
   function goOldest() {
     if (notes.length === 0 || current === notes[0].id) return
     var id = notes[0].id
