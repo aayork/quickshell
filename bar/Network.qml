@@ -11,6 +11,7 @@ BarButton {
   readonly property alias popup: popup
 
   text: Net.icon
+  fontSize: Theme.iconSize + 2
   active: popup.open
   onClicked: popup.toggle()
 
