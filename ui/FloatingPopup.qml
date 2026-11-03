@@ -86,7 +86,12 @@ PanelWindow {
   readonly property real homeX: {
     var w = anchorWindow
     if (!w || !anchorItem) return margin
-    return w.contentItem.mapFromItem(anchorItem, anchorItem.width / 2, 0).x - card.width / 2
+    // Read x and width so this binding follows the bar's layout; mapFromItem
+    // alone is not tracked and would keep the position from the first run,
+    // when the button was still at x = 0.
+    var x = anchorItem.x
+    var half = anchorItem.width / 2
+    return w.contentItem.mapFromItem(anchorItem, half, 0).x - card.width / 2
   }
 
   // Offsets that keep the card on screen. Dragging code clamps with these
