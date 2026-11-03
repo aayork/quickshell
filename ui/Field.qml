@@ -8,8 +8,12 @@ Rectangle {
   property alias text: input.text
   property string placeholder: ""
   property bool password: false
+  // Also commit when the field loses focus, so clicking elsewhere or closing
+  // the window does not throw away what was typed.
+  property bool commitOnBlur: false
   signal accepted()
   signal cancelled()
+  property bool _cancelled: false
 
   function focusInput() {
     input.forceActiveFocus()
@@ -41,7 +45,12 @@ Rectangle {
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fontSize
     echoMode: root.password ? TextInput.Password : TextInput.Normal
-    onAccepted: root.accepted()
-    Keys.onEscapePressed: root.cancelled()
+    onAccepted: if (!root.commitOnBlur) root.accepted()
+    onEditingFinished: if (root.commitOnBlur && !root._cancelled) root.accepted()
+    Keys.onEscapePressed: {
+      root._cancelled = true
+      root.cancelled()
+      root._cancelled = false
+    }
   }
 }

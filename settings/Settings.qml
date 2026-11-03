@@ -77,6 +77,8 @@ Scope {
   }
 
   function hide() {
+    // Leaving a field by closing the window should keep what was typed.
+    if (open) keys.forceActiveFocus()
     open = false
   }
 
@@ -93,6 +95,16 @@ Scope {
     matchStyleCurrent.running = true
     videoCount.running = true
     Background.check()
+  }
+
+  // A path pasted from a terminal often arrives quoted or with the space
+  // escaped (`apple\ aerials`); the screensaver wants the real path.
+  function cleanFolder(value) {
+    var path = String(value).trim()
+    if (path.length >= 2 && (path[0] === "\"" && path[path.length - 1] === "\""
+        || path[0] === "'" && path[path.length - 1] === "'"))
+      path = path.slice(1, -1)
+    return path.replace(/\\ /g, " ").trim()
   }
 
   function pretty(name) {
@@ -1075,7 +1087,14 @@ Scope {
                 Field {
                   Layout.preferredWidth: 260
                   text: Config.screensaver.folder
-                  onAccepted: if (text.trim() !== "") Config.screensaver.folder = text.trim()
+                  commitOnBlur: true
+                  onAccepted: {
+                    var folder = root.cleanFolder(text)
+                    if (folder !== "") {
+                      Config.screensaver.folder = folder
+                      text = folder
+                    }
+                  }
                   onCancelled: text = Config.screensaver.folder
                 }
               }
