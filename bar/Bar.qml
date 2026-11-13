@@ -76,7 +76,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -192,7 +192,7 @@ Scope {
           height: parent.height
           width: layout.width
 
-          readonly property var defaultOrder: ["jot", "tray", "bose", "things", "tailscale", "network", "control-center", "clock"]
+          readonly property var defaultOrder: ["jot", "tray", "bose", "things", "tailscale", "temps", "network", "control-center", "clock"]
           // The saved order, cleaned up: unknown names dropped, new ones put
           // back where the default has them.
           function savedOrder() {
@@ -214,7 +214,7 @@ Scope {
           property var order: savedOrder()
 
           function widget(name) {
-            return { "jot": jot, "tray": tray, "bose": bose, "things": things, "tailscale": tailscale,
+            return { "jot": jot, "tray": tray, "bose": bose, "things": things, "tailscale": tailscale, "temps": temps,
                      "network": network, "control-center": controlCenter, "clock": clock }[name]
           }
 
@@ -300,6 +300,12 @@ Scope {
             id: tailscale; x: row.slotX("tailscale"); z: moving ? 1 : 0
             foreground: bar.foregroundOver(row.x + tailscale.x, tailscale.width)
             movable: true; onMoveStarted: row.beginMove("tailscale"); onMoved: dx => row.move("tailscale", dx); onMoveEnded: row.endMove("tailscale")
+            BarSlide on x {}
+          }
+          Temps {
+            id: temps; x: row.slotX("temps"); z: moving ? 1 : 0
+            foreground: bar.foregroundOver(row.x + temps.x, temps.width)
+            movable: true; onMoveStarted: row.beginMove("temps"); onMoved: dx => row.move("temps", dx); onMoveEnded: row.endMove("temps")
             BarSlide on x {}
           }
           Network {

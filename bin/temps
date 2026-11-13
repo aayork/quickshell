@@ -1,0 +1,9 @@
+#!/bin/sh
+# Every hwmon temperature sensor, one per line, for services/Temps.qml:
+#
+#   <chip name> TAB <label, may be empty> TAB <millidegrees C>
+for input in /sys/class/hwmon/hwmon*/temp*_input; do
+  value=$(cat "$input" 2>/dev/null) || continue
+  label=$(cat "${input%_input}_label" 2>/dev/null)
+  printf '%s\t%s\t%s\n' "$(cat "${input%/*}/name")" "$label" "$value"
+done
