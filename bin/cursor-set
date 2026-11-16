@@ -11,17 +11,18 @@
 #   - GTK3 on Wayland, and the settings portal Flatpaks/Electron read: gsettings.
 #   - GTK apps without gsettings: gtk-3.0/gtk-4.0 settings.ini.
 #   - Xwayland GTK apps, live: xsettingsd's Gtk/CursorThemeSize (SIGHUP).
-#   - Other Xwayland apps (Qt xcb, Steam, Wine) go through libXcursor, which
-#     reads XCURSOR_SIZE first and the Xcursor.size resource only when that is
-#     unset, so both are written. Hyprland upscales Xwayland cursors by the
-#     monitor scale even with force_zero_scaling, so X apps take the same
-#     logical size as everything else, not size * scale. X windows with no
-#     cursor of their own show the root window's, which is reset here too.
-#     That logical size still snaps to the theme's nearest bitmap, where
+#   - Other Xwayland apps (Qt xcb, Steam, Wine) go through libXcursor. With
+#     xscale, X11 apps render at the X11 scale (2 here) and Xwayland divides
+#     the cursor back down, so the Xcursor.size resource (and the generated
+#     bitmap below) is size * x11 scale, while the XCURSOR_SIZE environment
+#     variable stays at the logical size: toolkits such as Qt multiply it by
+#     the scale themselves, so an X11-sized XCURSOR_SIZE would double them.
+#     X windows with no cursor of their own show the root window's, which is
+#     reset here too. That X11 size still snaps to the theme's nearest bitmap, where
 #     Hyprland scales its own cursor to the exact size, so a size between
-#     bitmaps (18 with a 24px smallest bitmap) left X apps visibly bigger.
-#     A copy of the theme with a bitmap at exactly this size goes in
-#     ~/.local/share/icons, which shadows the installed one.
+#     bitmaps left X apps visibly bigger. A copy of the theme with a bitmap at
+#     exactly the X11 size goes in ~/.local/share/icons, which shadows the
+#     installed one.
 #   - XCURSOR_* for apps started from now on: Hyprland's env (keybinds),
 #     the systemd/D-Bus activation env, and session.env, which the shell
 #     sources before every launch (Util.execDetached). Apps already running
@@ -47,6 +48,29 @@ usage() {
   exit 1
 }
 
+# The scale X11 clients render at in this session: xscale's xwayland:scale as
+# Hyprland resolves it (-1 the highest monitor scale rounded up, -2 as it is),
+# or, on a Hyprland without it, the highest monitor scale under
+# force_zero_scaling and 1 otherwise.
+x11_scale() {
+  local highest option fzs
+  highest=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] + [1] | max' 2>/dev/null)
+  highest=${highest:-1}
+  option=$(hyprctl getoption xwayland:scale -j 2>/dev/null | jq -r '.float // empty' 2>/dev/null || true)
+  if [[ -n $option ]]; then
+    awk -v s="$option" -v h="$highest" 'BEGIN {
+      if (s == 0) { print 0; exit }
+      if (s < -1.5) { v = h } else if (s < 0) { v = int(h - 0.001); if (v < h - 0.001) v += 1 } else { v = s }
+      v = int(v * 120 + 0.5) / 120
+      if (v < 1) v = 1
+      print v
+    }'
+    return
+  fi
+  fzs=$(hyprctl getoption xwayland:force_zero_scaling -j 2>/dev/null | jq -r 'if .bool == true or .int == 1 then 1 else 0 end')
+  if [[ $fzs == 1 ]]; then echo "$highest"; else echo 1; fi
+}
+
 # --sizes prints the sizes worth offering for a theme, one per line. XCursor
 # themes ship a few fixed bitmaps (often 24/36/48/...), and every requested
 # size snaps to the nearest one, so most sizes look identical to their
@@ -56,10 +80,13 @@ usage() {
 if [[ $1 == --sizes ]]; then
   (( $# == 2 )) || usage
   scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
-  THEME=$2 SCALE=${scale:-1} python3 - <<'EOF'
+  x11=$(x11_scale)
+  [[ $x11 == 0 ]] && x11=1
+  THEME=$2 SCALE=${scale:-1} X11_SCALE=${x11:-1} python3 - <<'EOF'
 import math, os, struct
 
-theme, scale = os.environ["THEME"], float(os.environ["SCALE"] or 1)
+theme = os.environ["THEME"]
+scale, x11_scale = float(os.environ["SCALE"] or 1), float(os.environ["X11_SCALE"] or 1)
 home = os.path.expanduser("~")
 dirs = [home + "/.local/share/icons", home + "/.icons", "/usr/share/icons"]
 
@@ -105,15 +132,17 @@ def nearest(target):
 def looks(size):
     # The bitmap each kind of client ends up with: Hyprland's own cursor
     # (size * scale), clients that draw at an integer buffer scale and let
-    # Hyprland downscale (GTK3 and friends, size * ceil(scale)), and Xwayland.
-    x = size if exact_x and size <= bitmaps[-1] else nearest(size)
+    # Hyprland downscale (GTK3 and friends, size * ceil(scale)), and Xwayland
+    # (size * the X11 scale, or the generated exact bitmap).
+    x_target = round(size * x11_scale)
+    x = x_target if exact_x and x_target <= bitmaps[-1] else nearest(x_target)
     return (nearest(size * scale), nearest(size * buffer_scale), x)
 
-# Candidates are the sizes that land exactly on a bitmap for Hyprland or for
-# the integer-scale clients. Sizes that look the same everywhere collapse into
-# one step, keeping the one Hyprland draws 1:1.
+# Candidates are the sizes that land exactly on a bitmap for Hyprland, for
+# the integer-scale clients, or for Xwayland. Sizes that look the same
+# everywhere collapse into one step, keeping the one Hyprland draws 1:1.
 crisp = {round(b / scale) for b in bitmaps}
-candidates = crisp | {round(b / buffer_scale) for b in bitmaps}
+candidates = crisp | {round(b / buffer_scale) for b in bitmaps} | {round(b / x11_scale) for b in bitmaps}
 steps = {}
 for size in sorted(s for s in candidates if 12 <= s <= 64):
     key = looks(size)
@@ -131,6 +160,11 @@ theme=$1 size=$2
 [[ $size =~ ^[0-9]+$ ]] || usage
 (( size < 12 )) && size=12
 (( size > 96 )) && size=96
+
+x11_scale=$(x11_scale)
+[[ $x11_scale == 0 ]] && x11_scale=1
+x11_scale=${x11_scale:-1}
+x11_size=$(awk -v s="$size" -v x="$x11_scale" 'BEGIN { printf "%d", s * x + 0.5 }')
 
 # Replace a `key<sep>value` line in a file, or append it when missing.
 set_line() {
@@ -171,13 +205,14 @@ for gtk in gtk-3.0 gtk-4.0; do
 done
 
 # Xwayland clients draw the theme's nearest bitmap at its own size, so give
-# them one at exactly this size: a copy of the theme in ~/.local/share/icons
-# (first in every client's search path, Steam's runtime included) with each
-# cursor's largest bitmap scaled down to it. Wayland clients ask for
-# size * scale and keep landing on the bitmaps they did before. Done before
-# the X settings below, which make running GTK apps reload their cursors.
+# them one at exactly the X11 size: a copy of the theme in
+# ~/.local/share/icons (first in every client's search path, Steam's runtime
+# included) with each cursor's largest bitmap scaled down to it. Wayland
+# clients ask for size * scale and keep landing on the bitmaps they did
+# before. Done before the X settings below, which make running GTK apps reload
+# their cursors.
 if command -v python3 >/dev/null; then
-  THEME=$theme SIZE=$size python3 - <<'EOF' 2>/dev/null
+  THEME=$theme SIZE=$x11_size python3 - <<'EOF' 2>/dev/null
 import os, shutil, struct
 
 theme, size = os.environ["THEME"], int(os.environ["SIZE"])
@@ -300,7 +335,7 @@ set_line "$XSETTINGS_FILE" Gtk/CursorThemeSize ' ' "$size"
 pkill -HUP -x xsettingsd 2>/dev/null
 
 set_line "$XRESOURCES_FILE" Xcursor.theme ': ' "$theme"
-set_line "$XRESOURCES_FILE" Xcursor.size ': ' "$size"
+set_line "$XRESOURCES_FILE" Xcursor.size ': ' "$x11_size"
 command -v xrdb >/dev/null && xrdb -merge "$XRESOURCES_FILE" 2>/dev/null
 
 # Xwayland windows that never set a cursor of their own show the root
@@ -308,7 +343,7 @@ command -v xrdb >/dev/null && xrdb -merge "$XRESOURCES_FILE" 2>/dev/null
 # resizes on setcursor. Redefine it (what `xsetroot -cursor_name left_ptr`
 # does, without needing xorg-xsetroot).
 if [[ -n $DISPLAY ]] && command -v python3 >/dev/null; then
-  XCURSOR_THEME=$theme XCURSOR_SIZE=$size python3 - <<'EOF' 2>/dev/null
+  XCURSOR_THEME=$theme XCURSOR_SIZE=$x11_size python3 - <<'EOF' 2>/dev/null
 import ctypes
 x11 = ctypes.CDLL("libX11.so.6")
 xcursor = ctypes.CDLL("libXcursor.so.1")
