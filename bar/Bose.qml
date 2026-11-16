@@ -15,7 +15,6 @@ BarButton {
 
   visible: Bose.connected
   onVisibleChanged: if (!visible) popup.close()
-  minimumWidth: 34
   active: popup.open
   onClicked: popup.toggle()
 
