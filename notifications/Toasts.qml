@@ -50,8 +50,10 @@ PanelWindow {
           readonly property var modelData: slot.modelData
 
           readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
-          // Seconds on screen. Critical ones stay until dealt with.
-          readonly property real lifetime: critical ? 0 : modelData.expireTimeout > 0 ? modelData.expireTimeout : 6
+          // Seconds on screen. expireTimeout comes straight off D-Bus in
+          // milliseconds. An app's own timeout wins; otherwise critical ones
+          // stay until dealt with and the rest get 6 s.
+          readonly property real lifetime: modelData.expireTimeout > 0 ? modelData.expireTimeout / 1000 : critical ? 0 : 6
           readonly property string icon: Notifs.iconFor(modelData)
           readonly property var defaultAction: modelData.actions.find(a => a.identifier === "default") ?? null
           // How far a swipe has to go before letting go throws the card away.
@@ -80,6 +82,9 @@ PanelWindow {
             else x = 0
           }
 
+          // Slides the card off the side, then closes it: dismissed when
+          // thrown away by hand, expired when its time runs out.
+          property bool expiring: false
           function throwAway(direction) {
             if (leaving) return
             leaving = true
@@ -87,16 +92,21 @@ PanelWindow {
             gone.start()
           }
 
+          function slideOut() {
+            expiring = true
+            throwAway(1)
+          }
+
           Timer {
             id: gone
             interval: 180
-            onTriggered: card.modelData.dismiss()
+            onTriggered: card.expiring ? card.modelData.expire() : card.modelData.dismiss()
           }
 
           Timer {
             interval: card.lifetime * 1000
             running: card.lifetime > 0 && !hover.hovered && !card.swiping && !card.leaving
-            onTriggered: card.modelData.expire()
+            onTriggered: card.slideOut()
           }
 
           // Two-finger touchpad swipes come in as horizontal scrolling; the
