@@ -51,7 +51,7 @@ Scope {
   property var cursors: []
   property string cursor: ""
   property int cursorSize: 24
-  // Sizes this cursor theme has crisp bitmaps for.
+  // Sizes this cursor theme has bitmaps for at the display scale.
   property var cursorSizes: []
   property var iconThemes: []
   property string iconTheme: ""
@@ -801,7 +801,7 @@ Scope {
               Setting {
                 glyph: 0xF0A68
                 label: "Cursor size"
-                note: "One notch for each size this cursor is drawn at"
+                note: "Only the sizes this cursor comes in at your display scale"
                 Label {
                   text: root.cursorSize + " px"
                   color: Theme.dim
