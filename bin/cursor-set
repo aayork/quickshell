@@ -18,8 +18,9 @@
 #     logical size: toolkits such as Qt multiply it by the scale themselves,
 #     so an X11-sized XCURSOR_SIZE would double them.
 #     X windows with no cursor of their own show the root window's, which is
-#     reset here too. Sizes are limited to the ones the theme has bitmaps
-#     for (see cursor_sizes), so Hyprland and X apps show the same bitmap.
+#     reset here too. Sizes between the theme's bitmaps get a generated
+#     bitmap at exactly that size (see below), so Hyprland and X apps show
+#     the same one.
 #   - XCURSOR_* for apps started from now on: Hyprland's env (keybinds),
 #     the systemd/D-Bus activation env, and session.env, which the shell
 #     sources before every launch (Util.execDetached). Apps already running
@@ -68,13 +69,13 @@ x11_scale() {
   if [[ $fzs == 1 ]]; then echo "$highest"; else echo 1; fi
 }
 
-# --sizes prints the sizes a theme comes in, one per line. XCursor themes
-# ship a few fixed bitmaps (often 24/36/48/...); a size between them snaps
-# to a neighbour, and each kind of client rounds and snaps (or rescales) its
-# own way, so the cursor changed size from app to app. The sizes offered are
-# the ones where size * the display scale is (within a pixel) one of the
-# bitmaps: the compositor and Xwayland then draw that bitmap and agree with
-# each other. A size given to cursor-set is snapped to the nearest of these.
+# --sizes prints the sizes worth offering for a theme, one per line. XCursor
+# themes ship a few fixed bitmaps (often 24/36/48/...); a size between them
+# snaps to a neighbour, and each kind of client rounds and snaps (or
+# rescales) its own way, so the cursor changed size from app to app. Sizes
+# offered either land (within a pixel) on a bitmap, or get one generated at
+# exactly size * scale, so the compositor and Xwayland agree. A size given
+# to cursor-set is snapped to the nearest of these.
 cursor_sizes() {
   local scale
   scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
@@ -125,6 +126,11 @@ for b in found:
     if size > 0 and abs(size * scale - b) <= max(1, b * 0.04):
         sizes.add(size)
 sizes = sizes or {round(b / scale) for b in found}
+# cursor-set fills the gaps with generated bitmaps (see below), so every whole
+# size from the smallest bitmap to the largest works, unless the theme sits
+# in ~/.local/share/icons itself, where the generated copy would have to go.
+if found and d != dirs[0]:
+    sizes = set(range(min(sizes), min(max(sizes), 64) + 1))
 print("\n".join(str(s) for s in sorted(s for s in sizes if 8 <= s <= 128)))
 EOF
 }
@@ -152,6 +158,147 @@ x11_scale=$(x11_scale)
 [[ $x11_scale == 0 ]] && x11_scale=1
 x11_scale=${x11_scale:-1}
 x11_size=$(awk -v s="$size" -v x="$x11_scale" 'BEGIN { printf "%d", s * x + 0.5 }')
+# The size the compositor draws its own cursor at.
+pixel_scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
+pixel_size=$(awk -v s="$size" -v x="${pixel_scale:-1}" 'BEGIN { printf "%d", s * x + 0.5 }')
+
+# Sizes between the theme's bitmaps: a copy of the theme goes in
+# ~/.local/share/icons (first in every cursor loader's search path, the
+# compositor's and Steam's runtime included, so it shadows the installed
+# one) with a bitmap scaled down to exactly size * scale. The compositor and
+# X apps then all find that exact bitmap instead of snapping to different
+# neighbours. Done before anything below tells a client about the new size.
+if command -v python3 >/dev/null; then
+  THEME=$theme SIZES="$pixel_size $x11_size" python3 - <<'EOF' 2>/dev/null
+import os, shutil, struct
+
+theme = os.environ["THEME"]
+sizes = sorted({int(n) for n in os.environ["SIZES"].split()})
+key = " ".join(map(str, sizes))
+home = os.path.expanduser("~")
+dirs = [home + "/.local/share/icons", home + "/.icons", "/usr/share/icons"]
+MARK = ".generated-xcursor"
+IMAGE = 0xFFFD0002
+copy = os.path.join(dirs[0], theme)
+
+def chunks(data):
+    # (type, subtype, raw bytes) per chunk; None for anything unexpected.
+    if data[:4] != b"Xcur":
+        return None
+    out = []
+    for i in range(struct.unpack_from("<I", data, 12)[0]):
+        kind, subtype, pos = struct.unpack_from("<III", data, 16 + 12 * i)
+        if kind != IMAGE:
+            return None
+        width, height = struct.unpack_from("<II", data, pos + 16)
+        out.append((kind, subtype, data[pos:pos + 36 + width * height * 4]))
+    return out
+
+def taps(src, dst):
+    # Per output pixel, the source pixels it covers and how much of each.
+    out = []
+    for i in range(dst):
+        lo, hi = i * src / dst, (i + 1) * src / dst
+        cover = [(j, min(hi, j + 1) - max(lo, j)) for j in range(int(lo), min(src, int(hi) + 1))]
+        total = sum(k for _, k in cover)
+        out.append([(j, k / total) for j, k in cover if k > 0])
+    return out
+
+def scaled(raw, nominal, size):
+    # Area-average one image chunk down to `size`. Pixels are premultiplied
+    # ARGB, so the channels average independently.
+    width, height, xhot, yhot, delay = struct.unpack_from("<5I", raw, 16)
+    nw = max(1, round(width * size / nominal))
+    nh = max(1, round(height * size / nominal))
+    pixels, tx, ty = raw[36:], taps(width, nw), taps(height, nh)
+    rows = []
+    for y in range(height):
+        row = pixels[y * width * 4:(y + 1) * width * 4]
+        rows.append([sum(row[j * 4 + c] * k for j, k in t) for t in tx for c in range(4)])
+    body = bytes(min(255, int(sum(rows[j][x] * k for j, k in t) + 0.5))
+                 for t in ty for x in range(nw * 4))
+    hot = (min(nw - 1, round(xhot * size / nominal)), min(nh - 1, round(yhot * size / nominal)))
+    return struct.pack("<9I", 36, IMAGE, size, 1, nw, nh, *hot, delay) + body
+
+def with_sizes(data):
+    parts = chunks(data)
+    if not parts:
+        return data
+    have = {subtype for _, subtype, _ in parts}
+    added = []
+    for size in sizes:
+        bigger = [n for n in have if n > size]
+        if size in have or not bigger:
+            continue
+        # From the nearest larger bitmap: the least detail thrown away.
+        nominal = min(bigger)
+        added += [(IMAGE, size, scaled(raw, nominal, size)) for _, subtype, raw in parts if subtype == nominal]
+    if not added:
+        return data
+    parts += added
+    out = struct.pack("<4sIII", b"Xcur", 16, 0x10000, len(parts))
+    pos = 16 + 12 * len(parts)
+    for kind, subtype, raw in parts:
+        out += struct.pack("<III", kind, subtype, pos)
+        pos += len(raw)
+    return out + b"".join(raw for _, _, raw in parts)
+
+def marked(path):
+    try:
+        with open(os.path.join(path, MARK)) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+if marked(copy) == key:
+    raise SystemExit
+
+# Copies for an earlier theme or size.
+if os.path.isdir(dirs[0]):
+    for name in os.listdir(dirs[0]):
+        if marked(os.path.join(dirs[0], name)) is not None:
+            shutil.rmtree(os.path.join(dirs[0], name))
+
+source = next((os.path.join(d, theme) for d in dirs
+               if os.path.isdir(os.path.join(d, theme, "cursors"))), None)
+# A theme installed in ~/.local/share/icons itself can't be shadowed.
+if not source or source == copy:
+    raise SystemExit
+
+bitmaps = set()
+for name in ("left_ptr", "default", "arrow"):
+    try:
+        with open(os.path.join(source, "cursors", name), "rb") as f:
+            bitmaps = {subtype for _, subtype, _ in chunks(f.read()) or []}
+    except OSError:
+        continue
+    if bitmaps:
+        break
+# Nothing to add when every size is a bitmap, or there is no larger one to
+# scale down from.
+if not bitmaps or all(n in bitmaps or n > max(bitmaps) for n in sizes):
+    raise SystemExit
+
+tmp = copy + ".new"
+shutil.rmtree(tmp, ignore_errors=True)
+os.makedirs(os.path.join(tmp, "cursors"))
+for name in os.listdir(os.path.join(source, "cursors")):
+    src, dst = os.path.join(source, "cursors", name), os.path.join(tmp, "cursors", name)
+    if os.path.islink(src):
+        os.symlink(os.readlink(src), dst)
+    elif os.path.isfile(src):
+        with open(src, "rb") as f:
+            data = f.read()
+        with open(dst, "wb") as f:
+            f.write(with_sizes(data))
+for name in ("index.theme", "cursor.theme"):
+    if os.path.isfile(os.path.join(source, name)):
+        shutil.copy(os.path.join(source, name), tmp)
+with open(os.path.join(tmp, MARK), "w") as f:
+    f.write(key)
+os.rename(tmp, copy)
+EOF
+fi
 
 # Replace a `key<sep>value` line in a file, or append it when missing.
 set_line() {
@@ -189,13 +336,6 @@ for gtk in gtk-3.0 gtk-4.0; do
   [[ -f $ini ]] || printf '[Settings]\n' >"$ini"
   set_line "$ini" gtk-cursor-theme-name = "$theme"
   set_line "$ini" gtk-cursor-theme-size = "$size"
-done
-
-# Older versions of this script put a copy of the theme with a generated
-# bitmap at the exact X11 size in ~/.local/share/icons; it would shadow the
-# real theme now that sizes are snapped to real bitmaps.
-for dir in "$HOME/.local/share/icons"/*/; do
-  [[ -f $dir.generated-xcursor ]] && rm -rf -- "$dir"
 done
 
 set_line "$XSETTINGS_FILE" Gtk/CursorThemeName ' ' "\"$theme\""
