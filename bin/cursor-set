@@ -79,7 +79,7 @@ x11_scale() {
 cursor_sizes() {
   local scale
   scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
-  THEME=$1 SCALE=${scale:-1} python3 - <<'EOF'
+  THEME=$1 SCALE=${scale:-1} HYPRLAND=1 python3 - <<'EOF'
 import os, struct
 
 theme, scale = os.environ["THEME"], float(os.environ["SCALE"] or 1)
@@ -126,11 +126,14 @@ for b in found:
     if size > 0 and abs(size * scale - b) <= max(1, b * 0.04):
         sizes.add(size)
 sizes = sizes or {round(b / scale) for b in found}
-# cursor-set fills the gaps with generated bitmaps (see below), so every whole
-# size from the smallest bitmap to the largest works, unless the theme sits
-# in ~/.local/share/icons itself, where the generated copy would have to go.
-if found and d != dirs[0]:
-    sizes = set(range(min(sizes), min(max(sizes), 64) + 1))
+# Only the theme's own sizes: generated in-between bitmaps (scaled down from
+# a bigger one) look no different from a neighbour at some sizes and soft at
+# others. Hyprland also draws its own cursor from a size * ceil(scale) bitmap,
+# which cursor-set makes by scaling down; a size whose one would be bigger
+# than the theme's largest can't match the X apps' cursor, so it's left out.
+if found and os.environ.get("HYPRLAND") == "1":
+    ceil = -(-scale // 1)
+    sizes = {s for s in sizes if s * ceil <= max(found)} or sizes
 print("\n".join(str(s) for s in sorted(s for s in sizes if 8 <= s <= 128)))
 EOF
 }
@@ -148,6 +151,18 @@ theme=$1 size=$2
 [[ $size =~ ^[0-9]+$ ]] || usage
 (( size < 12 )) && size=12
 (( size > 96 )) && size=96
+
+# Settings calls this on every notch while the size slider is dragged, and a
+# run takes a couple of seconds (the theme copy below). Runs go one at a
+# time, and one that waited while a newer request came in steps aside for
+# it, so only the latest size is applied and runs never trip over each
+# other's theme copy.
+mkdir -p "$STATE_DIR"
+request="$theme $size $$"
+printf '%s\n' "$request" >"$STATE_DIR/cursor-set.request"
+exec {lock}>"$STATE_DIR/cursor-set.lock"
+flock "$lock"
+[[ $(cat "$STATE_DIR/cursor-set.request" 2>/dev/null) == "$request" ]] || exit 0
 
 # Only sizes the theme comes in (see cursor_sizes).
 size=$(cursor_sizes "$theme" | awk -v s="$size" '
@@ -266,14 +281,18 @@ def marked(path):
 if marked(copy) == key:
     raise SystemExit
 
-# Copies for an earlier theme or size.
+# Copies for an earlier theme. One for this theme stays in place until the
+# new one is ready (swapped in at the end), so cursors never fall back to the
+# installed theme's sizes while it is built.
 if os.path.isdir(dirs[0]):
     for name in os.listdir(dirs[0]):
-        if marked(os.path.join(dirs[0], name)) is not None:
-            shutil.rmtree(os.path.join(dirs[0], name))
+        path = os.path.join(dirs[0], name)
+        if path != copy and (marked(path) is not None or name.endswith((".new", ".old"))):
+            shutil.rmtree(path, ignore_errors=True)
 
 source = next((os.path.join(d, theme) for d in dirs
-               if os.path.isdir(os.path.join(d, theme, "cursors"))), None)
+               if os.path.isdir(os.path.join(d, theme, "cursors"))
+               and marked(os.path.join(d, theme)) is None), None)
 # A theme installed in ~/.local/share/icons itself can't be shadowed.
 if not source or source == copy:
     raise SystemExit
@@ -309,9 +328,21 @@ for name in ("index.theme", "cursor.theme"):
         shutil.copy(os.path.join(source, name), tmp)
 with open(os.path.join(tmp, MARK), "w") as f:
     f.write(key)
+# Swap: the old copy (if any) moves aside, the new one takes its place.
+old = copy + ".old"
+shutil.rmtree(old, ignore_errors=True)
+if marked(copy) is not None:
+    os.rename(copy, old)
 os.rename(tmp, copy)
+shutil.rmtree(old, ignore_errors=True)
 EOF
 fi
+
+# The fallback theme for cursor names the chosen theme lacks: libXcursor and
+# Chromium (Steam) look in "default", so point it at the chosen theme rather
+# than whatever was picked before.
+mkdir -p "$HOME/.icons/default"
+printf '[Icon Theme]\nInherits=%s\n' "$theme" >"$HOME/.icons/default/index.theme"
 
 # Replace a `key<sep>value` line in a file, or append it when missing.
 set_line() {
@@ -351,9 +382,23 @@ for gtk in gtk-3.0 gtk-4.0; do
   set_line "$ini" gtk-cursor-theme-size = "$size"
 done
 
-set_line "$XSETTINGS_FILE" Gtk/CursorThemeName ' ' "\"$theme\""
-set_line "$XSETTINGS_FILE" Gtk/CursorThemeSize ' ' "$size"
+# Every xsettingsd config in play: ours, plus whatever the running xsettingsd
+# was started with (xscale settings starts one on ~/.config/xscale/...).
+xsettings_files=("$XSETTINGS_FILE")
+for pid in $(pgrep -x xsettingsd); do
+  conf=$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | awk 'prev == "-c" { print; exit } { prev = $0 }')
+  [[ -n $conf && -f $conf && $conf != "$XSETTINGS_FILE" ]] && xsettings_files+=("$conf")
+done
+for file in "${xsettings_files[@]}"; do
+  set_line "$file" Gtk/CursorThemeName ' ' "\"$theme\""
+  set_line "$file" Gtk/CursorThemeSize ' ' "$size"
+done
 pkill -HUP -x xsettingsd 2>/dev/null
+# xscale's own Xresources, merged again whenever `xscale settings` runs.
+if [[ -f $HOME/.config/xscale/Xresources ]]; then
+  set_line "$HOME/.config/xscale/Xresources" Xcursor.theme ': ' "$theme"
+  set_line "$HOME/.config/xscale/Xresources" Xcursor.size ': ' "$x11_size"
+fi
 
 set_line "$XRESOURCES_FILE" Xcursor.theme ': ' "$theme"
 set_line "$XRESOURCES_FILE" Xcursor.size ': ' "$x11_size"
