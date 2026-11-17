@@ -218,6 +218,9 @@ Scope {
     onResultChanged: {
       root.cursor = result[0] || ""
       root.cursorSize = parseInt(result[1], 10) || 24
+      // The sizes depend on the display scale and on cursor-set, not only
+      // the theme, so look them up again on every open.
+      root.loadCursorSizes()
     }
   }
   Lines {
@@ -258,7 +261,8 @@ Scope {
 
   // The command is set here, not bound: a binding on `cursor` is not
   // guaranteed to have caught up when this handler runs.
-  onCursorChanged: {
+  onCursorChanged: loadCursorSizes()
+  function loadCursorSizes() {
     if (cursor === "") return
     cursorSizeList.running = false
     cursorSizeList.command = [root.bin + "cursor-set", "--sizes", cursor]
