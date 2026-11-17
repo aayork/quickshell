@@ -823,7 +823,7 @@ Scope {
               Setting {
                 glyph: 0xF003B
                 label: "Icons"
-                note: "For apps that follow the system icon theme"
+                note: "Used by most apps"
                 Picker {
                   Layout.preferredWidth: 300
                   options: root.iconThemes
