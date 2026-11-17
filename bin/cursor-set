@@ -172,14 +172,20 @@ pixel_size="$pixel_size $(awk -v s="$size" -v x="${pixel_scale:-1}" 'BEGIN { c =
 # compositor's and Steam's runtime included, so it shadows the installed
 # one) with a bitmap scaled down to exactly size * scale. The compositor and
 # X apps then all find that exact bitmap instead of snapping to different
-# neighbours. Done before anything below tells a client about the new size.
+# neighbours. The copy holds ONLY the sizes in use: X apps read the logical
+# XCURSOR_SIZE and some (Chromium's Steam and Spotify) take a bitmap at
+# exactly that size when the theme has one (24, 36, 48... in most themes),
+# which the compositor then stretches by the scale into a blurry cursor.
+# With only size * scale and the compositor's sizes left, every X app ends
+# up on a sharp one. Done before anything below tells a client about the
+# new size.
 if command -v python3 >/dev/null; then
   THEME=$theme SIZES="$pixel_size $x11_size" python3 - <<'EOF' 2>/dev/null
 import os, shutil, struct
 
 theme = os.environ["THEME"]
 sizes = sorted({int(n) for n in os.environ["SIZES"].split()})
-key = " ".join(map(str, sizes))
+key = "only " + " ".join(map(str, sizes))
 home = os.path.expanduser("~")
 dirs = [home + "/.local/share/icons", home + "/.icons", "/usr/share/icons"]
 MARK = ".generated-xcursor"
@@ -238,9 +244,11 @@ def with_sizes(data):
         # From the nearest larger bitmap: the least detail thrown away.
         nominal = min(bigger)
         added += [(IMAGE, size, scaled(raw, nominal, size)) for _, subtype, raw in parts if subtype == nominal]
-    if not added:
+    # Keep only the sizes in use (see above), unless none of them exist.
+    kept = [p for p in parts + added if p[1] in sizes]
+    if not kept:
         return data
-    parts += added
+    parts = sorted(kept, key=lambda p: p[1])
     out = struct.pack("<4sIII", b"Xcur", 16, 0x10000, len(parts))
     pos = 16 + 12 * len(parts)
     for kind, subtype, raw in parts:
@@ -279,9 +287,9 @@ for name in ("left_ptr", "default", "arrow"):
         continue
     if bitmaps:
         break
-# Nothing to add when every size is a bitmap, or there is no larger one to
-# scale down from.
-if not bitmaps or all(n in bitmaps or n > max(bitmaps) for n in sizes):
+# Nothing to change when the theme already has exactly the sizes in use
+# (sizes above its largest bitmap can't be made).
+if not bitmaps or bitmaps == {n for n in sizes if n <= max(bitmaps)}:
     raise SystemExit
 
 tmp = copy + ".new"
