@@ -805,7 +805,7 @@ Scope {
               Setting {
                 glyph: 0xF0A68
                 label: "Cursor size"
-                note: "Only the sizes this cursor comes in at your display scale"
+                note: "Matches X11 apps too"
                 Label {
                   text: root.cursorSize + " px"
                   color: Theme.dim
@@ -814,6 +814,7 @@ Scope {
                 NotchSlider {
                   Layout.preferredWidth: 260
                   stops: root.cursorSizes
+                  notchEvery: 5
                   value: root.nearestCursorSize(root.cursorSize)
                   onMoved: function(value) { root.applyCursor(root.cursor, value) }
                 }

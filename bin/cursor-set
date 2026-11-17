@@ -161,6 +161,11 @@ x11_size=$(awk -v s="$size" -v x="$x11_scale" 'BEGIN { printf "%d", s * x + 0.5 
 # The size the compositor draws its own cursor at.
 pixel_scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
 pixel_size=$(awk -v s="$size" -v x="${pixel_scale:-1}" 'BEGIN { printf "%d", s * x + 0.5 }')
+# Hyprland loads XCursor themes at size * ceil(scale) and draws that bitmap at
+# 1 / ceil(scale), so at 1.6 it wants a size*2 bitmap (shown at size*1.6),
+# not size*1.6: without an exact one it snaps to a neighbour and its cursor
+# no longer matches the X apps' (Xcursor.size = size * x11 scale).
+pixel_size="$pixel_size $(awk -v s="$size" -v x="${pixel_scale:-1}" 'BEGIN { c = int(x); if (c < x) c++; printf "%d", s * c }')"
 
 # Sizes between the theme's bitmaps: a copy of the theme goes in
 # ~/.local/share/icons (first in every cursor loader's search path, the

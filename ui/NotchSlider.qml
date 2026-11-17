@@ -1,14 +1,18 @@
 import QtQuick
 import qs.theme
 
-// A slider that only rests on given values, each marked with a notch.
-// The notches are evenly spaced whatever the values are.
+// A slider that only rests on given values, marked with notches.
+// The values are evenly spaced whatever they are. With many stops, notchEvery
+// marks only the numeric values that are a multiple of it (a ruler), while
+// the slider still rests on every stop.
 Item {
   id: root
 
   // The values it can take, in order.
   property var stops: []
   property var value: null
+  // 0: a notch on every stop; N: only on stops whose value is a multiple of N.
+  property int notchEvery: 0
   signal moved(var value)
 
   readonly property int index: Math.max(0, stops.indexOf(value))
@@ -43,6 +47,7 @@ Item {
 
     Rectangle {
       required property int index
+      visible: root.notchEvery <= 0 || root.stops[index] % root.notchEvery === 0
       anchors.verticalCenter: parent.verticalCenter
       x: Math.round((root.width - width) * index / root.span)
       width: 2
