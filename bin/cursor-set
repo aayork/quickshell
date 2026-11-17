@@ -72,9 +72,9 @@ x11_scale() {
 # ship a few fixed bitmaps (often 24/36/48/...); a size between them snaps
 # to a neighbour, and each kind of client rounds and snaps (or rescales) its
 # own way, so the cursor changed size from app to app. The sizes offered are
-# the ones where size * the display scale is exactly one of the bitmaps:
-# the compositor and Xwayland then draw that bitmap 1:1 and agree with each
-# other. A size given to cursor-set is snapped to the nearest of these.
+# the ones where size * the display scale is (within a pixel) one of the
+# bitmaps: the compositor and Xwayland then draw that bitmap and agree with
+# each other. A size given to cursor-set is snapped to the nearest of these.
 cursor_sizes() {
   local scale
   scale=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[].scale] | max // 1' 2>/dev/null)
@@ -113,11 +113,18 @@ for d in dirs:
     if found:
         break
 
-# Sizes whose size * scale rounds to a bitmap exactly. At a scale no bitmap
-# divides into (1.6 with a 36 px bitmap), the nearest size stands in so every
-# bitmap is still reachable.
-exact = {round(b / scale) for b in found if round(round(b / scale) * scale) == b}
-sizes = exact or {round(b / scale) for b in found}
+# One size per bitmap: the whole number nearest bitmap / scale. Where the
+# bitmap doesn't divide by the scale (36 px at 1.6 -> 22, i.e. 35.2 px) it is
+# kept while it lands within a pixel or 4% of the bitmap: every loader still
+# picks that bitmap, and one that rescales to the asked-for size is off by
+# less than a pixel. Sizes further between bitmaps snap or stretch
+# differently from app to app, so they aren't offered.
+sizes = set()
+for b in found:
+    size = round(b / scale)
+    if size > 0 and abs(size * scale - b) <= max(1, b * 0.04):
+        sizes.add(size)
+sizes = sizes or {round(b / scale) for b in found}
 print("\n".join(str(s) for s in sorted(s for s in sizes if 8 <= s <= 128)))
 EOF
 }
