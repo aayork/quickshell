@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Redefine the Xwayland root window's cursor at the X11 cursor size
+
+# X windows that never set a cursor of their own (Steam's title strip, any X
+# window the pointer has only just entered) show the root window's cursor.
+# Hyprland defines that once when Xwayland starts, at its own size, and the
+# X11 scale then blurs it. This does what `xsetroot -cursor_name left_ptr`
+# does, without needing xorg-xsetroot, using the theme and size cursor-set /
+# xscale put in the X resources (Xcursor.theme, Xcursor.size).
+#
+# Run by cursor-set after a change, and at login after `xscale settings`
+# (~/.config/hypr/xscale.lua). Usage: x-root-cursor [theme size]
+
+[[ -n $DISPLAY ]] || export DISPLAY=:0
+command -v python3 >/dev/null || exit 0
+
+theme=$1 size=$2
+if [[ -z $theme || -z $size ]] && command -v xrdb >/dev/null; then
+  res=$(xrdb -query 2>/dev/null)
+  [[ -n $theme ]] || theme=$(awk -F':[ \t]*' '$1 == "Xcursor.theme" { print $2 }' <<<"$res")
+  [[ -n $size ]] || size=$(awk -F':[ \t]*' '$1 == "Xcursor.size" { print $2 }' <<<"$res")
+fi
+[[ -n $theme ]] && export XCURSOR_THEME=$theme
+[[ $size =~ ^[0-9]+$ ]] && export XCURSOR_SIZE=$size
+
+exec python3 -I - <<'EOF' 2>/dev/null
+import ctypes
+x11 = ctypes.CDLL("libX11.so.6")
+xcursor = ctypes.CDLL("libXcursor.so.1")
+x11.XOpenDisplay.restype = ctypes.c_void_p
+x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+x11.XDefaultRootWindow.restype = ctypes.c_ulong
+x11.XDefineCursor.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong]
+x11.XFreeCursor.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+xcursor.XcursorLibraryLoadCursor.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+xcursor.XcursorLibraryLoadCursor.restype = ctypes.c_ulong
+display = x11.XOpenDisplay(None)
+if display:
+    cursor = xcursor.XcursorLibraryLoadCursor(display, b"left_ptr")
+    if cursor:
+        x11.XDefineCursor(display, x11.XDefaultRootWindow(display), cursor)
+        x11.XFreeCursor(display, cursor)
+    x11.XCloseDisplay(display)
+EOF

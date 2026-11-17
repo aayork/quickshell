@@ -405,31 +405,8 @@ set_line "$XRESOURCES_FILE" Xcursor.size ': ' "$x11_size"
 command -v xrdb >/dev/null && xrdb -merge "$XRESOURCES_FILE" 2>/dev/null
 
 # Xwayland windows that never set a cursor of their own show the root
-# window's, which Hyprland loads once at the size it started with and never
-# resizes on setcursor. Redefine it (what `xsetroot -cursor_name left_ptr`
-# does, without needing xorg-xsetroot).
-if [[ -n $DISPLAY ]] && command -v python3 >/dev/null; then
-  XCURSOR_THEME=$theme XCURSOR_SIZE=$x11_size python3 - <<'EOF' 2>/dev/null
-import ctypes
-x11 = ctypes.CDLL("libX11.so.6")
-xcursor = ctypes.CDLL("libXcursor.so.1")
-x11.XOpenDisplay.restype = ctypes.c_void_p
-x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
-x11.XDefaultRootWindow.restype = ctypes.c_ulong
-x11.XDefineCursor.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong]
-x11.XFreeCursor.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
-xcursor.XcursorLibraryLoadCursor.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-xcursor.XcursorLibraryLoadCursor.restype = ctypes.c_ulong
-display = x11.XOpenDisplay(None)
-if display:
-    cursor = xcursor.XcursorLibraryLoadCursor(display, b"left_ptr")
-    if cursor:
-        x11.XDefineCursor(display, x11.XDefaultRootWindow(display), cursor)
-        x11.XFreeCursor(display, cursor)
-    x11.XCloseDisplay(display)
-EOF
-fi
+# window's; bin/x-root-cursor redefines it at the new size (also run at login).
+[[ -n $DISPLAY ]] && "$(dirname "$(readlink -f "$0")")/x-root-cursor" "$theme" "$x11_size"
 
 
 # Keep the login screen in step (no-op until bin/greeter-install has run).
