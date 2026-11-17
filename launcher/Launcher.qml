@@ -174,11 +174,26 @@ Scope {
     return { title: title, run: () => Quickshell.execDetached(["wl-copy", "--", text]) }
   }
 
+  // Start a desktop entry (or one of its actions) with the session env that
+  // bin/cursor-set writes sourced first. The shell's own env is frozen at the
+  // moment it started, so apps launched with execute() kept an old cursor
+  // theme/size until the next login. Terminal entries keep execute(), which
+  // knows how to wrap them in a terminal.
+  function launch(item) {
+    if (item.runInTerminal || !item.command || item.command.length === 0) return item.execute()
+    var opts = {
+      command: ["sh", "-c", "[ -r \"$0\" ] && . \"$0\"; exec \"$@\"",
+                Quickshell.env("HOME") + "/.local/state/aayork-quickshell/session.env"].concat(item.command)
+    }
+    if (item.workingDirectory) opts.workingDirectory = item.workingDirectory
+    Quickshell.execDetached(opts)
+  }
+
   function appRow(entry, score) {
-    var actions = [{ title: "Open", run: () => entry.execute() }]
+    var actions = [{ title: "Open", run: () => launch(entry) }]
     var extra = entry.actions || []
     for (var i = 0; i < extra.length; i++) {
-      actions.push({ title: extra[i].name, run: (function(action) { return () => action.execute() })(extra[i]) })
+      actions.push({ title: extra[i].name, run: (function(action) { return () => launch(action) })(extra[i]) })
     }
     actions.push(copyAction("Copy Name", entry.name))
     actions = actions.concat(favoriteActions("app:" + entry.id))
