@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 // Qualified: the Bose, Tailscale and Things widgets here share names with services.
 import qs.services as Services
+import qs.bar.elsewhen
 import qs.theme
 import qs.ui
 
@@ -192,7 +193,7 @@ Scope {
           height: parent.height
           width: layout.width
 
-          readonly property var defaultOrder: ["jot", "tray", "bose", "things", "tailscale", "temps", "network", "control-center", "clock"]
+          readonly property var defaultOrder: ["jot", "tray", "bose", "things", "tailscale", "temps", "network", "control-center", "elsewhen", "clock"]
           // The saved order, cleaned up: unknown names dropped, new ones put
           // back where the default has them.
           function savedOrder() {
@@ -215,7 +216,7 @@ Scope {
 
           function widget(name) {
             return { "jot": jot, "tray": tray, "bose": bose, "things": things, "tailscale": tailscale, "temps": temps,
-                     "network": network, "control-center": controlCenter, "clock": clock }[name]
+                     "network": network, "control-center": controlCenter, "elsewhen": elsewhen, "clock": clock }[name]
           }
 
           // Where each icon sits; a recording in progress always comes first.
@@ -318,6 +319,13 @@ Scope {
             id: controlCenter; x: row.slotX("control-center"); z: moving ? 1 : 0
             foreground: bar.foregroundOver(row.x + controlCenter.x, controlCenter.width)
             movable: true; onMoveStarted: row.beginMove("control-center"); onMoved: dx => row.move("control-center", dx); onMoveEnded: row.endMove("control-center")
+            BarSlide on x {}
+          }
+          WorldClock {
+            id: elsewhen; x: row.slotX("elsewhen"); z: moving ? 1 : 0
+            visible: false  // hidden for now (2026-11-18); set true to bring the world clock back
+            barForeground: bar.foregroundOver(row.x + elsewhen.x, elsewhen.width)
+            movable: true; onMoveStarted: row.beginMove("elsewhen"); onMoved: dx => row.move("elsewhen", dx); onMoveEnded: row.endMove("elsewhen")
             BarSlide on x {}
           }
           Clock {
