@@ -75,11 +75,12 @@ Singleton {
   }
 
   // Starts hyprsunset if it is not there yet, then sets the temperature.
+  // Neutral means identity: hyprsunset's 6000K is still a visible warm tint.
   Process {
     id: apply
     property int temperature: root.neutral
     property bool again: false
-    command: ["sh", "-c", "pgrep -x hyprsunset >/dev/null || { setsid -f hyprsunset >/dev/null 2>&1; sleep 1; }; hyprctl hyprsunset temperature \"$1\"", "sh", String(temperature)]
+    command: ["sh", "-c", "pgrep -x hyprsunset >/dev/null || { setsid -f hyprsunset >/dev/null 2>&1; sleep 1; }; if [ \"$1\" -ge 6000 ]; then hyprctl hyprsunset identity; else hyprctl hyprsunset temperature \"$1\"; fi", "sh", String(temperature)]
     onExited: {
       if (!again) return
       again = false
