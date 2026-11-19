@@ -87,25 +87,28 @@ Singleton {
 
       // Jot, the scratchpad under the bar's note button.
       property JsonObject jot: JsonObject {
-        // 20% smaller than Antinote's 360 x 412 note.
+        // The note's size.
         property int width: 288
         property int height: 330
         property int fontSize: 14
         // Where the note was dragged to, from its place under the bar button.
         property real offsetX: 0
         property real offsetY: 0
-        // Line height as a multiple of the font size; Antinote's is about 1.63.
+        // Line height as a multiple of the font size.
         property real lineSpacing: 1.63
-        // Colours: "antinote" or one of Antinote's themes (services/JotThemes.js).
-        property string theme: "antinote"
-        // Behind the text: "none", "ruled" (lined), "lines" (a grid) or "dots".
-        property string paper: "none"
+        // Colours: "shell" (the desktop's) or the name of a theme in themes/.
+        property string theme: "shell"
+        // Behind the text: "notepad" (a legal pad), "none", "ruled" (lined),
+        // "lines" (a grid) or "dots".
+        property string paper: "notepad"
         // "last" (the note you were on) or "newest".
         property string openOn: "last"
         // Notes untouched this many days go away; 0 keeps them.
         property int autoDeleteDays: 30
         property bool swipeInvert: false
         property string exportDir: "~/Documents/Jot"
+        // The notes themselves, one Markdown file each (bin/jot-notes).
+        property string notesDir: "~/Notes"
         // Daily euro reference rates from the European Central Bank, for
         // "32 USD to JPY". Jot's only connection, so off until switched on.
         property bool currency: false

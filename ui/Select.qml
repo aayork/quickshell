@@ -68,16 +68,19 @@ ColumnLayout {
     radius: Theme.controlRadius
     color: mouse.containsMouse ? Theme.hover : "transparent"
 
+    // The name stops short of the swatches and the arrow, and elides.
     Label {
       anchors.left: parent.left
-      anchors.right: tail.left
+      anchors.right: swatches.left
       anchors.leftMargin: 8
+      anchors.rightMargin: swatches.width > 0 ? 8 : 0
       anchors.verticalCenter: parent.verticalCenter
       text: row.label
       color: row.selected ? Theme.accent : Theme.foreground
     }
 
     Row {
+      id: swatches
       anchors.right: tail.left
       anchors.rightMargin: tail.text !== "" ? 8 : 0
       anchors.verticalCenter: parent.verticalCenter
@@ -182,36 +185,44 @@ ColumnLayout {
       x: root.dropX
       y: root.dropY
       onImplicitHeightChanged: if (visible) root.place()
-      implicitHeight: dropList.implicitHeight + 8
+      // At most ten rows; a longer list scrolls.
+      implicitHeight: Math.min(dropList.implicitHeight, Theme.rowHeight * 10) + 8
+      clip: true
       radius: Theme.controlRadius
       color: Theme.background
       border.width: 1
       border.color: Theme.alpha(Theme.foreground, 0.2)
 
-      ColumnLayout {
-        id: dropList
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
+      Flickable {
+        id: dropScroll
+        anchors.fill: parent
         anchors.margins: 4
-        spacing: 0
+        contentHeight: dropList.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
 
-        Repeater {
-          model: root.floating && root.expanded ? root.options : []
+        ColumnLayout {
+          id: dropList
+          width: dropScroll.width
+          spacing: 0
 
-          Option {
-            required property var modelData
-            label: modelData.label
-            colors: modelData.colors || []
-            selected: modelData.value === root.current
-            onHovered: function(on) {
-              if (on) root.hoveredValue = modelData.value
-              else if (root.hoveredValue === modelData.value) root.hoveredValue = null
-            }
-            onClicked: {
-              var value = modelData.value
-              root.picked(value)
-              root.expanded = false
+          Repeater {
+            model: root.floating && root.expanded ? root.options : []
+
+            Option {
+              required property var modelData
+              label: modelData.label
+              colors: modelData.colors || []
+              selected: modelData.value === root.current
+              onHovered: function(on) {
+                if (on) root.hoveredValue = modelData.value
+                else if (root.hoveredValue === modelData.value) root.hoveredValue = null
+              }
+              onClicked: {
+                var value = modelData.value
+                root.picked(value)
+                root.expanded = false
+              }
             }
           }
         }

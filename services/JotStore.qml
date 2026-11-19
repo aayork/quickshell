@@ -2,17 +2,83 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.theme
 import "JotEngine.js" as Engine
 
-// Jot's notes, timer, AutoPaste and currency rates. The notes live in
-// ~/.local/share/jot/notes.json, the same file the old GTK Jot used:
-// { version, current, notes: [{ id, text, links, created, modified }] },
-// times in seconds. The dropdown itself is bar/Jot.qml.
+// Jot's notes, timer, AutoPaste and currency rates. Each note is a Markdown
+// file in Config.jot.notesDir (~/Notes), named for when it was started, so
+// any editor, grep or git can use them; bin/jot-notes reads and writes the
+// folder. Notes in memory: { id (the file name), text, links, created,
+// modified, dirty }, times in seconds. The order, the open note and the
+// shortened links are kept in ~/.local/share/jot/state.json. Files changed
+// or added outside Jot are picked up whenever the dropdown opens. The
+// dropdown itself is bar/Jot.qml.
 Singleton {
   id: root
 
-  readonly property string dataDir: Quickshell.env("HOME") + "/.local/share/jot"
-  readonly property string cacheDir: Quickshell.env("HOME") + "/.cache/jot"
+  readonly property string home: Quickshell.env("HOME")
+  readonly property string dataDir: home + "/.local/share/jot"
+  readonly property string cacheDir: home + "/.cache/jot"
+  readonly property string notesDir: String(Config.jot.notesDir || "~/Notes").replace(/^~(?=\/|$)/, home)
+  readonly property string helper: Quickshell.shellDir + "/bin/jot-notes"
+
+  // The note's colours: the shell theme's own ("shell", the default), or
+  // any of the desktop themes in themes/ (Settings › Jot › Colours, Ctrl+T),
+  // the paper a step lighter than the shell's popups, the syntax in the
+  // theme's terminal colours.
+  readonly property string themesDir: Quickshell.shellDir + "/themes"
+  // [{ name, colors }] for every desktop theme, read once at start.
+  property var themes: []
+  readonly property string themeName: themes.some(t => t.name === Config.jot.theme) ? Config.jot.theme : "shell"
+  readonly property var themeColors: {
+    var t = themes.find(t => t.name === themeName)
+    return t ? t.colors : Theme.colors
+  }
+
+  // A palette from a colors.toml map, falling back to the shell theme.
+  function palette(c) {
+    c = c || {}
+    function k(name, fallback) { return c[name] !== undefined ? c[name] : fallback }
+    var fg = k("foreground", Theme.foreground), muted = k("muted", Theme.muted), accent = k("accent", Theme.accent)
+    var magenta = k("magenta", accent), cyan = k("cyan", accent), blue = k("blue", accent)
+    return {
+      bg: k("lighter_background", Theme.surface), fg: fg, dim: k("dark_foreground", Theme.dim), accent: accent,
+      caret: accent, selection: k("selection", Theme.selection),
+      keyword: accent, listKeyword: magenta, variable: cyan, colon: magenta, reference: blue,
+      result: k("green", Theme.green), link: blue, check: k("dark_foreground", Theme.dim), checkDone: magenta,
+      done: muted, doneMark: Theme.alpha(muted, 0.7),
+      timer: k("dark_foreground", Theme.dim), railOn: accent, railOff: Theme.alpha(fg, 0.1),
+      toastBg: k("background", Theme.background), toastFg: fg, badgeBg: k("background", Theme.background),
+      edge: accent, clip: k("green", Theme.green), icon: k("dark_foreground", Theme.dim), border: accent,
+      hover: Theme.alpha(fg, 0.08), margin: k("red", Theme.red), rule: blue
+    }
+  }
+  readonly property var pal: palette(themeColors)
+
+  // The next (or previous) choice, "shell" first, for Ctrl+T.
+  function cycleTheme(step) {
+    var names = ["shell"].concat(themes.map(t => t.name))
+    var at = Math.max(0, names.indexOf(themeName))
+    Config.jot.theme = names[(at + step + names.length) % names.length]
+    return Config.jot.theme === "shell" ? "Shell theme" : Config.jot.theme
+  }
+
+  Process {
+    running: true
+    command: ["sh", "-c", "for f in \"$1\"/*/colors.toml; do printf '== %s\\n' \"$(basename \"$(dirname \"$f\")\")\"; cat \"$f\"; echo; done", "sh", root.themesDir]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var list = [], cur = null
+        text.split("\n").forEach(function(line) {
+          var head = line.match(/^== (.+)$/)
+          if (head) { cur = { name: head[1], colors: {} }; list.push(cur); return }
+          var m = cur && line.match(/^\s*([A-Za-z0-9_-]+)\s*=\s*["'](#[0-9A-Fa-f]{6})["']/)
+          if (m) cur.colors[m[1]] = m[2]
+        })
+        root.themes = list
+      }
+    }
+  }
 
   property var notes: []
   property string current: ""
@@ -32,8 +98,8 @@ Singleton {
   // Set by the dropdown while it has the keyboard, so AutoPaste leaves
   // copies made inside Jot alone.
   property bool editorFocused: false
-  // The note's text colour in the current theme, for ui/JotLabel.qml.
-  property color ink: "#36312e"
+  // The note's text colour, for ui/JotLabel.qml.
+  readonly property color ink: pal.fg
 
   readonly property string welcome: "Hi, this is Jot.\n\n"
     + "Jot is for the scraps: numbers, links, lists, half-thoughts. No titles, no folders. "
@@ -42,9 +108,12 @@ Singleton {
     + "Try a keyword on the first line: math, list, sum, count. Or type \"timer 5m\" on a line and press Enter.\n\n"
     + "Right-click the note button for settings.\n"
 
+  // A new note, named for now: 2026-11-19-141502.md.
   function makeNote(text) {
-    var now = Date.now() / 1000
-    return { id: Math.random().toString(16).slice(2, 14).padEnd(12, "0"), text: text || "", links: {}, created: now, modified: now }
+    var now = new Date()
+    var base = Qt.formatDateTime(now, "yyyy-MM-dd-HHmmss"), id = base + ".md"
+    for (var n = 2; find(id) || trash.indexOf(id) >= 0; n++) id = base + "-" + n + ".md"
+    return { id: id, text: text || "", links: {}, created: now / 1000, modified: now / 1000, dirty: ++editSeq }
   }
 
   // ------------------------------------------------------------ keywords
@@ -61,11 +130,6 @@ Singleton {
     Engine.setKeywords(keywordConfig)
     engineVersion++
   }
-  Component.onCompleted: {
-    Engine.setKeywords(keywordConfig)
-    loadRates()
-  }
-
   // ------------------------------------------------------------ notes
 
   // The engine, shared with the dropdown so both see the same keywords and rates.
@@ -78,6 +142,7 @@ Singleton {
     if (!n || n.text === text) return
     n.text = text
     n.modified = Date.now() / 1000
+    n.dirty = ++editSeq
     save()
   }
 
@@ -100,6 +165,7 @@ Singleton {
     var n = note
     if (!n || n.text.trim() !== "" || notes.length <= 1) return false
     notes = notes.filter(x => x !== n)
+    discard([n.id])
     return true
   }
 
@@ -158,6 +224,7 @@ Singleton {
 
   function deleteNote() {
     var at = index
+    discard([notes[at].id])
     var rest = notes.filter((x, i) => i !== at)
     if (rest.length === 0) rest = [makeNote("")]
     notes = rest
@@ -168,6 +235,7 @@ Singleton {
   // Delete any note, from the notes list.
   function deleteById(id) {
     if (id === current) { deleteNote(); return }
+    discard([id])
     notes = notes.filter(n => n.id !== id)
     save()
     toast("Note deleted")
@@ -188,6 +256,7 @@ Singleton {
     var cutoff = Date.now() / 1000 - days * 86400
     var keep = notes.filter(n => n.modified >= cutoff || n.id === current)
     if (keep.length === notes.length) return
+    discard(notes.filter(n => keep.indexOf(n) < 0).map(n => n.id))
     notes = keep.length ? keep : [makeNote("")]
     if (!find(current)) open(notes[notes.length - 1].id, 0)
     save()
@@ -201,13 +270,41 @@ Singleton {
   }
 
   // ------------------------------------------------------------ disk
+  //
+  // Edits are written a moment later by bin/jot-notes. Each edit gets a
+  // number (editSeq); a note stays dirty until a sync that included its
+  // latest edit has finished, so nothing typed during a sync is lost.
+  // Deleted notes go to the desktop trash.
+
+  property int editSeq: 0
+  property var trash: []
+  // The edit number the running sync covers.
+  property int syncSeq: 0
+  property bool syncAgain: false
+
+  function discard(ids) {
+    trash = trash.concat(ids)
+    save()
+  }
 
   function save() { if (loaded) saveTimer.restart() }
+
+  function snapshot(withText) {
+    return JSON.stringify({
+      current: current,
+      notes: notes.map(n => ({ id: n.id, created: n.created, modified: n.modified, links: n.links,
+        dirty: !!n.dirty, text: n.dirty || withText ? n.text : "" })),
+      trash: trash
+    })
+  }
 
   function flush() {
     if (!loaded) return
     saveTimer.stop()
-    notesFile.setText(JSON.stringify({ version: 1, current: current, notes: notes }, null, 1))
+    if (syncProc.running) { syncAgain = true; return }
+    syncSeq = editSeq
+    syncProc.sentTrash = trash.slice()
+    snapshotFile.setText(snapshot(false))
   }
 
   Timer {
@@ -216,44 +313,136 @@ Singleton {
     onTriggered: root.flush()
   }
 
-  function load(raw) {
-    var list = [], cur = ""
-    if (raw !== null) {
-      try {
-        var data = JSON.parse(raw)
-        list = (data.notes || []).map(n => ({
-          id: String(n.id), text: String(n.text || ""), links: n.links || {},
-          created: Number(n.created) || Date.now() / 1000, modified: Number(n.modified) || Date.now() / 1000
-        }))
-        cur = data.current || ""
-      } catch (e) {
-        // Unreadable: keep it aside rather than overwrite it.
-        backup.running = true
-        console.warn("jot: notes file unreadable, moved to notes.broken.json:", e)
-      }
-    } else {
-      list = [makeNote(welcome)]
-    }
-    if (list.length === 0) list = [makeNote("")]
-    notes = list
-    current = list.some(n => n.id === cur) ? cur : list[list.length - 1].id
-    loaded = true
-    expire()
-    switched(0)
-  }
-
   FileView {
-    id: notesFile
-    path: root.dataDir + "/notes.json"
+    id: snapshotFile
+    path: root.dataDir + "/sync.json"
     atomicWrites: true
     printErrors: false
-    onLoaded: if (!root.loaded) root.load(text())
-    onLoadFailed: if (!root.loaded) root.load(null)
+    onSaved: syncProc.running = true
+    onSaveFailed: console.warn("jot: could not write", path)
   }
 
   Process {
-    id: backup
-    command: ["mv", "-f", root.dataDir + "/notes.json", root.dataDir + "/notes.broken.json"]
+    id: syncProc
+    property var sentTrash: []
+    command: [root.helper, "sync", root.notesDir, root.dataDir + "/state.json", root.dataDir + "/sync.json"]
+    stderr: StdioCollector { onStreamFinished: if (text.trim() !== "") console.warn("jot-notes:", text.trim()) }
+    onExited: function(code) {
+      if (code === 0) {
+        for (var i = 0; i < root.notes.length; i++)
+          if (root.notes[i].dirty && root.notes[i].dirty <= root.syncSeq) root.notes[i].dirty = 0
+        var sent = sentTrash
+        root.trash = root.trash.filter(id => sent.indexOf(id) < 0)
+      }
+      if (root.syncAgain) {
+        root.syncAgain = false
+        root.flush()
+      } else if (root.notes.some(n => n.dirty) || root.trash.length) {
+        // Failed, or edited while it ran: try again shortly.
+        root.save()
+      }
+    }
+  }
+
+  // The folder may have changed since (edited in another editor, notes
+  // copied in or deleted): read it again, keeping anything not yet written.
+  function rescan() {
+    if (!loaded || loadProc.running) return
+    if (saveTimer.running || syncProc.running || notes.some(n => n.dirty) || trash.length) {
+      flush()
+      rescanTimer.restart()
+      return
+    }
+    loadProc.running = true
+  }
+
+  Timer {
+    id: rescanTimer
+    interval: 300
+    onTriggered: root.rescan()
+  }
+
+  // A different folder: read the notes from there instead. Files are not
+  // moved; that is left to whoever changed it.
+  onNotesDirChanged: {
+    if (!loaded) return
+    loaded = false
+    notes = []
+    trash = []
+    loadProc.running = true
+  }
+
+  function apply(raw) {
+    var data
+    try {
+      data = JSON.parse(raw)
+    } catch (e) {
+      console.warn("jot: could not read the notes folder:", e)
+      if (!loaded) { notes = [makeNote("")]; current = notes[0].id; loaded = true; switched(0) }
+      return
+    }
+    var disk = (data.notes || []).map(n => ({
+      id: String(n.id), text: String(n.text || ""), links: n.links || {},
+      created: Number(n.created) || Date.now() / 1000, modified: Number(n.modified) || Date.now() / 1000, dirty: 0
+    }))
+    if (!loaded) {
+      var first = disk.length === 0 && !data.current
+      var list = disk.length ? disk : [makeNote(first ? welcome : "")]
+      notes = list
+      current = list.some(n => n.id === data.current) ? data.current : list[list.length - 1].id
+      loaded = true
+      expire()
+      switched(0)
+      return
+    }
+    // A rescan: the disk wins for notes Jot has no unsaved edits to.
+    var byId = {}, changed = false, shownChanged = false
+    disk.forEach(n => byId[n.id] = n)
+    var merged = []
+    notes.forEach(function(n) {
+      var d = byId[n.id]
+      delete byId[n.id]
+      if (!d) {
+        // Gone from the folder: deleted outside Jot. Blank notes never had a file.
+        if (n.dirty || n.text.trim() === "") merged.push(n)
+        else changed = true
+        return
+      }
+      if (!n.dirty && d.text !== n.text) {
+        n.text = d.text
+        n.modified = d.modified
+        changed = true
+        if (n.id === current) shownChanged = true
+      }
+      merged.push(n)
+    })
+    disk.forEach(function(d) { if (byId[d.id]) { merged.push(d); changed = true } })
+    if (!changed) return
+    if (merged.length === 0) merged = [makeNote("")]
+    notes = merged
+    if (!find(current)) open(notes[notes.length - 1].id, 0)
+    else if (shownChanged) textReplaced(current)
+  }
+
+  Process {
+    id: loadProc
+    command: [root.helper, "load", root.notesDir, root.dataDir + "/state.json", root.dataDir + "/notes.json"]
+    stdout: StdioCollector { onStreamFinished: root.apply(text) }
+    stderr: StdioCollector { onStreamFinished: if (text.trim() !== "") console.warn("jot-notes:", text.trim()) }
+  }
+
+  Component.onCompleted: {
+    Engine.setKeywords(keywordConfig)
+    loadRates()
+    loadProc.running = true
+  }
+
+  // On the way out (a shell reload) there is no waiting for a Process, so
+  // anything unwritten goes straight to the helper.
+  Component.onDestruction: {
+    if (!loaded || (!notes.some(n => n.dirty) && trash.length === 0 && !saveTimer.running)) return
+    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" > \"$2.tmp\" && mv -f \"$2.tmp\" \"$2\" && exec \"$3\" sync \"$4\" \"$5\" \"$2\"",
+      "sh", snapshot(false), dataDir + "/sync.json", helper, notesDir, dataDir + "/state.json"])
   }
 
   // ------------------------------------------------------------ IPC
@@ -465,5 +654,4 @@ Singleton {
     onTriggered: root.loadRates()
   }
 
-  Component.onDestruction: flush()
 }

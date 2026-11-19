@@ -273,8 +273,11 @@ Scope {
 
           // A recording in progress: its time, and click to stop.
           Recording { id: recording; x: 0 }
+          // Jot has no icon on the bar: it opens from ALT+A or the launcher
+          // ("Notes"). It stays here, hidden, as the note's anchor.
           Jot {
             id: jot; x: row.slotX("jot"); z: moving ? 1 : 0
+            visible: false
             foreground: bar.foregroundOver(row.x + jot.x, jot.width)
             movable: true; onMoveStarted: row.beginMove("jot"); onMoved: dx => row.move("jot", dx); onMoveEnded: row.endMove("jot")
             BarSlide on x {}

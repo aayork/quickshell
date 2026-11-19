@@ -7,7 +7,6 @@ import Quickshell.Io
 import qs.services
 import qs.theme
 import qs.ui
-import "../services/JotThemes.js" as JotThemes
 
 // Settings: how things look, how the shell behaves, how windows are drawn,
 // and the network and Bluetooth panels.
@@ -1409,28 +1408,30 @@ Scope {
 
                 Setting {
                   glyph: 0xF03D8
-                  label: "Theme"
-                  note: "Ctrl+T in a note cycles them"
+                  label: "Colours"
+                  note: "Any desktop theme, or the current one; Ctrl+T in a note cycles them"
                   Select {
                     id: jotThemeSelect
-                    Layout.preferredWidth: 200
-                    Layout.maximumWidth: 200
+                    Layout.preferredWidth: 240
+                    Layout.maximumWidth: 240
                     floating: true
-                    options: JotThemes.ORDER.map(function(k) {
-                      var p = JotThemes.palette(k)
-                      return { label: JotThemes.NAMES[k], value: k, colors: [p.bg, p.variable, p.result, p.colon] }
+                    options: [{ name: "shell", colors: Theme.colors }].concat(JotStore.themes).map(function(t) {
+                      var p = JotStore.palette(t.colors)
+                      return { label: t.name === "shell" ? "Shell theme" : t.name, value: t.name, colors: [p.bg, p.accent, p.result, p.colon] }
                     })
-                    current: Config.jot.theme
+                    current: JotStore.themeName
                     onPicked: function(value) { Config.jot.theme = value }
                   }
                 }
 
-                // A small note in the theme under the pointer (or the chosen
-                // one), drawn by Jot's own highlighter.
+                // A small note in the colours under the pointer (or the
+                // chosen ones), drawn by Jot's own highlighter.
                 Rectangle {
                   id: jotPreview
-                  readonly property string theme: jotThemeSelect.hoveredValue !== null ? jotThemeSelect.hoveredValue : Config.jot.theme
-                  readonly property var pal: JotThemes.palette(theme)
+                  readonly property var hoveredTheme: jotThemeSelect.hoveredValue !== null
+                    ? JotStore.themes.find(t => t.name === jotThemeSelect.hoveredValue) : null
+                  readonly property var pal: jotThemeSelect.hoveredValue === "shell" ? JotStore.palette(Theme.colors)
+                    : hoveredTheme ? JotStore.palette(hoveredTheme.colors) : JotStore.pal
                   // Jot's line height: a multiple of the font size.
                   readonly property string block: "margin:0; white-space:pre-wrap; line-height:"
                     + Math.round(Config.jot.lineSpacing * 12 / Math.max(1, previewMetrics.height) * 100) + "%"
@@ -1439,7 +1440,7 @@ Scope {
 
                   FontMetrics {
                     id: previewMetrics
-                    font.family: "GeistMono Nerd Font Mono"
+                    font.family: Theme.fontFamily
                     font.pixelSize: 12
                   }
 
@@ -1449,7 +1450,7 @@ Scope {
                   Canvas {
                     id: previewPaper
                     anchors.fill: parent
-                    readonly property var look: [Config.jot.paper, width, height, jotPreview.pitch, jotPreview.firstBaseline, jotPreview.pal.fg]
+                    readonly property var look: [Config.jot.paper, width, height, jotPreview.pitch, jotPreview.firstBaseline, jotPreview.pal]
                     onLookChanged: requestPaint()
                     onPaint: {
                       var ctx = getContext("2d")
@@ -1461,7 +1462,13 @@ Scope {
                       ctx.clip()
                       var baseline = jotPreview.firstBaseline, left = previewRow.x
                       function from(at, step) { return at - Math.ceil(at / step) * step }
-                      if (paper === "ruled") {
+                      if (paper === "notepad") {
+                        ctx.fillStyle = Theme.alpha(jotPreview.pal.rule, 0.22)
+                        for (var ny = from(baseline, pitch); ny < height; ny += pitch) if (ny > 6) ctx.fillRect(0, Math.round(ny), width, 1)
+                        ctx.fillStyle = Theme.alpha(jotPreview.pal.margin, 0.3)
+                        ctx.fillRect(left - 9, 0, 1, height)
+                        ctx.fillRect(left - 7, 0, 1, height)
+                      } else if (paper === "ruled") {
                         ctx.fillStyle = Theme.alpha(jotPreview.pal.fg, 0.1)
                         for (var ry = from(baseline, pitch); ry < height; ry += pitch) ctx.fillRect(0, Math.round(ry), width, 1)
                       } else if (paper === "lines") {
@@ -1480,10 +1487,10 @@ Scope {
                   Layout.fillWidth: true
                   Layout.leftMargin: 34
                   implicitHeight: previewRow.implicitHeight + 32
-                  radius: 12
+                  radius: Theme.radius
                   color: pal.bg
-                  border.width: 1
-                  border.color: Theme.alpha(Theme.foreground, 0.15)
+                  border.width: Theme.borderWidth
+                  border.color: pal.border
 
                   RowLayout {
                     id: previewRow
@@ -1499,7 +1506,7 @@ Scope {
                       Layout.fillWidth: true
                       Layout.alignment: Qt.AlignTop
                       textFormat: Text.RichText
-                      font.family: "GeistMono Nerd Font Mono"
+                      font.family: Theme.fontFamily
                       font.pixelSize: 12
                       color: jotPreview.pal.fg
                       text: JotStore.engine().highlight("math\nrent: 1200\nfood: 340\nrent + food = 1,540", jotPreview.pal, jotPreview.block)
@@ -1512,7 +1519,7 @@ Scope {
                       Layout.alignment: Qt.AlignTop
                       Layout.leftMargin: 18
                       textFormat: Text.RichText
-                      font.family: "GeistMono Nerd Font Mono"
+                      font.family: Theme.fontFamily
                       font.pixelSize: 12
                       color: jotPreview.pal.fg
                       text: JotStore.engine().highlight("list\nmilk /x\neggs\nbread",
@@ -1555,16 +1562,6 @@ Scope {
                       }
                     }
                   }
-
-                  Text {
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 8
-                    anchors.rightMargin: 12
-                    text: JotThemes.NAMES[jotPreview.theme] || ""
-                    font.pixelSize: Theme.fontSmall - 1
-                    color: jotPreview.pal.dim
-                  }
                 }
 
                 Setting {
@@ -1572,6 +1569,7 @@ Scope {
                   label: "Paper"
                   Segmented {
                     options: [
+                      { label: "Notepad", value: "notepad" },
                       { label: "Plain", value: "none" },
                       { label: "Lined", value: "ruled" },
                       { label: "Grid", value: "lines" },
@@ -1588,7 +1586,7 @@ Scope {
                   Segmented {
                     options: [
                       { label: "Tight", value: 1.35 },
-                      { label: "Antinote", value: 1.63 },
+                      { label: "Normal", value: 1.63 },
                       { label: "Roomy", value: 1.9 }
                     ]
                     current: Config.jot.lineSpacing
@@ -1648,6 +1646,18 @@ Scope {
                     to: 365
                     display: value === 0 ? "Never" : value + " d"
                     onMoved: function(value) { Config.jot.autoDeleteDays = value }
+                  }
+                }
+
+                Setting {
+                  glyph: 0xF0770
+                  label: "Notes folder"
+                  note: "One Markdown file per note; edit them anywhere, Jot picks changes up when opened"
+                  Field {
+                    Layout.preferredWidth: 200
+                    text: Config.jot.notesDir
+                    onAccepted: if (text.trim() !== "") Config.jot.notesDir = text.trim()
+                    onCancelled: text = Config.jot.notesDir
                   }
                 }
 

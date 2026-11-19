@@ -52,22 +52,14 @@ Scope {
       // to clicks. Otherwise the card does, but not its shadow margin.
       mask: Region { item: pin.locked ? lockBadge : card }
 
-      RectangularShadow {
-        anchors.fill: card
-        radius: card.radius
-        offset.y: 6
-        blur: 24
-        spread: -3
-        color: Theme.alpha("#000000", 0.4 * pin.fade)
-      }
-
       Item {
         id: card
         x: pin.pad
         y: pin.pad
         width: Math.max(80, Math.round(picture.implicitWidth * pin.fit * pin.zoom))
         height: Math.max(60, Math.round(picture.implicitHeight * pin.fit * pin.zoom))
-        readonly property int radius: 10
+        // Shaped like a window: the window rounding from Settings › Windows.
+        readonly property int radius: Math.max(0, Number(Config.windows.rounding) || 0)
         opacity: pin.fade
         focus: true
 
@@ -92,7 +84,7 @@ Scope {
             maskSpreadAtMin: 1
           }
 
-          Rectangle { anchors.fill: parent; color: "#111111" }
+          Rectangle { anchors.fill: parent; color: Theme.darkerBackground }
 
           Image {
             id: picture
@@ -118,8 +110,10 @@ Scope {
           anchors.fill: parent
           radius: card.radius
           color: "transparent"
-          border.width: 1
-          border.color: Theme.alpha("#ffffff", hover.hovered ? 0.18 : 0.07)
+          // The compositor's border colours: accent while it has the pointer
+          // or the keys, muted otherwise.
+          border.width: Theme.borderWidth
+          border.color: hover.hovered || card.activeFocus ? Theme.accent : Theme.muted
         }
 
         HoverHandler { id: hover }
@@ -149,42 +143,35 @@ Scope {
           }
         }
 
-        // Hover controls, in CleanShot's light style.
-        Item {
-          anchors.fill: parent
+        // Hover controls: a strip along the top, like a title bar.
+        Rectangle {
+          anchors { top: parent.top; left: parent.left; right: parent.right; margins: Theme.borderWidth }
+          height: Theme.rowHeight + 4
           visible: hover.hovered && !pin.locked
+          color: Theme.alpha(Theme.background, 0.92)
 
-          CornerButton {
-            anchors { top: parent.top; left: parent.left; margins: 8 }
-            glyph: 0xF0156
+          IconButton {
+            anchors { left: parent.left; leftMargin: 2; verticalCenter: parent.verticalCenter }
+            icon: Icons.close
             onClicked: Captures.unpin(pin.modelData.id)
           }
 
-          Row {
-            anchors { top: parent.top; right: parent.right; margins: 8 }
-            spacing: 6
-            CornerButton { glyph: 0xF018F; onClicked: Captures.copy(pin.modelData.path) }
-            CornerButton { glyph: 0xF0193; onClicked: Captures.save(pin.modelData.path) }
-            CornerButton { glyph: 0xF03EB; onClicked: { Captures.edit(pin.modelData.path); Captures.unpin(pin.modelData.id) } }
-            CornerButton { glyph: 0xF0341; onClicked: pin.locked = true }
+          // Opacity, while it is not full.
+          Label {
+            visible: pin.fade < 0.99
+            anchors.centerIn: parent
+            text: Math.round(pin.fade * 100) + "%"
+            color: Theme.dim
+            font.pixelSize: Theme.fontSmall
+            elide: Text.ElideNone
           }
 
-          // Opacity, while it is not full.
-          Rectangle {
-            visible: pin.fade < 0.99
-            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; margins: 8 }
-            width: fadeLabel.implicitWidth + 14
-            height: 20
-            radius: 10
-            color: Theme.alpha("#000000", 0.6)
-            Label {
-              id: fadeLabel
-              anchors.centerIn: parent
-              text: Math.round(pin.fade * 100) + "%"
-              color: "#ffffff"
-              font.pixelSize: Theme.fontSmall
-              elide: Text.ElideNone
-            }
+          Row {
+            anchors { right: parent.right; rightMargin: 2; verticalCenter: parent.verticalCenter }
+            IconButton { icon: Icons.glyph(0xF018F); onClicked: Captures.copy(pin.modelData.path) }
+            IconButton { icon: Icons.glyph(0xF0193); onClicked: Captures.save(pin.modelData.path) }
+            IconButton { icon: Icons.glyph(0xF03EB); onClicked: { Captures.edit(pin.modelData.path); Captures.unpin(pin.modelData.id) } }
+            IconButton { icon: Icons.glyph(0xF0341); onClicked: pin.locked = true }
           }
         }
       }
@@ -195,15 +182,17 @@ Scope {
         visible: pin.locked
         x: card.x + card.width - width - 8
         y: card.y + 8
-        width: 22
-        height: 22
-        radius: 11
-        color: Theme.alpha("#f2f2f2", 0.92)
+        width: 24
+        height: 24
+        radius: Theme.controlRadius
+        color: Theme.background
+        border.width: 1
+        border.color: Theme.muted
         Label {
           anchors.centerIn: parent
           text: Icons.glyph(0xF0341)
-          color: "#1c1c1e"
-          font.pixelSize: 12
+          color: Theme.dim
+          font.pixelSize: Theme.fontSmall
           elide: Text.ElideNone
         }
         MouseArea {

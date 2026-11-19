@@ -7,16 +7,18 @@ import Quickshell.Wayland
 import qs.services
 import qs.theme
 import qs.ui
+import qs.capture
 
 // Notifications as they arrive, stacked under the bar's right end on the
-// monitor that has focus.
+// monitor that has focus. Fresh screenshots and recordings sit at the top
+// of the same column (capture/CaptureToast.qml) until they are dealt with.
 PanelWindow {
   id: root
 
   readonly property int cardWidth: 360
 
   screen: Quickshell.screens.find(s => Hyprland.focusedMonitor && s.name === Hyprland.focusedMonitor.name) ?? Quickshell.screens[0]
-  visible: Notifs.toasts.length > 0 && !Session.screensaver
+  visible: (Notifs.toasts.length > 0 || Captures.stack.length > 0) && !Session.screensaver
   anchors { top: true; right: true }
   margins { top: Theme.popupGap; right: Theme.popupGap }
   implicitWidth: cardWidth
@@ -31,6 +33,19 @@ PanelWindow {
     id: stack
     width: parent.width
     spacing: 6
+
+    // Newest first; only the newest shows its picture.
+    Repeater {
+      model: Captures.stack
+
+      CaptureToast {
+        required property string modelData
+        required property int index
+        Layout.fillWidth: true
+        path: modelData
+        compact: index > 0
+      }
+    }
 
     Repeater {
       model: Notifs.toasts

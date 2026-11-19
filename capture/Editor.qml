@@ -11,10 +11,10 @@ import qs.theme
 import qs.ui
 
 // The screenshot editor: mark a capture up, crop it, put it on a background,
-// then copy, save or pin the result. Laid out like CleanShot X's Annotate
-// window: one toolbar along the top (close, the tools, undo and redo), a
-// row under it with the current tool's options, the picture, and a bottom
-// bar with the size on the left and Pin, Copy, Save and Done on the right.
+// then copy, save or pin the result. One toolbar along the top (close, the
+// tools, undo and redo), a row under it with the current tool's options, the
+// picture, and a bottom bar with the size on the left and Pin, Copy, Save
+// and Done on the right.
 //
 // Everything is drawn in the picture's own pixels on a "sheet" that is scaled
 // down to fit the screen, so what is exported is full resolution whatever
@@ -77,10 +77,11 @@ Scope {
   property real cropRatio: 0
   // The background's own shape, for social posts; 0 fits the picture.
   property real bgRatio: 0
-  // Gradient backgrounds, as CleanShot offers; ids g0.. in `backdrop`.
+  // Gradient backgrounds from the theme's own colours; ids g0.. in `backdrop`.
   readonly property var gradients: [
-    ["#ff8a5b", "#ff3d77"], ["#36d1dc", "#5b86e5"], ["#a18cd1", "#fbc2eb"],
-    ["#a8e063", "#56ab2f"], ["#f6d365", "#fda085"], ["#232526", "#414345"]
+    [Theme.accent, Theme.pick("magenta", Theme.red)], [Theme.pick("cyan", Theme.accent), pickBlue],
+    [Theme.green, Theme.pick("cyan", Theme.accent)], [Theme.yellow, pickOrange],
+    [pickOrange, Theme.red], [Theme.surface, Theme.darkerBackground]
   ]
   readonly property int gradientIndex: /^g\d+$/.test(backdrop) ? parseInt(backdrop.slice(1)) : -1
 
@@ -615,8 +616,9 @@ Scope {
         height: Math.round(parent.height * 0.88)
         radius: root.corner
         color: Theme.background
-        border.width: 1
-        border.color: Theme.alpha(Theme.foreground, 0.14)
+        // A focused window's border.
+        border.width: Theme.borderWidth
+        border.color: Theme.accent
         clip: true
 
         // Clicks on the window's own surface don't reach the dim around it.
@@ -722,7 +724,7 @@ Scope {
                 required property color modelData
                 implicitWidth: 20
                 implicitHeight: 20
-                radius: 10
+                radius: Theme.controlRadius
                 color: modelData
                 border.width: Qt.colorEqual(root.ink, modelData) ? 3 : 1
                 border.color: Qt.colorEqual(root.ink, modelData) ? Theme.brightForeground : Theme.alpha(Theme.foreground, 0.3)
@@ -744,7 +746,7 @@ Scope {
                 required property int index
                 implicitWidth: 30
                 implicitHeight: 28
-                radius: 6
+                radius: Theme.controlRadius
                 color: root.weight === index ? Theme.alpha(Theme.foreground, 0.12) : "transparent"
 
                 Rectangle {
@@ -817,7 +819,7 @@ Scope {
                 required property int index
                 implicitWidth: 22
                 implicitHeight: 22
-                radius: 11
+                radius: Theme.controlRadius
                 border.width: root.gradientIndex === index ? 2 : 1
                 border.color: root.gradientIndex === index ? Theme.brightForeground : Theme.alpha(Theme.foreground, 0.25)
                 gradient: Gradient {

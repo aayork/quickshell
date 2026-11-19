@@ -27,7 +27,6 @@ ShellRoot {
   Lock {}
   Idle {}
   Polkit {}
-  QuickAccess {}
   AreaPicker {}
   Pins {}
   Editor {}

@@ -3,7 +3,7 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// CleanShot's All-In-One bar, under the kept area: the capture modes with
+// The All-In-One bar, under the kept area: the capture modes with
 // their names (Area, Fullscreen, Window, Scrolling, Timer, OCR, Recording),
 // and beside them a pill with the exact size, an aspect-ratio lock and the
 // capture button. Recording swaps the bar for the recording panel: what to
@@ -38,8 +38,9 @@ Item {
     return r.y + r.h - height - gap
   }
 
-  readonly property color panel: Theme.alpha("#1e1e20", 0.94)
-  readonly property color edge: Theme.alpha("#ffffff", 0.12)
+  // Drawn like the shell's popups.
+  readonly property color panel: Theme.background
+  readonly property color edge: Theme.separator
 
   // Clicks on the bar stay on the bar.
   MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
@@ -58,10 +59,10 @@ Item {
       Rectangle {
         width: modeRow.width + 10
         height: 50
-        radius: 13
+        radius: Theme.radius
         color: root.panel
-        border.width: 1 / Screen.devicePixelRatio
-        border.color: root.edge
+        border.width: Theme.borderWidth
+        border.color: Theme.accent
 
         Row {
           id: modeRow
@@ -99,8 +100,8 @@ Item {
               Rectangle {
                 visible: !mode.sep
                 anchors.fill: parent
-                radius: 9
-                color: modeMouse.pressed ? Theme.alpha("#ffffff", 0.16) : modeMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
+                radius: Theme.controlRadius
+                color: modeMouse.pressed ? Theme.pressed : modeMouse.containsMouse ? Theme.hover : "transparent"
               }
 
               Column {
@@ -111,8 +112,8 @@ Item {
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: mode.modelData.text || Icons.glyph(mode.modelData.glyph || 0)
-                  color: "#ffffff"
-                  font.family: mode.modelData.text ? Theme.fontFamily : Theme.fontFamily
+                  color: Theme.foreground
+                  font.family: Theme.fontFamily
                   font.pixelSize: mode.modelData.text ? 13 : 17
                   font.bold: !!mode.modelData.text
                 }
@@ -120,7 +121,7 @@ Item {
                   id: modeLabel
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: mode.modelData.id === "timer" ? "Timer · " + picker.timerSeconds + "s" : (mode.modelData.label || "")
-                  color: Theme.alpha("#ffffff", 0.82)
+                  color: Theme.dim
                   font.family: Theme.fontFamily
                   font.pixelSize: 10
                 }
@@ -157,10 +158,10 @@ Item {
       Rectangle {
         width: sizeRow.width + 18
         height: 50
-        radius: 13
+        radius: Theme.radius
         color: root.panel
-        border.width: 1 / Screen.devicePixelRatio
-        border.color: root.edge
+        border.width: Theme.borderWidth
+        border.color: Theme.accent
 
         Row {
           id: sizeRow
@@ -175,7 +176,7 @@ Item {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "×"
-            color: Theme.alpha("#ffffff", 0.6)
+            color: Theme.dim
             font.family: Theme.fontFamily
             font.pixelSize: 14
           }
@@ -190,14 +191,14 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 26
             height: 24
-            radius: 6
-            color: picker.lockRatio ? Theme.alpha("#ffffff", 0.2) : lockMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
+            radius: Theme.controlRadius
+            color: picker.lockRatio ? Theme.selection : lockMouse.containsMouse ? Theme.hover : "transparent"
             border.width: 1 / Screen.devicePixelRatio
-            border.color: picker.lockRatio ? Theme.alpha("#ffffff", 0.4) : root.edge
+            border.color: picker.lockRatio ? Theme.accent : root.edge
             Text {
               anchors.centerIn: parent
               text: Icons.glyph(0xF0616)
-              color: picker.lockRatio ? "#ffffff" : Theme.alpha("#ffffff", 0.6)
+              color: picker.lockRatio ? Theme.accent : Theme.dim
               font.family: Theme.fontFamily
               font.pixelSize: 14
             }
@@ -222,12 +223,12 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 34
             height: 34
-            radius: 8
-            color: shotMouse.pressed ? Theme.alpha("#ffffff", 0.16) : shotMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
+            radius: Theme.controlRadius
+            color: shotMouse.pressed ? Theme.pressed : shotMouse.containsMouse ? Theme.hover : "transparent"
             Text {
               anchors.centerIn: parent
               text: Icons.glyph(0xF019E)
-              color: "#ffffff"
+              color: Theme.foreground
               font.family: Theme.fontFamily
               font.pixelSize: 17
             }
@@ -253,16 +254,16 @@ Item {
       Rectangle {
         width: parent.width
         height: 104
-        radius: 18
+        radius: Theme.radius
         color: root.panel
-        border.width: 1 / Screen.devicePixelRatio
-        border.color: root.edge
+        border.width: Theme.borderWidth
+        border.color: Theme.accent
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           y: 12
           text: root.r ? Math.round(root.r.w * area.ratio) + "  ×  " + Math.round(root.r.h * area.ratio) : ""
-          color: "#ffffff"
+          color: Theme.foreground
           font.family: Theme.fontFamily
           font.pixelSize: 15
         }
@@ -287,8 +288,8 @@ Item {
               readonly property bool active: picker[modelData.key]
               width: 84
               height: 42
-              radius: 10
-              color: optionMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
+              radius: Theme.controlRadius
+              color: optionMouse.containsMouse ? Theme.hover : "transparent"
 
               Column {
                 anchors.centerIn: parent
@@ -296,14 +297,14 @@ Item {
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: Icons.glyph(option.active ? option.modelData.on : option.modelData.off)
-                  color: option.active ? "#ffffff" : Theme.alpha("#ffffff", 0.35)
+                  color: option.active ? Theme.accent : Theme.muted
                   font.family: Theme.fontFamily
                   font.pixelSize: 18
                 }
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: option.modelData.hint
-                  color: option.active ? Theme.alpha("#ffffff", 0.8) : Theme.alpha("#ffffff", 0.35)
+                  color: option.active ? Theme.foreground : Theme.muted
                   font.family: Theme.fontFamily
                   font.pixelSize: 9
                 }
@@ -324,10 +325,10 @@ Item {
       Rectangle {
         width: parent.width
         height: 104
-        radius: 18
+        radius: Theme.radius
         color: root.panel
-        border.width: 1 / Screen.devicePixelRatio
-        border.color: root.edge
+        border.width: Theme.borderWidth
+        border.color: Theme.accent
 
         Column {
           anchors.fill: parent
@@ -344,8 +345,8 @@ Item {
               required property var modelData
               width: parent.width
               height: 48
-              radius: 14
-              color: recordMouse.containsMouse ? Theme.alpha("#ffffff", 0.09) : "transparent"
+              radius: Theme.controlRadius
+              color: recordMouse.containsMouse ? Theme.hover : "transparent"
 
               Rectangle {
                 anchors.left: parent.left
@@ -353,13 +354,13 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 30
                 height: 20
-                radius: 4
-                color: recordRow.modelData.format === "gif" ? "#ffffff" : "transparent"
+                radius: Theme.controlRadius
+                color: recordRow.modelData.format === "gif" ? Theme.foreground : "transparent"
                 Text {
                   anchors.centerIn: parent
                   text: recordRow.modelData.format === "gif" ? "GIF" : Icons.glyph(0xF0567)
-                  color: recordRow.modelData.format === "gif" ? "#1e1e20" : "#ffffff"
-                  font.family: recordRow.modelData.format === "gif" ? Theme.fontFamily : Theme.fontFamily
+                  color: recordRow.modelData.format === "gif" ? Theme.background : Theme.red
+                  font.family: Theme.fontFamily
                   font.pixelSize: recordRow.modelData.format === "gif" ? 10 : 20
                   font.bold: true
                 }
@@ -369,7 +370,7 @@ Item {
                 anchors.leftMargin: 56
                 anchors.verticalCenter: parent.verticalCenter
                 text: recordRow.modelData.label
-                color: "#ffffff"
+                color: Theme.foreground
                 font.family: Theme.fontFamily
                 font.pixelSize: 15
               }
@@ -378,7 +379,7 @@ Item {
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 text: recordRow.modelData.keys
-                color: Theme.alpha("#ffffff", 0.5)
+                color: Theme.dim
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
               }

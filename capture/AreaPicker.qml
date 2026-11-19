@@ -19,9 +19,9 @@ import qs.ui
 //   M               show or hide the magnifier
 //   Esc, right click, or the shortcut again   cancel
 //
-// Drawn as CleanShot draws it: the screen untouched until you drag, a small
-// crosshair with its coordinates beside it, then the outside dimmed, white
-// handles on the selection's corners and edges, and its size by the pointer.
+// The screen untouched until you drag, the cursor theme's crosshair with its
+// coordinates beside it, then the outside dimmed, the selection outlined in
+// the accent like a focused window, and its size by the pointer.
 // The result is cropped out of the still, so nothing of the picker gets in.
 //
 // In "allinone" mode (CleanShot's All-In-One) the area stays put once drawn:
@@ -415,8 +415,8 @@ Scope {
         smooth: true
       }
 
-      // While dragging: the outside dimmed, the selection outlined, with
-      // white L-shaped handles on its corners and short bars mid-edge.
+      // While dragging: the outside dimmed, the selection outlined in the
+      // accent with square grips.
       Item {
         anchors.fill: parent
         readonly property var r: surface.selection && surface.selection.w >= 1 ? surface.selection : null
@@ -434,33 +434,32 @@ Scope {
           width: parent.r ? Math.round(parent.r.w) : 0
           height: parent.r ? Math.round(parent.r.h) : 0
 
-          // A hairline: one device pixel, crisp white, not a soft band.
+          // Outlined like a focused window: the theme's accent, at the
+          // window border's width.
           Rectangle {
             anchors.fill: parent
+            anchors.margins: -Theme.borderWidth
             color: "transparent"
-            border.width: 1 / Screen.devicePixelRatio
-            border.color: Theme.alpha("#ffffff", 0.95)
+            border.width: Theme.borderWidth
+            border.color: Theme.accent
           }
 
-          // Corners: two bars each, 3 px thick, sitting just outside.
+          // Square grips on the corners and mid-edges.
           Repeater {
-            model: [[0, 0], [1, 0], [0, 1], [1, 1]]
-            Item {
+            model: [[0, 0], [0.5, 0], [1, 0], [0, 0.5], [1, 0.5], [0, 1], [0.5, 1], [1, 1]]
+            Rectangle {
               required property var modelData
-              readonly property int len: Math.min(16, Math.max(6, Math.min(parent.width, parent.height) / 3))
-              x: modelData[0] ? parent.width - len + 2 : -2
-              y: modelData[1] ? parent.height - len + 2 : -2
-              width: len
-              height: len
-              Rectangle { x: 0; y: parent.modelData[1] ? parent.height - 2 : 0; width: parent.width; height: 2; color: "#ffffff" }
-              Rectangle { x: parent.modelData[0] ? parent.width - 2 : 0; y: 0; width: 2; height: parent.height; color: "#ffffff" }
+              readonly property bool mid: modelData[0] === 0.5 || modelData[1] === 0.5
+              visible: !mid || (modelData[0] === 0.5 ? parent.width > 48 : parent.height > 48)
+              width: 8
+              height: 8
+              x: Math.round(parent.width * modelData[0] - width / 2 + (modelData[0] - 0.5) * Theme.borderWidth)
+              y: Math.round(parent.height * modelData[1] - height / 2 + (modelData[1] - 0.5) * Theme.borderWidth)
+              color: Theme.accent
+              border.width: 1
+              border.color: Theme.background
             }
           }
-          // Mid-edge handles.
-          Rectangle { visible: parent.width > 48; x: (parent.width - 12) / 2; y: -1; width: 12; height: 2; radius: 1; color: "#ffffff" }
-          Rectangle { visible: parent.width > 48; x: (parent.width - 12) / 2; y: parent.height - 1; width: 12; height: 2; radius: 1; color: "#ffffff" }
-          Rectangle { visible: parent.height > 48; x: -1; y: (parent.height - 12) / 2; width: 2; height: 12; radius: 1; color: "#ffffff" }
-          Rectangle { visible: parent.height > 48; x: parent.width - 1; y: (parent.height - 12) / 2; width: 2; height: 12; radius: 1; color: "#ffffff" }
         }
       }
 
@@ -496,12 +495,12 @@ Scope {
           readonly property real off: crosshair.size / 2 + 3
           width: readoutText.implicitWidth + 12
           height: readoutText.implicitHeight + 6
-          radius: 5
+          radius: Theme.controlRadius
           x: surface.cx + off + width > surface.width ? -off - width : off
           y: surface.cy + off + height > surface.height ? -off - height : off
-          color: Theme.alpha("#1e1e20", 0.88)
-          border.width: 1 / Screen.devicePixelRatio
-          border.color: Theme.alpha("#ffffff", 0.14)
+          color: Theme.background
+          border.width: 1
+          border.color: Theme.accent
 
           Text {
             id: readoutText
@@ -509,7 +508,7 @@ Scope {
             text: readout.sizing
               ? Math.round(surface.selection.w * surface.ratio) + " × " + Math.round(surface.selection.h * surface.ratio)
               : Math.round(surface.cx * surface.ratio) + ", " + Math.round(surface.cy * surface.ratio)
-            color: "#ffffff"
+            color: Theme.foreground
             font.family: Theme.fontFamily
             font.pixelSize: 11
             font.features: { "tnum": 1 }
@@ -527,14 +526,6 @@ Scope {
         height: size
         x: surface.cx + 34 + size > surface.width ? surface.cx - 34 - size : surface.cx + 34
         y: surface.cy + 34 + size > surface.height ? surface.cy - 34 - size : surface.cy + 34
-
-        RectangularShadow {
-          anchors.fill: lens
-          radius: lens.width / 2
-          blur: 20
-          offset.y: 4
-          color: Theme.alpha("#000000", 0.6)
-        }
 
         Item {
           id: lens
@@ -567,7 +558,7 @@ Scope {
             height: surface.zoom + 2
             color: "transparent"
             border.width: 1
-            border.color: "#ffffff"
+            border.color: Theme.accent
           }
         }
 
@@ -577,15 +568,15 @@ Scope {
           height: loupe.size
           visible: false
           layer.enabled: true
-          Rectangle { anchors.fill: parent; radius: width / 2 }
+          Rectangle { anchors.fill: parent; radius: Theme.radius }
         }
 
         Rectangle {
           anchors.fill: parent
-          radius: width / 2
+          radius: Theme.radius
           color: "transparent"
-          border.width: 2
-          border.color: Theme.alpha("#ffffff", 0.9)
+          border.width: Theme.borderWidth
+          border.color: Theme.accent
         }
       }
 
@@ -689,24 +680,24 @@ Scope {
       width: r ? r.w : 0
       height: r ? r.h : 0
       color: "transparent"
-      border.width: 1
-      border.color: Theme.alpha("#ffffff", 0.6)
+      border.width: Theme.borderWidth
+      border.color: Theme.accent
     }
 
     Rectangle {
       readonly property var r: root.countdownRect
       width: 96
       height: 96
-      radius: 48
+      radius: Theme.radius
       x: r ? r.x + r.w / 2 - 48 : (parent.width - 96) / 2
       y: r ? r.y + r.h / 2 - 48 : (parent.height - 96) / 2
-      color: Theme.alpha("#1e1e20", 0.85)
-      border.width: 1
-      border.color: Theme.alpha("#ffffff", 0.2)
+      color: Theme.background
+      border.width: Theme.borderWidth
+      border.color: Theme.accent
       Text {
         anchors.centerIn: parent
         text: Captures.countdown
-        color: "#ffffff"
+        color: Theme.accent
         font.family: Theme.fontFamily
         font.pixelSize: 44
         font.bold: true

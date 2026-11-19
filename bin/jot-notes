@@ -1,0 +1,191 @@
+#!/usr/bin/env -S python3 -I
+"""Jot's notes on disk: one Markdown file per note in a folder (~/Notes by
+default), so they can be read, grepped and edited with anything. The file is
+the note, exactly as typed. What a file can't hold (the order of the notes,
+the one that was open, shortened links) lives in a small state file.
+
+  jot-notes load <dir> <state.json> [legacy-notes.json]
+      Prints { current, notes: [{ id, text, created, modified, links }] },
+      oldest first. id is the file name. On the first run it moves the notes
+      out of the old notes.json (which is left where it is, as a backup).
+
+  jot-notes sync <dir> <state.json> <snapshot.json>
+      Snapshot: { current, notes: [{ id, text, created, modified, links,
+      dirty }], trash: [id] }. Writes the dirty notes, sends the trashed ones
+      to the desktop trash (gio), records the order, and prints
+      { mtimes: { id: mtime } } for every note it knows.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+NAME_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(?:(\d{2}))?(?:-\d+)?\.md$")
+
+
+def read_json(path, fallback):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return fallback
+
+
+UMASK = os.umask(0)
+os.umask(UMASK)
+
+
+def write_atomic(path, text, mtime=None):
+    folder = os.path.dirname(path)
+    os.makedirs(folder, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".jot-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(tmp, 0o666 & ~UMASK)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    if mtime:
+        os.utime(path, (mtime, mtime))
+
+
+def created_from_name(name):
+    m = NAME_RE.match(name)
+    if not m:
+        return None
+    y, mo, d, h, mi, s = m.groups()
+    try:
+        return time.mktime((int(y), int(mo), int(d), int(h), int(mi), int(s or 0), 0, 0, -1))
+    except (OverflowError, ValueError):
+        return None
+
+
+def new_name(folder, created, taken):
+    base = time.strftime("%Y-%m-%d-%H%M%S", time.localtime(created))
+    name, n = base + ".md", 2
+    while name in taken or os.path.exists(os.path.join(folder, name)):
+        name, n = "%s-%d.md" % (base, n), n + 1
+    taken.add(name)
+    return name
+
+
+def migrate(folder, state_path, legacy_path):
+    """Old notes.json → one file per note. Only when nothing is there yet."""
+    data = read_json(legacy_path, None)
+    if not data or not data.get("notes"):
+        return None
+    taken, order, meta, current = set(), [], {}, ""
+    for note in data["notes"]:
+        text = str(note.get("text") or "")
+        created = float(note.get("created") or time.time())
+        modified = float(note.get("modified") or created)
+        name = new_name(folder, created, taken)
+        if text.strip():
+            write_atomic(os.path.join(folder, name), text, modified)
+        order.append(name)
+        meta[name] = {"created": created, "links": note.get("links") or {}}
+        if note.get("id") == data.get("current"):
+            current = name
+    state = {"version": 2, "current": current, "order": order, "meta": meta}
+    write_atomic(state_path, json.dumps(state, indent=1))
+    return state
+
+
+def load(folder, state_path, legacy_path=None):
+    os.makedirs(folder, exist_ok=True)
+    state = read_json(state_path, None)
+    if state is None and legacy_path and not any(f.endswith(".md") for f in os.listdir(folder)):
+        state = migrate(folder, state_path, legacy_path)
+    state = state or {}
+    meta = state.get("meta") or {}
+    order = state.get("order") or []
+
+    found = {}
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name)
+        if not name.endswith(".md") or name.startswith(".") or not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                text = f.read()
+            mtime = os.stat(path).st_mtime
+        except OSError:
+            continue
+        info = meta.get(name) or {}
+        created = info.get("created") or created_from_name(name) or mtime
+        found[name] = {"id": name, "text": text, "created": created, "modified": mtime,
+                       "links": info.get("links") or {}}
+
+    # Known notes in their saved order; files that turned up since (made by
+    # hand, or copied in) go by when they were last changed.
+    notes = [found.pop(n) for n in order if n in found]
+    notes += sorted(found.values(), key=lambda n: n["modified"])
+    print(json.dumps({"current": state.get("current") or "", "notes": notes}))
+
+
+def trash(path):
+    if not os.path.exists(path):
+        return
+    if os.path.getsize(path) == 0 or not shutil.which("gio"):
+        os.remove(path)
+        return
+    if subprocess.run(["gio", "trash", path], capture_output=True).returncode != 0:
+        os.remove(path)
+
+
+def sync(folder, state_path, snapshot_path):
+    snap = read_json(snapshot_path, None)
+    if snap is None:
+        sys.exit("jot-notes: unreadable snapshot")
+    os.makedirs(folder, exist_ok=True)
+    for name in snap.get("trash") or []:
+        if "/" not in name and name.endswith(".md"):
+            trash(os.path.join(folder, name))
+
+    order, meta, mtimes = [], {}, {}
+    for note in snap.get("notes") or []:
+        name = str(note.get("id") or "")
+        if "/" in name or not name.endswith(".md"):
+            continue
+        path = os.path.join(folder, name)
+        text = str(note.get("text") or "")
+        if note.get("dirty"):
+            exists = os.path.exists(path)
+            # A blank note gets no file until something is typed in it.
+            if text.strip() or exists:
+                current = None
+                if exists:
+                    with open(path, encoding="utf-8", errors="replace") as f:
+                        current = f.read()
+                if current != text:
+                    write_atomic(path, text)
+        order.append(name)
+        meta[name] = {"created": note.get("created"), "links": note.get("links") or {}}
+        if os.path.exists(path):
+            mtimes[name] = os.stat(path).st_mtime
+
+    state = {"version": 2, "current": snap.get("current") or "", "order": order, "meta": meta}
+    write_atomic(state_path, json.dumps(state, indent=1))
+    print(json.dumps({"mtimes": mtimes}))
+
+
+def main(argv):
+    if len(argv) >= 4 and argv[1] == "load":
+        load(argv[2], argv[3], argv[4] if len(argv) > 4 else None)
+    elif len(argv) == 5 and argv[1] == "sync":
+        sync(argv[2], argv[3], argv[4])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

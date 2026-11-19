@@ -6,14 +6,14 @@ import Quickshell.Io
 import qs.services
 import qs.theme
 import qs.ui
-import "../services/JotThemes.js" as JotThemes
-import "../ui/Squircle.js" as Squircle
-
-// Jot, a scratchpad that drops from the bar (Antinote-style). Notes have no
+// Jot, a scratchpad that drops from the bar. Notes have no
 // titles; a keyword on the first line switches a feature on (math, list,
 // sum, avg, count), "timer 5m" on a line starts a timer, and Ctrl+[ / Ctrl+]
 // or a sideways swipe move between notes. The notes, timer and AutoPaste
-// live in services/JotStore.qml; the text logic in services/JotEngine.js.
+// live in services/JotStore.qml (one Markdown file per note, in ~/Notes);
+// the text logic in services/JotEngine.js. It is drawn like the shell's
+// other popups (theme colours, square corners, the accent border), on a
+// sheet of paper a step lighter than they are.
 //
 // The editor is a plain TextEdit with see-through text, laid over a rich
 // text copy of the same characters in the theme's colours; both lay out the
@@ -46,29 +46,27 @@ BarButton {
   // A link under the pointer, for the tooltip: { url, short, x, y } or null.
   property var hoverLink: null
 
-  // Antinote's measurements (its 360x412 note): text 47 px in from the left,
-  // 46 from the right, the first line's baseline 50 px down.
+  // Room in the left margin for list boxes and the timer, and at the top
+  // and bottom for the hover bars.
   readonly property int gutter: 47
   readonly property int padTop: Math.round(50 - rowMetrics.ascent)
   readonly property int padBottom: 40
   readonly property int padRight: 46
 
-  // Antinote's font is SF Mono; Geist Mono is the closest one here.
-  readonly property string fontFamily: "GeistMono Nerd Font Mono"
+  // The shell's font.
+  readonly property string fontFamily: Theme.fontFamily
 
-  // Antinote's default look, sampled from its own screenshots. The note is
-  // the same whatever the desktop theme.
-  // Antinote's default look or one of its themes (services/JotThemes.js).
-  readonly property var pal: JotThemes.palette(Config.jot.theme)
-  Binding { target: JotStore; property: "ink"; value: root.pal.fg }
-
-  function cycleTheme(step) {
-    Config.jot.theme = JotThemes.next(Config.jot.theme, step)
-    showToast(JotThemes.NAMES[Config.jot.theme])
-  }
+  // The shell theme's colours, or the desktop theme picked for Jot
+  // (services/JotStore.qml).
+  readonly property var pal: JotStore.pal
   readonly property string paper: Config.jot.paper
-  // The keyword takes its feature's colour, as in Antinote: navy for math,
-  // purple for lists.
+  // Keeps a canvas to the note (which already sits inside the border).
+  function clipCard(ctx, w, h) {
+    ctx.beginPath()
+    ctx.rect(0, 0, w, h)
+    ctx.clip()
+  }
+  // The keyword takes its feature's colour: one for math, another for lists.
   readonly property var colors: ({
     keyword: pal.keyword, colon: pal.colon, variable: pal.variable, reference: pal.reference,
     result: pal.result, link: pal.link, done: pal.done, doneMark: pal.doneMark
@@ -560,6 +558,7 @@ BarButton {
       // As Antinote: Ctrl+1 jumps to the front, Ctrl+Shift+1 promotes.
       else if (k === Qt.Key_Exclam || (k === Qt.Key_1 && shift)) JotStore.promote()
       else if (k === Qt.Key_1) JotStore.goFront(false)
+      else if (k === Qt.Key_T) showToast(JotStore.cycleTheme(shift ? -1 : 1))
       else if (k === Qt.Key_N) {
         // Only this shortcut announces the new note.
         var before = JotStore.notes.length
@@ -585,7 +584,6 @@ BarButton {
       else if (k === Qt.Key_D && shift) JotStore.deleteNote()
       else if (k === Qt.Key_Return || k === Qt.Key_Enter) toggleDone(cursorLine().index)
       else if (k === Qt.Key_Comma) root.openSettings()
-      else if (k === Qt.Key_T) cycleTheme(shift ? -1 : 1)
       else if (k === Qt.Key_Equal || k === Qt.Key_Plus) zoom(1)
       else if (k === Qt.Key_Minus) zoom(-1)
       else if (k === Qt.Key_0) zoom(0)
@@ -658,15 +656,14 @@ BarButton {
     contentWidth: Config.jot.width
     contentHeight: Config.jot.height
     keepOpen: root.pinned
-    inset: 0
+    // The note sits just inside the border, so nothing draws over it.
+    inset: Theme.borderWidth
     cardColor: root.pal.bg
     borderColor: root.pal.border
-    borderWidth: 1
-    // Shaped like a macOS Tahoe window's corners.
-    cornerRadius: 16
-    cornerSmoothing: 0.6
-    shadow: true
-    // Dragged by its top strip, as Antinote's window is; remembered.
+    borderWidth: Theme.borderWidth
+    cornerRadius: Theme.radius
+    shadow: false
+    // Dragged by its top strip; remembered.
     offsetX: chromeDrag.pressed ? chromeDrag.liveX : Config.jot.offsetX
     offsetY: chromeDrag.pressed ? chromeDrag.liveY : Config.jot.offsetY
 
@@ -674,6 +671,8 @@ BarButton {
       if (open) {
         if (Config.jot.openOn === "newest") JotStore.goFront(true)
         root.loadNote(0)
+        // Picks up edits made to the files outside Jot since last time.
+        JotStore.rescan()
         Qt.callLater(() => editor.forceActiveFocus())
       } else {
         root.searching = false
@@ -714,8 +713,8 @@ BarButton {
         Canvas {
           id: paperCanvas
           anchors.fill: parent
-          visible: root.paper === "lines" || root.paper === "dots" || root.paper === "ruled"
-          readonly property var look: [root.paper, width, height, pitchProbe.pitch, rowMetrics.ascent, root.gutter, flick.contentY]
+          visible: root.paper === "lines" || root.paper === "dots" || root.paper === "ruled" || root.paper === "notepad"
+          readonly property var look: [root.paper, width, height, pitchProbe.pitch, rowMetrics.ascent, root.gutter, flick.contentY, root.pal]
           onLookChanged: requestPaint()
           // The paper is laid out from the text, as Antinote's is: letters
           // stand on it. Grid squares are half a line tall with a line on
@@ -726,14 +725,33 @@ BarButton {
             var ctx = getContext("2d")
             ctx.reset()
             if (!visible) return
-            Squircle.trace(ctx, width, height, popup.cornerRadius, popup.cornerSmoothing, 1)
-            ctx.clip()
+            root.clipCard(ctx, width, height)
             var pitch = pitchProbe.pitch
             var baseline = root.padTop + rowMetrics.ascent - flick.contentY
             var left = root.gutter
             // First position at or before 0 on a lattice through `at`.
             function from(at, step) { return at - Math.ceil(at / step) * step }
-            if (root.paper === "ruled") {
+            if (root.paper === "notepad") {
+              // A legal pad: rules on every baseline in the theme's blue, a
+              // heavier one under the header, a red margin between the list
+              // boxes and the text, and holes along the top where it tears off.
+              // The header rule scrolls away with the first line.
+              var header = Math.round(root.padTop - 6 - flick.contentY)
+              ctx.fillStyle = Theme.alpha(root.pal.rule, 0.22)
+              for (var ny = from(baseline, pitch); ny < height; ny += pitch)
+                if (ny > header + 2) ctx.fillRect(0, Math.round(ny), width, 1)
+              ctx.fillStyle = Theme.alpha(root.pal.rule, 0.4)
+              if (header > -2) ctx.fillRect(0, header, width, 2)
+              ctx.fillStyle = Theme.alpha(root.pal.margin, 0.3)
+              ctx.fillRect(left - 9, 0, 1, height)
+              ctx.fillRect(left - 7, 0, 1, height)
+              ctx.fillStyle = Theme.alpha(root.pal.fg, 0.12)
+              for (var hx = 14; hx < width - 8; hx += 12) {
+                ctx.beginPath()
+                ctx.arc(hx, 5, 1.6, 0, 2 * Math.PI)
+                ctx.fill()
+              }
+            } else if (root.paper === "ruled") {
               ctx.fillStyle = Theme.alpha(root.pal.fg, 0.1)
               for (var ry = from(baseline, pitch); ry < height; ry += pitch) ctx.fillRect(0, Math.round(ry), width, 1)
             } else if (root.paper === "lines") {
@@ -1056,8 +1074,7 @@ BarButton {
           onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
-            Squircle.trace(ctx, width, height, popup.cornerRadius, popup.cornerSmoothing, 1)
-            ctx.clip()
+            root.clipCard(ctx, width, height)
             ctx.fillStyle = root.pal.edge
             ctx.fillRect(side ? width - 5 : 0, 0, 5, height)
           }
@@ -1065,26 +1082,25 @@ BarButton {
           NumberAnimation on opacity { id: edgeFade; running: false; from: 1; to: 0; duration: 420; easing.type: Easing.OutCubic }
         }
 
-        // "New note created": a flat blue pill in the note's font.
+        // "New note created", in the shell's accent.
         Rectangle {
           id: createdPill
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.bottom: parent.bottom
           anchors.bottomMargin: 10
-          width: createdLabel.implicitWidth + 28
-          height: createdLabel.implicitHeight + 12
-          radius: height / 2
-          color: "#8ec5e2"
+          width: createdLabel.implicitWidth + 20
+          height: createdLabel.implicitHeight + 8
+          radius: Theme.controlRadius
+          color: root.pal.accent
           opacity: createdTimer.running && editor.length === 0 && !toastTimer.running && !root.searching ? 1 : 0
           visible: opacity > 0
           Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
           JotLabel {
             id: createdLabel
             anchors.centerIn: parent
-            text: "New note created"
-            color: "#27333b"
+            text: "New note · " + (JotStore.note ? JotStore.note.id : "")
+            color: root.pal.toastBg
             font.pixelSize: Theme.fontSmall
-            font.letterSpacing: 0.5
           }
         }
         Timer { id: createdTimer; interval: 1800 }
@@ -1094,10 +1110,12 @@ BarButton {
           anchors.bottom: parent.bottom
           anchors.bottomMargin: 8
           visible: toastTimer.running
-          width: toastLabel.implicitWidth + 24
+          width: toastLabel.implicitWidth + 20
           height: toastLabel.implicitHeight + 8
-          radius: height / 2
+          radius: Theme.controlRadius
           color: root.pal.toastBg
+          border.width: 1
+          border.color: Theme.alpha(root.pal.fg, 0.2)
           JotLabel {
             id: toastLabel
             anchors.centerIn: parent
@@ -1168,7 +1186,7 @@ BarButton {
           anchors.fill: parent
           anchors.margins: 8
           anchors.topMargin: root.padTop - 4
-          radius: 8
+          radius: Theme.radius
           color: root.pal.bg
           border.width: 1
           border.color: Theme.alpha(root.pal.fg, 0.15)
@@ -1387,9 +1405,9 @@ BarButton {
           onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
-            Squircle.trace(ctx, content.width, content.height, popup.cornerRadius, popup.cornerSmoothing, 1)
-            ctx.clip()
-            ctx.fillStyle = root.pal.bg
+            root.clipCard(ctx, content.width, content.height)
+            // A little see-through, so the note shows faintly behind the buttons.
+            ctx.fillStyle = Theme.alpha(root.pal.bg, 0.72)
             ctx.fillRect(0, 0, width, height)
           }
         }
@@ -1436,34 +1454,34 @@ BarButton {
           anchors.rightMargin: 10
           spacing: 6
 
-          // As Antinote: settings and search on the left, a new note and
-          // the pin on the right, drawn to match its icons (ui/JotIcon.qml).
-          JotIcon {
-            kind: "settings"
-            color: root.pal.icon
+          // Settings and the notes list on the left, a new note and the
+          // pin on the right.
+          IconButton {
+            icon: Icons.glyph(0xF08BB)
+            foreground: root.pal.icon
             onClicked: root.openSettings()
           }
-          JotIcon {
-            kind: "search"
-            color: root.searching ? root.pal.accent : root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0349)
+            foreground: root.searching ? root.pal.accent : root.pal.icon
             onClicked: root.searching ? root.closeSearch() : root.openSearch()
           }
           Item { Layout.fillWidth: true }
-          JotIcon {
-            kind: "compose"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF090C)
+            foreground: root.pal.icon
             onClicked: JotStore.newNote("")
           }
-          JotIcon {
-            kind: root.pinned ? "pinned" : "pin"
-            color: root.pinned ? root.pal.accent : root.pal.icon
+          IconButton {
+            icon: Icons.glyph(root.pinned ? 0xF0403 : 0xF0931)
+            foreground: root.pinned ? root.pal.accent : root.pal.icon
             onClicked: root.pinned = !root.pinned
           }
         }
       }
 
-      // Antinote's bottom bar: promote on the left, the note's date, then
-      // back, forward, jump to the front and export on the right.
+      // The bottom bar: promote on the left, the note's file, then back,
+      // forward, jump to the newest and export on the right.
       Rectangle {
         id: foot
         objectName: "jotFoot"
@@ -1486,9 +1504,8 @@ BarButton {
             var ctx = getContext("2d")
             ctx.reset()
             ctx.translate(0, height - content.height)
-            Squircle.trace(ctx, content.width, content.height, popup.cornerRadius, popup.cornerSmoothing, 1)
-            ctx.clip()
-            ctx.fillStyle = root.pal.bg
+            root.clipCard(ctx, content.width, content.height)
+            ctx.fillStyle = Theme.alpha(root.pal.bg, 0.72)
             ctx.fillRect(0, content.height - height, width, height)
           }
         }
@@ -1502,37 +1519,39 @@ BarButton {
           anchors.rightMargin: 10
           spacing: 6
 
-          JotIcon {
-            kind: "promote"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0552)
+            foreground: root.pal.icon
             onClicked: JotStore.promote()
           }
           Text {
             Layout.fillWidth: true
             Layout.leftMargin: 4
-            text: JotStore.note ? Qt.formatDate(new Date(JotStore.note.created * 1000), "MMM d, yyyy") : ""
+            // When the note was started (its file in ~/Notes is named for it).
+            text: JotStore.note ? Qt.formatDate(new Date(JotStore.note.created * 1000), "yyyy-MM-dd") : ""
             color: root.pal.dim
+            font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSmall
-            elide: Text.ElideRight
+            elide: Text.ElideMiddle
           }
-          JotIcon {
-            kind: "back"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0141)
+            foreground: root.pal.icon
             onClicked: JotStore.go(-1)
           }
-          JotIcon {
-            kind: "forward"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0142)
+            foreground: root.pal.icon
             onClicked: JotStore.go(1)
           }
-          JotIcon {
-            kind: "front"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0601)
+            foreground: root.pal.icon
             onClicked: JotStore.goFront(false)
           }
-          JotIcon {
-            kind: "export"
-            color: root.pal.icon
+          IconButton {
+            icon: Icons.glyph(0xF0207)
+            foreground: root.pal.icon
             onClicked: root.exportNote()
           }
         }

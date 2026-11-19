@@ -7,7 +7,7 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// The capture menu (ALT+SHIFT+5): pick what to grab. Number keys work too.
+// The capture menu: pick what to grab. Number keys work too.
 Scope {
   id: root
 
@@ -60,7 +60,7 @@ Scope {
       color: Theme.background
       border.width: Theme.borderWidth
       border.color: Theme.accent
-      radius: Theme.controlRadius + 6
+      radius: Theme.radius
 
       Item {
         id: keys
@@ -88,7 +88,7 @@ Scope {
 
             implicitWidth: 78
             implicitHeight: 60
-            radius: Theme.controlRadius + 4
+            radius: Theme.controlRadius
             color: modeMouse.containsMouse ? Theme.selection : Theme.alpha(Theme.foreground, 0.04)
 
             Column {
@@ -147,7 +147,7 @@ Scope {
       color: stopMouse.containsMouse ? Theme.red : Theme.background
       border.width: Theme.borderWidth
       border.color: Theme.red
-      radius: height / 2
+      radius: Theme.radius
 
       RowLayout {
         id: stopRow

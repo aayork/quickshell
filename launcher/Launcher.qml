@@ -93,6 +93,8 @@ Scope {
     { id: "tailscale", title: "Tailscale", glyph: 0xF0582, mark: "tailscale", words: "vpn tailnet", run: () => PopupState.request("tailscale") },
     { id: "calendar", title: "Calendar and Weather", glyph: 0xF0599, words: "clock date notifications", run: () => PopupState.request("clock") },
     { id: "settings", title: "Settings", glyph: 0xF0493, words: "preferences theme background font cursor night light windows", run: () => PopupState.request("settings") },
+    { id: "notes", title: "Notes", glyph: 0xF039B, words: "jot notepad scratchpad note memo alt+a", run: () => JotStore.openRequested() },
+    { id: "new-note", title: "New Note", glyph: 0xF090C, words: "jot notes notepad scratchpad create write", run: () => { JotStore.newNote(""); JotStore.openRequested() } },
     { id: "capture", title: "Take a Screenshot", glyph: 0xF0E51, words: "screenshot capture region area window fullscreen scroll", run: () => Captures.menuRequested() },
     { id: "colorpicker", title: "Color Picker", glyph: 0xF0349, words: "colour pick hex hyprpicker", run: () => Quickshell.execDetached(["hyprpicker", "-a"]) },
     { id: "reload", title: "Reload Shell", glyph: 0xF0450, words: "restart quickshell", run: () => Quickshell.reload(true) }
