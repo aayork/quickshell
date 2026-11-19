@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Open bottom (btm) with the temperature layout in a terminal.
+
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec "$SHELL_ROOT/bin/launch-tui" --app-id=org.aayork.temps btm -C "$SHELL_ROOT/assets/btm/temps.toml" "$@"

@@ -6,7 +6,7 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// The clock, and behind it the day at a glance: a calendar, the weather, and
+// The clock, and behind it the day at a glance: a calendar and
 // the notifications that came in.
 BarButton {
   id: root
@@ -141,7 +141,6 @@ BarButton {
       root.monthOffset = 0
       root.selectedDay = new Date()
       offsets.running = true
-      Weather.refresh()
       Calendar.refresh()
     }
 
@@ -487,86 +486,6 @@ BarButton {
             options: Calendar.writable.map(c => ({ label: c.name, value: c.url }))
             current: root.eventCalendar
             onPicked: function(value) { root.eventCalendar = value }
-          }
-        }
-      }
-
-      Separator { Layout.fillWidth: true }
-
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: 10
-
-        Label {
-          visible: Weather.ready
-          text: Weather.icon
-          font.pixelSize: 26
-          color: Theme.accent
-          elide: Text.ElideNone
-        }
-
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: 0
-          Label {
-            text: Weather.ready ? Weather.temperature + "  " + Weather.condition
-              : Weather.failed ? "Weather unavailable" : "Checking the weather…"
-            color: Weather.ready ? Theme.foreground : Theme.dim
-            Layout.fillWidth: true
-          }
-          Label {
-            visible: Weather.ready
-            text: Weather.placeName
-            color: Theme.dim
-            font.pixelSize: Theme.fontSmall
-            Layout.fillWidth: true
-          }
-        }
-      }
-
-      // The week: each day gets an equal share of the width, set outright
-      // so the columns cannot crowd each other.
-      Row {
-        id: week
-        visible: Weather.ready
-        Layout.fillWidth: true
-        Layout.topMargin: 6
-
-        Repeater {
-          model: Weather.days
-
-          Column {
-            required property var modelData
-            required property int index
-            width: week.width / Math.max(1, Weather.days.length)
-            spacing: 5
-
-            Label {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: index === 0 ? "Today" : modelData.day
-              color: index === 0 ? Theme.foreground : Theme.dim
-              font.pixelSize: Theme.fontSmall
-              elide: Text.ElideNone
-            }
-            Label {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: modelData.icon
-              font.pixelSize: Theme.iconLarge
-              elide: Text.ElideNone
-            }
-            Label {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: modelData.high
-              font.pixelSize: Theme.fontSmall
-              elide: Text.ElideNone
-            }
-            Label {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: modelData.low
-              color: Theme.dim
-              font.pixelSize: Theme.fontSmall
-              elide: Text.ElideNone
-            }
           }
         }
       }

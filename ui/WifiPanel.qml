@@ -169,20 +169,13 @@ ColumnLayout {
       model: {
         var d = details.info, rows = []
         if (details.wifi) {
-          rows.push(["Signal", d.dbm + " dBm · " + Net.signalWord(d.dbm)])
-          var radio = [d.band, d.channel ? "Ch " + d.channel : "", d.width ? d.width + " MHz" : ""]
-          rows.push(["Band", radio.filter(x => x).join(" · ")])
-          if (d.standard) rows.push(["Standard", d.standard])
-          if (d.rxRate) rows.push(["Link rate", "↓ " + Math.round(d.rxRate) + " · ↑ " + Math.round(d.txRate || 0) + " Mb/s"])
-          if (d.security) rows.push(["Security", d.security])
+          rows.push(["Signal", Net.signalWord(d.dbm) + " · " + d.dbm + " dBm"])
+          if (d.band) rows.push(["Band", d.band])
         } else if (d.linkSpeed) {
           rows.push(["Link rate", d.linkSpeed >= 1000 ? (d.linkSpeed / 1000) + " Gb/s" : d.linkSpeed + " Mb/s"])
         }
         if (d.ip4) rows.push(["IP address", d.ip4])
         if (d.gateway) rows.push(["Router", d.gateway + (d.latency !== undefined && d.latency !== null ? " · " + Math.round(d.latency) + " ms" : "")])
-        if (d.dns && d.dns.length) rows.push(["DNS", d.dns.join(", ")])
-        if (d.ip6) rows.push(["IPv6", d.ip6])
-        if (d.mac) rows.push(["MAC", d.mac])
         return rows
       }
 

@@ -8,6 +8,9 @@ import qs.theme
 ColumnLayout {
   id: root
 
+  // Off inside the Headphones panel, which shows the name and battery itself.
+  property bool showHeader: true
+
   spacing: 10
 
   // A section title led by a small glyph.
@@ -95,6 +98,7 @@ ColumnLayout {
 
   // Headphones, name, connection and battery.
   RowLayout {
+    visible: root.showHeader
     Layout.fillWidth: true
     spacing: 10
 
@@ -139,7 +143,7 @@ ColumnLayout {
     }
   }
 
-  Separator { Layout.fillWidth: true }
+  Separator { visible: root.showHeader; Layout.fillWidth: true }
 
   RowLayout {
     visible: Bose.error !== ""

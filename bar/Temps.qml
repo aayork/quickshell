@@ -5,8 +5,9 @@ import qs.services
 import qs.theme
 import qs.ui
 
-// CPU temperature on the bar (yellow when warm, red when hot); click for
-// every sensor and a graph of the last few minutes.
+// CPU temperature on the bar (yellow when warm, red when hot). Click opens
+// bottom (btm) with a temperature layout (bin/temps-monitor); right click
+// shows the quick popup with every sensor and a graph of the last few minutes.
 BarButton {
   id: root
 
@@ -23,7 +24,10 @@ BarButton {
   text: Icons.glyph(0xF050F) + "\u2009" + Temps.format(Temps.cpu)
   fontSize: Theme.fontSize
   foreground: levelColor(cpuLevel, Theme.foreground)
-  onClicked: popup.toggle()
+  onClicked: button => {
+    if (button === Qt.RightButton) popup.toggle()
+    else Quickshell.execDetached([Quickshell.shellDir + "/bin/temps-monitor"])
+  }
 
   Popup {
     id: popup
@@ -119,19 +123,13 @@ BarButton {
           Layout.rightMargin: 8
           spacing: 10
 
-          Rectangle {
-            implicitWidth: 30
-            implicitHeight: 30
-            radius: Theme.controlRadius + 4
-            color: Theme.alpha(root.levelColor(sensor.level, Theme.foreground), sensor.level > 0 ? 0.18 : 0.08)
-
-            Label {
-              anchors.centerIn: parent
-              text: Icons.glyph(sensor.modelData.glyph)
-              color: root.levelColor(sensor.level, Theme.foreground)
-              font.pixelSize: Theme.iconSize + 1
-              elide: Text.ElideNone
-            }
+          Label {
+            Layout.preferredWidth: 20
+            horizontalAlignment: Text.AlignHCenter
+            text: Icons.glyph(sensor.modelData.glyph)
+            color: root.levelColor(sensor.level, Theme.dim)
+            font.pixelSize: Theme.iconSize + 1
+            elide: Text.ElideNone
           }
 
           ColumnLayout {

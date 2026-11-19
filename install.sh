@@ -33,7 +33,7 @@ into /opt/aayork-desktop, which takes a while (longest on Debian 13 and
 24.04-based releases, where GCC and Qt are built too).
 
 Extras, off unless asked for:
-  --with-bose         Bose headphone controls on the bar
+  --with-bose         Bose controls in the launcher's headphones: panel
   --with-razer        Razer mouse DPI/polling settings (installs OpenRazer)
   --with-things       Things 3 to-dos on the bar (installs Go and things-cli)
   --with-tailscale    Tailscale (the bar shows it whenever it is installed)

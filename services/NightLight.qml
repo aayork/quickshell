@@ -9,9 +9,9 @@ import "Sun.js" as Sun
 Singleton {
   id: root
 
-  readonly property int neutral: 6000
+  readonly property int neutral: 6500
   readonly property string schedule: Config.nightlight.schedule
-  readonly property int warmth: Math.max(2500, Math.min(5500, Config.nightlight.temperature))
+  readonly property int warmth: Math.max(2500, Math.min(6300, Config.nightlight.temperature))
 
   // Whether the tint is on right now.
   property bool active: false
@@ -75,12 +75,12 @@ Singleton {
   }
 
   // Starts hyprsunset if it is not there yet, then sets the temperature.
-  // Neutral means identity: hyprsunset's 6000K is still a visible warm tint.
+  // Neutral means identity: hyprsunset still tints visibly at 6000K.
   Process {
     id: apply
     property int temperature: root.neutral
     property bool again: false
-    command: ["sh", "-c", "pgrep -x hyprsunset >/dev/null || { setsid -f hyprsunset >/dev/null 2>&1; sleep 1; }; if [ \"$1\" -ge 6000 ]; then hyprctl hyprsunset identity; else hyprctl hyprsunset temperature \"$1\"; fi", "sh", String(temperature)]
+    command: ["sh", "-c", "pgrep -x hyprsunset >/dev/null || { setsid -f hyprsunset >/dev/null 2>&1; sleep 1; }; if [ \"$1\" -ge 6500 ]; then hyprctl hyprsunset identity; else hyprctl hyprsunset temperature \"$1\"; fi", "sh", String(temperature)]
     onExited: {
       if (!again) return
       again = false

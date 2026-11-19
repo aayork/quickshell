@@ -950,9 +950,9 @@ Scope {
                 Slider {
                   Layout.preferredWidth: 260
                   // Left is neutral, right is warmest.
-                  value: (5500 - Config.nightlight.temperature) / 3000
-                  step: 250 / 3000
-                  onMoved: function(value) { Config.nightlight.temperature = Math.round((5500 - value * 3000) / 50) * 50 }
+                  value: (6300 - Config.nightlight.temperature) / 3800
+                  step: 250 / 3800
+                  onMoved: function(value) { Config.nightlight.temperature = Math.round((6300 - value * 3800) / 50) * 50 }
                 }
               }
 

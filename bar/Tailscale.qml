@@ -50,8 +50,8 @@ BarButton {
     size: 11
     color: root.foreground
     off: !Tailscale.active
-    hovered: root.hovered
-    busy: Tailscale.busy || Tailscale.pending !== -1
+    busy: Tailscale.busy || Tailscale.pending !== -1 || Tailscale.backendState === "Starting"
+    exitNode: Tailscale.running && Tailscale.exitNode !== null
   }
 
   // One machine: its kind in a tile with an online dot, name over address,
@@ -90,11 +90,9 @@ BarButton {
       spacing: 10
 
       // Kind of machine, with the online dot on the tile's corner.
-      Rectangle {
-        implicitWidth: 30
-        implicitHeight: 30
-        radius: Theme.controlRadius + 4
-        color: machine.self ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.foreground, machine.online ? 0.08 : 0.04)
+      Item {
+        implicitWidth: 22
+        implicitHeight: 22
 
         Label {
           anchors.centerIn: parent
@@ -208,11 +206,9 @@ BarButton {
         Layout.fillWidth: true
         spacing: 10
 
-        Rectangle {
-          implicitWidth: 34
-          implicitHeight: 34
-          radius: Theme.controlRadius + 5
-          color: Tailscale.active ? Theme.alpha(Theme.accent, 0.18) : Theme.alpha(Theme.foreground, 0.06)
+        Item {
+          implicitWidth: 22
+          implicitHeight: 22
 
           TailscaleIcon {
             anchors.centerIn: parent

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Headphone jacks and Bluetooth headset modes, for the Headphones panel.
+
+  headphones status                 JSON: wired jacks and Bluetooth cards
+  headphones use-jack <card> <port> turn the jack's card on and play there
+  headphones bt-mode <card> <music|call>
+                                    high-quality playback, or the headset
+                                    profile that also gives a microphone
+"""
+
+import json
+import subprocess
+import sys
+import time
+
+
+def pactl(*args, check=False):
+    result = subprocess.run(["pactl", *args], capture_output=True, text=True, timeout=10)
+    if check and result.returncode != 0:
+        sys.exit(result.stderr.strip() or f"pactl {args[0]} failed")
+    return result.stdout
+
+
+def listing(kind):
+    try:
+        return json.loads(pactl("-f", "json", "list", kind) or "[]")
+    except json.JSONDecodeError:
+        return []
+
+
+def best_profile(card, names):
+    """The available profile among names with the highest priority."""
+    profiles = card.get("profiles", {})
+    choices = [(profiles[n].get("priority", 0), n) for n in names
+               if n in profiles and profiles[n].get("available", True)]
+    return max(choices)[1] if choices else None
+
+
+def status():
+    cards = listing("cards")
+    sinks = listing("sinks")
+    jacks, bluetooth = [], []
+
+    for card in cards:
+        name = card["name"]
+        props = card.get("properties", {})
+        description = props.get("device.description", name)
+        card_sinks = [s for s in sinks if s.get("properties", {}).get("device.name") == name]
+
+        if name.startswith("bluez_card."):
+            profiles = card.get("profiles", {})
+            music = best_profile(card, [p for p in profiles if p.startswith("a2dp")])
+            call = best_profile(card, [p for p in profiles if p.startswith("headset-head-unit")])
+            codec = ""
+            for sink in card_sinks:
+                codec = sink.get("properties", {}).get("api.bluez5.codec", "") or codec
+            bluetooth.append({
+                "card": name,
+                "address": props.get("api.bluez5.address", "").upper(),
+                "profile": card.get("active_profile", ""),
+                "call": card.get("active_profile", "").startswith("headset-head-unit"),
+                "canMusic": music is not None,
+                "canCall": call is not None,
+                "codec": codec.upper().replace("_", " "),
+            })
+            continue
+
+        for port_name, port in card.get("ports", {}).items():
+            if port.get("type") != "Headphones" or port.get("direction", "output") != "output":
+                continue
+            if "output" not in port_name:
+                continue
+            sink = next((s for s in card_sinks if any(p.get("name") == port_name for p in s.get("ports", []))), None)
+            jacks.append({
+                "card": name,
+                "device": description,
+                "port": port_name,
+                "label": port.get("description", "Headphones"),
+                "plugged": port.get("availability") != "not available",
+                "sink": sink["name"] if sink else "",
+                "active": bool(sink and sink.get("active_port") == port_name),
+            })
+
+    print(json.dumps({"jacks": jacks, "bluetooth": bluetooth}))
+
+
+def use_jack(card_name, port_name):
+    card = next((c for c in listing("cards") if c["name"] == card_name), None)
+    if card is None:
+        sys.exit("That sound card is gone")
+    port = card.get("ports", {}).get(port_name)
+    if port is None:
+        sys.exit("That jack is gone")
+
+    def sink_for():
+        for sink in listing("sinks"):
+            if sink.get("properties", {}).get("device.name") == card_name and \
+                    any(p.get("name") == port_name for p in sink.get("ports", [])):
+                return sink["name"]
+        return None
+
+    sink = sink_for()
+    if sink is None:
+        # The card is off, or on a profile without this jack: pick the best
+        # output profile that has it.
+        profile = best_profile(card, [p for p in port.get("profiles", []) if p.startswith("output:")])
+        if profile is None:
+            sys.exit("No way to play through that jack")
+        pactl("set-card-profile", card_name, profile, check=True)
+        for _ in range(20):
+            time.sleep(0.1)
+            sink = sink_for()
+            if sink:
+                break
+        if sink is None:
+            sys.exit("The jack's output did not appear")
+
+    pactl("set-sink-port", sink, port_name, check=True)
+    pactl("set-default-sink", sink, check=True)
+
+
+def bt_mode(card_name, mode):
+    card = next((c for c in listing("cards") if c["name"] == card_name), None)
+    if card is None:
+        sys.exit("Those headphones are gone")
+    prefix = "headset-head-unit" if mode == "call" else "a2dp"
+    profile = best_profile(card, [p for p in card.get("profiles", {}) if p.startswith(prefix)])
+    if profile is None:
+        sys.exit("These headphones have no " + ("headset microphone" if mode == "call" else "music") + " mode")
+    pactl("set-card-profile", card_name, profile, check=True)
+
+
+def main():
+    args = sys.argv[1:]
+    if args == ["status"]:
+        status()
+    elif len(args) == 3 and args[0] == "use-jack":
+        use_jack(args[1], args[2])
+    elif len(args) == 3 and args[0] == "bt-mode" and args[2] in ("music", "call"):
+        bt_mode(args[1], args[2])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

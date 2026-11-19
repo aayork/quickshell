@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Give the Helium browser the current theme. The template engine has already
+# written helium-theme.json, a Chrome theme manifest in the desktop's colours;
+# this installs it as an unpacked theme extension and, the first time, makes
+# Helium load it on every start (helium-browser-flags.conf, read by the
+# /usr/bin/helium-browser wrapper). Chromium only reads a theme when it
+# starts, so an open Helium keeps its colours until it is restarted.
+
+theme="$HOME/.local/state/aayork-quickshell/current/theme/helium-theme.json"
+ext="$HOME/.local/share/aayork-quickshell/helium-theme"
+flags="${XDG_CONFIG_HOME:-$HOME/.config}/helium-browser-flags.conf"
+
+[[ -f $theme ]] && command -v helium-browser >/dev/null || exit 0
+
+mkdir -p "$ext"
+cp "$theme" "$ext/manifest.json"
+
+grep -qF -- "--load-extension=$ext" "$flags" 2>/dev/null && exit 0
+{
+  echo "# Desktop theme (aayork-quickshell bin/theme-set-helium)"
+  echo "--load-extension=$ext"
+} >>"$flags"

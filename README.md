@@ -35,7 +35,7 @@ deletes them again.
 Off unless asked for, and switchable later in Settings › Shell › Extras:
 
 ```
---with-bose        Bose headphone controls on the bar
+--with-bose        Bose controls in the launcher's headphones: panel
 --with-razer       Razer mouse DPI and polling (installs OpenRazer)
 --with-things      Things 3 to-dos on the bar (installs things-cli)
 --with-tailscale   Tailscale (shown on the bar whenever it is installed)

@@ -12,6 +12,7 @@ import qs.osd
 import qs.polkit
 import qs.session
 import qs.settings
+import qs.weather
 
 ShellRoot {
   // The night light is a service; naming it here is what starts it.
@@ -33,5 +34,6 @@ ShellRoot {
   CaptureMenu {}
   SessionOverlay {}
   Settings {}
+  WeatherApp {}
 }
 

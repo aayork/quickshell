@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
-// Qualified: the Bose, Tailscale and Things widgets here share names with services.
+// Qualified: the Tailscale and Things widgets here share names with services.
 import qs.services as Services
 import qs.bar.elsewhen
 import qs.theme
@@ -77,7 +77,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "bose": bose.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -193,7 +193,7 @@ Scope {
           height: parent.height
           width: layout.width
 
-          readonly property var defaultOrder: ["jot", "tray", "bose", "things", "tailscale", "temps", "network", "control-center", "elsewhen", "clock"]
+          readonly property var defaultOrder: ["jot", "tray", "things", "tailscale", "temps", "network", "control-center", "elsewhen", "weather", "clock"]
           // The saved order, cleaned up: unknown names dropped, new ones put
           // back where the default has them.
           function savedOrder() {
@@ -215,8 +215,8 @@ Scope {
           property var order: savedOrder()
 
           function widget(name) {
-            return { "jot": jot, "tray": tray, "bose": bose, "things": things, "tailscale": tailscale, "temps": temps,
-                     "network": network, "control-center": controlCenter, "elsewhen": elsewhen, "clock": clock }[name]
+            return { "jot": jot, "tray": tray, "things": things, "tailscale": tailscale, "temps": temps,
+                     "network": network, "control-center": controlCenter, "elsewhen": elsewhen, "weather": weather, "clock": clock }[name]
           }
 
           // Where each icon sits; a recording in progress always comes first.
@@ -288,12 +288,6 @@ Scope {
             movable: true; onMoveStarted: row.beginMove("tray"); onMoved: dx => row.move("tray", dx); onMoveEnded: row.endMove("tray")
             BarSlide on x {}
           }
-          Bose {
-            id: bose; x: row.slotX("bose"); z: moving ? 1 : 0
-            foreground: bar.foregroundOver(row.x + bose.x, bose.width)
-            movable: true; onMoveStarted: row.beginMove("bose"); onMoved: dx => row.move("bose", dx); onMoveEnded: row.endMove("bose")
-            BarSlide on x {}
-          }
           Things {
             id: things; x: row.slotX("things"); z: moving ? 1 : 0
             foreground: bar.foregroundOver(row.x + things.x, things.width)
@@ -329,6 +323,12 @@ Scope {
             visible: false  // hidden for now (2026-11-18); set true to bring the world clock back
             barForeground: bar.foregroundOver(row.x + elsewhen.x, elsewhen.width)
             movable: true; onMoveStarted: row.beginMove("elsewhen"); onMoved: dx => row.move("elsewhen", dx); onMoveEnded: row.endMove("elsewhen")
+            BarSlide on x {}
+          }
+          WeatherButton {
+            id: weather; x: row.slotX("weather"); z: moving ? 1 : 0
+            foreground: bar.foregroundOver(row.x + weather.x, weather.width)
+            movable: true; onMoveStarted: row.beginMove("weather"); onMoved: dx => row.move("weather", dx); onMoveEnded: row.endMove("weather")
             BarSlide on x {}
           }
           Clock {

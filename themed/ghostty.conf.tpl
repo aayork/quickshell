@@ -12,7 +12,7 @@ palette = 4={{ blue }}
 palette = 5={{ magenta }}
 palette = 6={{ cyan }}
 palette = 7={{ foreground }}
-palette = 8={{ muted }}
+palette = 8={{ dark_foreground }}
 palette = 9={{ bright_red }}
 palette = 10={{ bright_green }}
 palette = 11={{ bright_yellow }}

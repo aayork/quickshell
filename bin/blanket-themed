@@ -1,0 +1,58 @@
+#!/usr/bin/python3 -I
+# Run Blanket (white noise app) with the desktop theme on top.
+#
+# Blanket is libadwaita, and GTK 4 has no per-app user stylesheet, so this
+# adds current/theme/blanket.css (written by theme-set-templates from
+# themed/blanket.css.tpl) as a USER-priority provider before handing over
+# to the stock /usr/bin/blanket. It re-reads the file whenever it changes,
+# so a theme switch recolours an open window.
+#
+# ~/.local/share/applications/com.rafaelmardojai.Blanket.desktop and
+# ~/.local/share/dbus-1/services/com.rafaelmardojai.Blanket.service point
+# here, so the launcher and D-Bus activation both get the themed copy.
+
+import os
+import runpy
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
+
+BLANKET = "/usr/bin/blanket"
+CSS = os.path.expanduser("~/.local/state/aayork-quickshell/current/theme/blanket.css")
+
+Gtk.init()
+provider = Gtk.CssProvider()
+Gtk.StyleContext.add_provider_for_display(
+    Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+)
+
+# The theme switch swaps the whole current/theme directory, which a file
+# monitor on the old path would miss, so poll the file's mtime instead.
+stamp = None
+
+
+def reload():
+    global stamp
+    try:
+        st = os.stat(CSS)
+        now = (st.st_ino, st.st_mtime_ns)
+    except OSError:
+        now = None
+    if now != stamp:
+        stamp = now
+        if now is None:
+            provider.load_from_string("")
+        else:
+            provider.load_from_path(CSS)
+    return GLib.SOURCE_CONTINUE
+
+
+reload()
+GLib.timeout_add_seconds(2, reload)
+
+sys.argv[0] = BLANKET
+runpy.run_path(BLANKET, run_name="__main__")

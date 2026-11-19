@@ -52,7 +52,7 @@ popover label.accelerator { color: {{ dark_foreground }}; }
 
 /* Tab bar: a see-through strip in the terminal's own colour, so it reads as
    part of the window rather than a black band on top. Tabs share the width
-   evenly with centred titles; the active tab is a soft raised pill, the
+   evenly with centred titles; the active tab is a soft raised block (2px corners, like the shell's controls), the
    others are plain text that lights up on hover. Close buttons show only on
    the active tab and on hover. libadwaita rounds and pads tabboxchild (the
    tab's wrapper), not just tab, so both are styled. */
@@ -73,7 +73,7 @@ toolbarview > .bottom-bar .collapse-spacing tabbar tabbox {
   padding: 4px 0 5px;
   min-height: 26px; /* whole bar is 35px tall */
 }
-tabbar tabbox > tabboxchild { border-radius: 7px; outline-offset: -1px; padding: 0; margin: 0; }
+tabbar tabbox > tabboxchild { border-radius: 2px; outline-offset: -1px; padding: 0; margin: 0; }
 /* No dividers: they would add a pixel between tabs that the ends lack. */
 tabbar tabbox > separator,
 tabbar tabbox > separator.hidden {
@@ -86,7 +86,7 @@ tabbar tab:backdrop {
   min-height: 26px;
   margin: 0;
   padding: 0 8px;
-  border-radius: 7px;
+  border-radius: 2px;
   background: none;
   box-shadow: none;
   color: alpha({{ foreground }}, 0.55);
@@ -116,7 +116,7 @@ tabbar tab button.image-button:backdrop {
   min-height: 18px;
   padding: 0;
   margin: 0;
-  border-radius: 99px;
+  border-radius: 2px;
   background: none;
   box-shadow: none;
   color: inherit;
@@ -139,7 +139,7 @@ tabbar tab indicator, tabbar tabbox > revealer > indicator {
 tabbar .start-action, tabbar .end-action { padding: 0; }
 tabbar .start-action button, tabbar .end-action button,
 tabbar .start-action button:backdrop, tabbar .end-action button:backdrop {
-  border-radius: 7px;
+  border-radius: 2px;
   margin: 4px 2px;
   min-height: 26px;
   min-width: 26px;
@@ -225,8 +225,9 @@ entry, text { caret-color: {{ accent }}; }
 selection, text selection { background-color: {{ selection }}; color: {{ bright_foreground }}; }
 
 /* Hyprland's rounding is 0: square off every widget, popups included.
-   The tab bar's pills above are the one exception. */
+   The tab bar keeps the shell's 2px control radius. */
 * { border-radius: 0; }
 tabbar tab, tabbar tabbox > tabboxchild,
-tabbar .start-action button, tabbar .end-action button { border-radius: 7px; }
-tabbar tab button.image-button, tabbar indicator { border-radius: 99px; }
+tabbar .start-action button, tabbar .end-action button { border-radius: 2px; }
+tabbar tab button.image-button { border-radius: 2px; }
+tabbar indicator { border-radius: 99px; }

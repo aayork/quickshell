@@ -77,8 +77,8 @@ BarButton {
     ColumnLayout {
       visible: todo.startsGroup
       Layout.fillWidth: true
-      Layout.topMargin: todo.index === 0 ? 2 : 14
-      Layout.bottomMargin: 4
+      Layout.topMargin: todo.index === 0 ? 0 : 8
+      Layout.bottomMargin: 2
       spacing: 3
 
       RowLayout {
@@ -87,7 +87,7 @@ BarButton {
         Label {
           visible: root.view === "upcoming"
           text: todo.group !== "" ? String(Number(todo.group.slice(8, 10))) : ""
-          font.pixelSize: Theme.fontLarge + 4
+          font.pixelSize: Theme.fontLarge
           font.bold: true
           elide: Text.ElideNone
         }
@@ -103,7 +103,7 @@ BarButton {
 
     Rectangle {
       Layout.fillWidth: true
-      implicitHeight: todo.where !== "" ? Theme.rowHeight + 12 : Theme.rowHeight
+      implicitHeight: todo.where !== "" ? Theme.rowHeight + 8 : Theme.rowHeight - 2
       radius: Theme.controlRadius + 2
       color: todo.open ? Theme.selection : hover.hovered ? Theme.hover : "transparent"
 
@@ -128,7 +128,7 @@ BarButton {
           implicitWidth: 14
           implicitHeight: 14
           Layout.alignment: todo.where !== "" ? Qt.AlignTop : Qt.AlignVCenter
-          Layout.topMargin: todo.where !== "" ? 7 : 0
+          Layout.topMargin: todo.where !== "" ? 5 : 0
           radius: 3
           color: tick.containsMouse ? Theme.alpha(Theme.accent, 0.15) : "transparent"
           border.width: 1.5
@@ -184,7 +184,7 @@ BarButton {
         // Deadline with a flag; red once it is due.
         Label {
           visible: todo.modelData.deadline !== ""
-          text: Icons.glyph(0xF023B) + " " + root.dayLabel(todo.modelData.deadline)
+          text: Icons.glyph(0xF023B) + " " + Qt.formatDate(new Date(todo.modelData.deadline + "T12:00:00"), "MMM d")
           color: todo.modelData.deadline <= Things.dateKey(0) ? Theme.red : Theme.dim
           font.pixelSize: Theme.fontSmall
           elide: Text.ElideNone
@@ -198,9 +198,9 @@ BarButton {
       Layout.fillWidth: true
       Layout.leftMargin: 32
       Layout.rightMargin: 8
-      Layout.topMargin: 4
-      Layout.bottomMargin: 10
-      spacing: 6
+      Layout.topMargin: 2
+      Layout.bottomMargin: 6
+      spacing: 4
 
       Label {
         visible: text !== ""
@@ -238,28 +238,18 @@ BarButton {
         }
       }
 
-      Label {
-        visible: todo.items.length > 0
-        text: "Checklist items can only be ticked off in Things itself."
-        color: Theme.muted
-        font.pixelSize: Theme.fontSmall
-        // Wrap within the row: at its full width it would widen the to-do
-        // and push the row's markers past the edge.
-        wrapMode: Text.Wrap
-        Layout.fillWidth: true
-      }
-
       Flow {
         Layout.fillWidth: true
-        spacing: 6
+        Layout.leftMargin: -6
+        spacing: 2
 
         Repeater {
           model: ["today", "tomorrow", "anytime", "someday", "inbox"].filter(id => id !== root.view)
 
-          TextButton {
+          ThingsMoveButton {
             required property string modelData
-            text: modelData === "tomorrow" ? "Tomorrow" : Things.views.find(v => v.id === modelData).label
-            icon: Icons.glyph(modelData === "tomorrow" ? root.looks.upcoming.glyph : root.looks[modelData].glyph)
+            glyph: modelData === "tomorrow" ? root.looks.upcoming.glyph : root.looks[modelData].glyph
+            tint: modelData === "tomorrow" ? root.looks.upcoming.color : root.looks[modelData].color
             onClicked: {
               Things.move(todo.modelData, modelData)
               root.expanded = ""
@@ -267,10 +257,11 @@ BarButton {
           }
         }
 
-        TextButton {
+        ThingsMoveButton {
           readonly property bool armed: root.trashing === todo.modelData.uuid
-          text: armed ? "Click again" : "Trash"
-          icon: Icons.glyph(0xF0A79)
+          glyph: 0xF0A79
+          tint: armed ? Theme.red : Theme.dim
+          armedLook: armed
           onClicked: {
             if (!armed) {
               root.trashing = todo.modelData.uuid
@@ -288,7 +279,7 @@ BarButton {
   Popup {
     id: popup
     anchorItem: root
-    contentWidth: 400
+    contentWidth: 290
     contentHeight: column.implicitHeight
 
     onOpenChanged: {
@@ -301,7 +292,7 @@ BarButton {
     ColumnLayout {
       id: column
       width: parent.width
-      spacing: Theme.spacing
+      spacing: 6
 
       Label {
         visible: !Things.ready
@@ -381,7 +372,7 @@ BarButton {
             readonly property var look: root.looks[modelData.id]
 
             Layout.fillWidth: true
-            implicitHeight: 30
+            implicitHeight: 26
             radius: Theme.controlRadius + 2
             color: current ? Theme.selection : tabMouse.containsMouse ? Theme.hover : "transparent"
 
@@ -418,48 +409,50 @@ BarButton {
           }
         }
 
-        // Sync, at the end of the row.
-        Label {
-          text: Icons.glyph(0xF0450)
-          color: Things.busy ? Theme.accent : refreshMouse.containsMouse ? Theme.foreground : Theme.muted
-          font.pixelSize: Theme.iconSize
-          elide: Text.ElideNone
-          Layout.leftMargin: 6
-          MouseArea {
-            id: refreshMouse
-            anchors.fill: parent
-            anchors.margins: -4
-            hoverEnabled: true
-            onClicked: Things.refresh()
+        // Sync and sign out: same pill shape as the tabs, set off by a divider.
+        Rectangle {
+          implicitWidth: 1
+          implicitHeight: 14
+          color: Theme.separator
+          Layout.leftMargin: 3
+          Layout.rightMargin: 3
+        }
+
+        Repeater {
+          model: [
+            { glyph: 0xF0450, action: "refresh" },
+            { glyph: 0xF0343, action: "logout" }
+          ]
+
+          Rectangle {
+            id: tool
+            required property var modelData
+            readonly property bool danger: modelData.action === "logout"
+
+            implicitWidth: 28
+            implicitHeight: 26
+            radius: Theme.controlRadius + 2
+            color: toolMouse.pressed ? Theme.pressed
+              : toolMouse.containsMouse ? (danger ? Theme.alpha(Theme.red, 0.15) : Theme.hover)
+              : "transparent"
+
+            Label {
+              anchors.centerIn: parent
+              text: Icons.glyph(tool.modelData.glyph)
+              color: !tool.danger && Things.busy ? Theme.accent
+                : toolMouse.containsMouse ? (tool.danger ? Theme.red : Theme.foreground)
+                : Theme.dim
+              font.pixelSize: Theme.iconSize
+              elide: Text.ElideNone
+            }
+
+            MouseArea {
+              id: toolMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              onClicked: tool.danger ? Things.logout() : Things.refresh()
+            }
           }
-        }
-      }
-
-      // The list's name, big, with its coloured icon.
-      RowLayout {
-        visible: Things.ready
-        Layout.fillWidth: true
-        Layout.topMargin: 6
-        Layout.leftMargin: 4
-        spacing: 8
-
-        Label {
-          text: Icons.glyph(root.look.glyph)
-          color: root.look.color
-          font.pixelSize: Theme.iconLarge + 4
-          elide: Text.ElideNone
-        }
-        Label {
-          text: root.viewLabel
-          font.pixelSize: Theme.fontLarge + 6
-          font.bold: true
-          Layout.fillWidth: true
-        }
-        Label {
-          text: Things.busy ? "Syncing…" : ""
-          color: Theme.dim
-          font.pixelSize: Theme.fontSmall
-          elide: Text.ElideNone
         }
       }
 
@@ -474,7 +467,7 @@ BarButton {
         id: list
         visible: Things.ready && root.rows.length > 0
         Layout.fillWidth: true
-        implicitHeight: Math.min(rows.implicitHeight, 420)
+        implicitHeight: Math.min(rows.implicitHeight, 380)
         contentHeight: rows.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -542,21 +535,6 @@ BarButton {
         }
       }
 
-      Separator { visible: Things.ready; Layout.fillWidth: true }
-
-      Label {
-        visible: Things.ready
-        text: "Sign out"
-        color: signOut.containsMouse ? Theme.foreground : Theme.muted
-        font.pixelSize: Theme.fontSmall
-        MouseArea {
-          id: signOut
-          anchors.fill: parent
-          anchors.margins: -4
-          hoverEnabled: true
-          onClicked: Things.logout()
-        }
-      }
     }
   }
 }

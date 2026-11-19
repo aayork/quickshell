@@ -80,8 +80,11 @@ PanelWindow {
           implicitHeight: body.implicitHeight + 24
           opacity: 1 - Math.min(0.8, Math.abs(x) / width)
           color: Theme.background
-          border.width: Theme.borderWidth
-          border.color: critical ? Theme.red : Theme.accent
+          // A thin light grey edge, so a toast doesn't read as an app window
+          // with the compositor's accent border; critical ones keep red.
+          // 1 device pixel at the 1.6x screen scale.
+          border.width: 0.625
+          border.color: critical ? Theme.alpha(Theme.red, 0.6) : Theme.alpha("#9a9a9a", 0.35)
           radius: Theme.radius
 
           Behavior on x {

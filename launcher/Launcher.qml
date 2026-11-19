@@ -63,7 +63,11 @@ Scope {
       aliases: ["emojis", "e", "smiley", "symbol"], glyph: Icons.glyph(0xF01F5), minChars: 0, debounceMs: 0, maxRows: 2500, provider: emoji, grid: true },
     // Shows the mouse settings panel in place of a list.
     { id: "mouse", title: "Mouse", subtitle: "Razer DPI, polling and speed", keyword: "mouse",
-      aliases: ["razer", "dpi", "pointer", "sensitivity", "acceleration"], glyph: Icons.glyph(0xF037D), minChars: 0, debounceMs: 0, maxRows: 1, panel: "mouse" }
+      aliases: ["razer", "dpi", "pointer", "sensitivity", "acceleration"], glyph: Icons.glyph(0xF037D), minChars: 0, debounceMs: 0, maxRows: 1, panel: "mouse" },
+    // The same for headphones: output, Bluetooth, jacks, Bose and AirPods.
+    { id: "headphones", title: "Headphones", subtitle: "Output, battery, noise control, Bose and AirPods", keyword: "headphones",
+      aliases: ["headphone", "bose", "airpods", "earbuds", "anc", "noise", "eq", "equalizer", "audio", "output", "sound"],
+      glyph: Icons.glyph(0xF02CB), minChars: 0, debounceMs: 0, maxRows: 1, panel: "headphones" }
   ]
   readonly property var scopes: builtins.filter(b => b.id !== "mouse" || Config.features.mouse).concat(extensions)
 
@@ -393,6 +397,7 @@ Scope {
       if (Mouse.connected) return []
       return [hintRow(Mouse.present ? "The mouse is asleep. Move it to wake it" : "No Razer mouse found", extension)]
     }
+    if (extension.panel === "headphones") return []
     if (scoped.text.trim().length < extension.minChars) return [hintRow("Keep typing to search " + extension.title, extension)]
     if (extensionRows.length === 0) return [hintRow(extensionBusy ? "Searching…" : "Nothing found", extension)]
     return extensionRows
@@ -768,20 +773,32 @@ Scope {
 
     Rectangle {
       id: card
+      // Edges sit on whole device pixels (the screen is 1.6x): otherwise the
+      // clip rounds outward and the rows spill a pixel past the border.
+      function snap(v) { return Math.round(v * window.pixelScale) / window.pixelScale }
       width: 720
-      height: column.implicitHeight
-      anchors.horizontalCenter: parent.horizontalCenter
-      y: Math.round(parent.height * 0.2)
+      height: Math.ceil(column.implicitHeight * window.pixelScale) / window.pixelScale
+      x: snap((parent.width - width) / 2)
+      y: snap(parent.height * 0.2)
       // Translucent: Hyprland blurs what is behind it (a layer rule for
       // aayork-launcher in hyprland.lua).
       // Opaque enough that a bright page behind does not show through.
       color: Theme.alpha(Theme.background, 0.9)
-      border.width: 1
-      border.color: Theme.alpha(Theme.foreground, 0.14)
       radius: root.corner
       clip: true
 
       MouseArea { anchors.fill: parent }
+
+      // The border is drawn over the contents, so the list and its fade
+      // cannot paint across it.
+      Rectangle {
+        anchors.fill: parent
+        z: 100
+        color: "transparent"
+        border.width: 1
+        border.color: Theme.alpha(Theme.foreground, 0.14)
+        radius: card.radius
+      }
 
       ColumnLayout {
         id: column
@@ -922,7 +939,7 @@ Scope {
           }
         }
 
-        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible || root.gridMode }
+        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible || headphonesPanel.visible || root.gridMode }
 
         EmojiGrid {
           id: emojiGrid
@@ -943,6 +960,15 @@ Scope {
           Layout.fillWidth: true
           Layout.margins: 14
           onVisibleChanged: Mouse.watching = visible
+        }
+
+        // The `headphones:` keyword's panel.
+        HeadphonesPanel {
+          id: headphonesPanel
+          visible: root.open && root.scoped !== null && root.scoped.extension.panel === "headphones"
+          active: visible
+          Layout.fillWidth: true
+          Layout.margins: 14
         }
 
         RowLayout {

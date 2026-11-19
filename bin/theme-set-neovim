@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Recolour open Neovims after a theme change. The template engine has already
+# written nvim-palette.lua; Neovims using the "desktop" colorscheme
+# (~/.config/nvim/colors/desktop.lua) re-run it to read the new palette.
+# Ones on another colorscheme are left alone.
+
+command -v nvim >/dev/null || exit 0
+
+for socket in "${XDG_RUNTIME_DIR:-/run/user/$UID}"/nvim.*.0; do
+  [[ -S $socket ]] || continue
+  timeout 2s nvim --server "$socket" --remote-send \
+    '<Cmd>if get(g:, "colors_name", "") ==# "desktop" | colorscheme desktop | endif<CR>' >/dev/null 2>&1 &
+done
+wait
+exit 0

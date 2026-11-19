@@ -34,8 +34,8 @@ Singleton {
       property JsonObject nightlight: JsonObject {
         // "off", "sunset" (sunset to sunrise) or "custom" (start to end).
         property string schedule: "sunset"
-        // Kelvin; lower is warmer. 6000 is no tint.
-        property int temperature: 5250
+        // Kelvin, 2500-6300; lower is warmer.
+        property int temperature: 6000
         property string start: "20:00"
         property string end: "07:00"
       }

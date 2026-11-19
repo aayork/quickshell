@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Give the Herdr app the current theme. The template engine has already
+# written herdr.json; this installs it as Herdr's theme "desktop" and, the
+# first time, points settings.json at it along with the desktop's fonts.
+# Herdr redraws from its config folder by itself, so an open window follows.
+
+theme="$HOME/.local/state/aayork-quickshell/current/theme/herdr.json"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app"
+settings="$config/settings.json"
+
+[[ -f $theme && -d $config ]] || exit 0
+
+mkdir -p "$config/themes"
+cp "$theme" "$config/themes/desktop.json"
+
+[[ -f $settings ]] || exit 0
+grep -q '"theme": "desktop"' "$settings" && exit 0
+
+python3 - "$settings" <<'PY'
+import json, subprocess, sys
+
+path = sys.argv[1]
+settings = json.load(open(path))
+settings["theme"] = "desktop"
+
+# Same fonts as the rest of the desktop (fontconfig's monospace, as Ghostty
+# and the shell use), unless one has been picked already.
+mono = subprocess.run(["fc-match", "-f", "%{family[0]}", "monospace"],
+                      capture_output=True, text=True).stdout.strip()
+if mono:
+    settings.setdefault("font", mono)
+    settings.setdefault("ui_font", mono)
+
+with open(path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+PY
