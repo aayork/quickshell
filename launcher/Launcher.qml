@@ -177,13 +177,15 @@ Scope {
   // Start a desktop entry (or one of its actions) with the session env that
   // bin/cursor-set writes sourced first. The shell's own env is frozen at the
   // moment it started, so apps launched with execute() kept an old cursor
-  // theme/size until the next login. Terminal entries keep execute(), which
-  // knows how to wrap them in a terminal.
+  // theme/size until the next login. Quickshell's execute() ignores
+  // Terminal=true (nvim/vim started with no tty and exited at once), so
+  // terminal entries are wrapped in xdg-terminal-exec here.
   function launch(item) {
-    if (item.runInTerminal || !item.command || item.command.length === 0) return item.execute()
+    if (!item.command || item.command.length === 0) return item.execute()
+    var cmd = item.runInTerminal ? ["xdg-terminal-exec", "--"].concat(item.command) : item.command
     var opts = {
       command: ["sh", "-c", "[ -r \"$0\" ] && . \"$0\"; exec \"$@\"",
-                Quickshell.env("HOME") + "/.local/state/aayork-quickshell/session.env"].concat(item.command)
+                Quickshell.env("HOME") + "/.local/state/aayork-quickshell/session.env"].concat(cmd)
     }
     if (item.workingDirectory) opts.workingDirectory = item.workingDirectory
     Quickshell.execDetached(opts)
