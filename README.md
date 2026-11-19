@@ -54,8 +54,11 @@ Other options: `--theme NAME`, `--check` (only verify dependencies),
 | `SUPER+Escape` | power menu |
 | `SUPER+Return` | terminal |
 | `SUPER+L` | lock |
-| `ALT+SHIFT+3 / 4 / 5` | screenshot: screen / area / all-in-one |
-| `ALT+A` | Jot scratchpad |
+| `Print` or `ALT+SHIFT+4` | screenshot: drag an area or click a window |
+| `SHIFT+Print` or `ALT+SHIFT+3` | screenshot: whole screen |
+| `CTRL+Print` or `ALT+SHIFT+5` | screenshot: all-in-one bar (every mode, OCR, recording) |
+| `F12` | screenshot: area |
+| `ALT+A` | Jot, the notepad (also "Notes" in the launcher) |
 
 The full list is in `~/.config/hypr/hyprland.lua`. Put your own additions in
 `~/.config/hypr/local.lua`; it is loaded last and the installer never touches it.

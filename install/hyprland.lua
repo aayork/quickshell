@@ -186,14 +186,19 @@ hl.bind(mainMod .. " + CTRL + L",      shellIpc("lock", "lock"))
 
 -------- Screenshots --------
 -- Run by Hyprland directly, never through the shell, so the screen freeze
--- and area picker work. Each capture goes to the shell's quick-access stack.
+-- and area picker work. Each capture waits at the top of the notification
+-- column to be copied, saved, pinned or opened in the editor.
 local screenshot = shellPath .. "/bin/screenshot"
 
+-- Print: drag an area or click a window. Shift: the whole screen. Ctrl: the
+-- All-In-One bar (every mode, OCR and recording).
 hl.bind("PRINT",           hl.dsp.exec_cmd(screenshot .. " smart"))
+hl.bind("SHIFT + PRINT",   hl.dsp.exec_cmd(screenshot .. " fullscreen"))
+hl.bind("CTRL + PRINT",    hl.dsp.exec_cmd(screenshot .. " allinone"))
+hl.bind("F12",             hl.dsp.exec_cmd(screenshot .. " region"))
+-- The same three for keyboards without a Print key.
 hl.bind("ALT + SHIFT + 3", hl.dsp.exec_cmd(screenshot .. " fullscreen"))
 hl.bind("ALT + SHIFT + 4", hl.dsp.exec_cmd(screenshot .. " smart"))
-hl.bind("F12",             hl.dsp.exec_cmd(screenshot .. " region"))
--- All-In-One: every capture mode, and recording, from one key.
 hl.bind("ALT + SHIFT + 5", hl.dsp.exec_cmd(screenshot .. " allinone"))
 
 hl.bind(mainMod .. " + comma",         shellIpc("notifications", "dismissAll"))
