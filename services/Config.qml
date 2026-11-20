@@ -17,6 +17,7 @@ Singleton {
   readonly property alias media: adapter.media
   readonly property alias jot: adapter.jot
   readonly property alias features: adapter.features
+  readonly property alias launcher: adapter.launcher
 
   FileView {
     path: Quickshell.env("HOME") + "/.config/aayork-quickshell/config.json"
@@ -80,6 +81,12 @@ Singleton {
         property bool bose: false
         property bool mouse: false
         property bool things: false
+      }
+
+      property JsonObject launcher: JsonObject {
+        // Keywords switched off with `extensions:` (ids of built-ins and
+        // extension files). Things and Mouse use `features` above instead.
+        property var disabled: []
       }
 
       property JsonObject media: JsonObject {
