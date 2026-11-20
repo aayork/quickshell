@@ -138,7 +138,9 @@ ColumnLayout {
     border.color: Theme.alpha(Theme.foreground, 0.2)
 
     // The buttons' hover ring (ui/TextButton.qml): 1px, 2px out from the edge.
-    HoverHandler { id: boxHover }
+    // Lit by the head row's own hover; a HoverHandler here never sees the
+    // pointer past the rows' hover-enabled MouseAreas.
+    property bool headHovered: false
     Rectangle {
       anchors.fill: parent
       anchors.margins: -3
@@ -146,7 +148,7 @@ ColumnLayout {
       color: "transparent"
       border.width: 1
       border.color: Theme.alpha(Theme.foreground, 0.22)
-      opacity: boxHover.hovered ? 1 : 0
+      opacity: box.headHovered ? 1 : 0
       Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
     }
 
@@ -169,6 +171,7 @@ ColumnLayout {
         }
         trailing: root.options.length > 1 ? (root.expanded ? Icons.chevronDown : Icons.chevronRight) : ""
         onClicked: if (root.options.length > 1) root.expanded = !root.expanded
+        onHovered: function(on) { box.headHovered = on }
       }
 
       Repeater {

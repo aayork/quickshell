@@ -85,6 +85,18 @@ ColumnLayout {
     border.width: 1
     border.color: root.expanded ? Theme.accent : Theme.alpha(Theme.foreground, 0.2)
 
+    // The buttons' hover ring (ui/TextButton.qml): 1px, 2px out from the edge.
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -3
+      radius: head.radius + 3
+      color: "transparent"
+      border.width: 1
+      border.color: Theme.alpha(Theme.foreground, 0.22)
+      opacity: headMouse.containsMouse ? 1 : 0
+      Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+    }
+
     Label {
       anchors.left: parent.left
       anchors.right: chevron.left
