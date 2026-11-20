@@ -24,8 +24,10 @@ Rectangle {
   scale: mouse.pressed ? 0.99 : 1
   color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.alpha(Theme.foreground, 0.07) : Theme.alpha(Theme.foreground, 0.05)
   Behavior on color { ColorAnimation { duration: 90; easing.type: Easing.OutCubic } }
-  border.width: selected ? 0 : 1
-  border.color: Theme.alpha(Theme.foreground, 0.1)
+  // Selected keeps the same 1px edge as the rest, in a darker accent, so
+  // it reads as the same size.
+  border.width: 1
+  border.color: selected ? Qt.darker(Theme.accent, 1.35) : Theme.alpha(Theme.foreground, 0.1)
 
   // delta.dev buttons: a darker, thicker bottom edge at rest that slides
   // away on hover while a ring fades in just outside the button.
@@ -36,7 +38,7 @@ Rectangle {
   // touch at the sides. Plain rectangles, so it stays crisp at 1.6x.
   // Hover slides it down and out of the clipped inside.
   readonly property real lip: 2
-  readonly property color lipInk: selected ? Theme.alpha("#000000", 0.18)
+  readonly property color lipInk: selected ? Theme.alpha("#000000", 0.42)
     : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.5)
 
   Item {
