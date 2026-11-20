@@ -154,8 +154,6 @@ run_parallel \
   theme-set-thunderbird \
   theme-set-vscode \
   theme-set-obsidian \
-  theme-set-termusic \
-  theme-set-rmpc \
   theme-set-strawberry \
   theme-set-neovim
 
