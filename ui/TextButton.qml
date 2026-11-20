@@ -36,8 +36,7 @@ Rectangle {
   // Drawn once; hover only fades it back, so nothing is repainted mid-fade.
   readonly property real lip: 2
 
-  // Hover slides the drawn edge down and out of this clipped window, so it
-  // moves without being repainted.
+  // Clipped to the button's inside.
   Item {
     anchors.fill: parent
     anchors.margins: root.border.width
@@ -47,8 +46,9 @@ Rectangle {
     id: lipCanvas
     width: parent.width
     height: parent.height
-    y: root.lit ? root.lip : 0
-    Behavior on y { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+    // Gone the moment the ring arrives, as on the site; nothing moves.
+    opacity: root.lit ? 0 : 1
+    Behavior on opacity { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
     readonly property color ink: root.selected ? Theme.alpha("#000000", 0.18)
       : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.55)
     onInkChanged: requestPaint()
@@ -79,6 +79,9 @@ Rectangle {
       ctx.globalCompositeOperation = "destination-out"
       shape(-root.lip)
       ctx.fill()
+      // Clear everything above the crescent's raised ends, so no anti-aliased
+      // trace of the shapes' top corners is left behind.
+      ctx.fillRect(0, 0, w, h - root.lip - r - 0.5)
     }
   }
   }
