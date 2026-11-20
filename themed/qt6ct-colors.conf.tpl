@@ -1,0 +1,9 @@
+# Qt palette from the current theme, for qt6ct (used by bin/strawberry-themed).
+# Roles in Qt's order: WindowText, Button, Light, Midlight, Dark, Mid, Text,
+# BrightText, ButtonText, Base, Window, Shadow, Highlight, HighlightedText,
+# Link, LinkVisited, AlternateBase, NoRole, ToolTipBase, ToolTipText,
+# PlaceholderText.
+[ColorScheme]
+active_colors={{ foreground }}, {{ lighter_background }}, {{ mix lighter_background foreground 20% }}, {{ mix lighter_background foreground 10% }}, {{ darker_background }}, {{ dark_background }}, {{ foreground }}, {{ bright_foreground }}, {{ foreground }}, {{ background }}, {{ background }}, {{ darker_background }}, {{ mix background accent 30% }}, {{ bright_foreground }}, {{ accent }}, {{ magenta }}, {{ mix background lighter_background 45% }}, {{ background }}, {{ darker_background }}, {{ foreground }}, {{ muted }}
+inactive_colors={{ foreground }}, {{ lighter_background }}, {{ mix lighter_background foreground 20% }}, {{ mix lighter_background foreground 10% }}, {{ darker_background }}, {{ dark_background }}, {{ foreground }}, {{ bright_foreground }}, {{ foreground }}, {{ background }}, {{ background }}, {{ darker_background }}, {{ mix background accent 30% }}, {{ bright_foreground }}, {{ accent }}, {{ magenta }}, {{ mix background lighter_background 45% }}, {{ background }}, {{ darker_background }}, {{ foreground }}, {{ muted }}
+disabled_colors={{ muted }}, {{ lighter_background }}, {{ mix lighter_background foreground 20% }}, {{ mix lighter_background foreground 10% }}, {{ darker_background }}, {{ dark_background }}, {{ muted }}, {{ bright_foreground }}, {{ muted }}, {{ background }}, {{ background }}, {{ darker_background }}, {{ mix background accent 30% }}, {{ muted }}, {{ accent }}, {{ magenta }}, {{ mix background lighter_background 45% }}, {{ background }}, {{ darker_background }}, {{ foreground }}, {{ muted }}

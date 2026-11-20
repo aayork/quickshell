@@ -1,0 +1,139 @@
+#!/usr/bin/python3 -I
+# Give Strawberry (music player) a flat icon set in the desktop theme's
+# colours: Material Design Icons, the same family as the shell's Nerd Font
+# glyphs (path data in assets/mdi/strawberry-icons.json).
+#
+# Strawberry looks in <its data dir>/icons/scalable/<name>.svg before the
+# system icon theme, so these replace its glossy built-in icons everywhere
+# (controls, toolbar, sidebar tabs, collection tree). Names it asks for that
+# are not drawn here fall back to the system theme / its own icons.
+#
+#   theme-set-strawberry [icons-dir]   default ~/.local/share/strawberry/strawberry/icons
+#
+# Run on every theme change (bin/theme-set). Strawberry reads icons when it
+# starts, so an open window shows the new colours after a restart.
+
+import json
+import os
+import sys
+import tomllib
+
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+COLORS = os.path.expanduser("~/.local/state/aayork-quickshell/current/theme/colors.toml")
+PATHS = os.path.join(ROOT, "assets", "mdi", "strawberry-icons.json")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.local/share/strawberry/strawberry/icons")
+
+# Strawberry's icon name -> (Material Design icon, colour role). Roles:
+# "accent" for play/pause, "dim" for quiet ones, "fg" otherwise. None draws
+# nothing (the artist rows in the collection tree read better bare).
+ICONS = {
+    # transport
+    "media-playback-start": ("play", "accent"),
+    "media-playback-pause": ("pause", "accent"),
+    "media-playback-stop": ("stop", "fg"),
+    "media-skip-backward": ("skip-previous", "fg"),
+    "media-skip-forward": ("skip-next", "fg"),
+    "media-seek-backward": ("rewind", "fg"),
+    "media-seek-forward": ("fast-forward", "fg"),
+    "media-playlist-repeat": ("repeat", "fg"),
+    "media-playlist-shuffle": ("shuffle-variant", "fg"),
+    "media-eject": ("eject", "fg"),
+    # sidebar tabs
+    "strawberry": ("information-outline", "fg"),
+    "library-music": ("album", "fg"),
+    "footsteps": ("playlist-play", "fg"),
+    "view-media-playlist": ("playlist-music", "fg"),
+    "document-open": ("folder-outline", "fg"),
+    "radio": ("radio", "fg"),
+    "device": ("usb-flash-drive-outline", "fg"),
+    # collection tree: artists bare, albums without covers dim
+    "folder-sound": (None, "fg"),
+    "cdcase": ("album", "dim"),
+    "albums": ("album", "dim"),
+    "media-optical": ("album", "dim"),
+    # toolbar, menus, search
+    "document-new": ("playlist-plus", "fg"),
+    "document-save": ("content-save-outline", "fg"),
+    "document-save-all": ("content-save-all-outline", "fg"),
+    "document-open-folder": ("folder-open-outline", "fg"),
+    "document-open-remote": ("download", "fg"),
+    "document-download": ("download", "fg"),
+    "download": ("download", "fg"),
+    "folder": ("folder-outline", "fg"),
+    "folder-new": ("folder-plus-outline", "fg"),
+    "edit-clear-list": ("playlist-remove", "fg"),
+    "edit-clear-locationbar-ltr": ("close", "dim"),
+    "edit-copy": ("content-copy", "fg"),
+    "edit-delete": ("delete-outline", "fg"),
+    "edit-find": ("magnify", "fg"),
+    "edit-redo": ("redo", "fg"),
+    "edit-undo": ("undo", "fg"),
+    "edit-rename": ("pencil-outline", "fg"),
+    "list-add": ("plus", "fg"),
+    "list-remove": ("minus", "fg"),
+    "go-down": ("chevron-down", "fg"),
+    "go-up": ("chevron-up", "fg"),
+    "go-next": ("chevron-right", "fg"),
+    "go-previous": ("chevron-left", "fg"),
+    "go-home": ("home-outline", "fg"),
+    "go-jump": ("arrow-right", "fg"),
+    "view-refresh": ("refresh", "fg"),
+    "view-fullscreen": ("fullscreen", "fg"),
+    "view-choose": ("view-grid-outline", "fg"),
+    "view-media-lyrics": ("text-box-outline", "fg"),
+    "equalizer": ("equalizer", "fg"),
+    "tools-wizard": ("auto-fix", "fg"),
+    "configure": ("cog-outline", "fg"),
+    "search": ("magnify", "fg"),
+    "document-search": ("magnify", "fg"),
+    "application-exit": ("exit-to-app", "fg"),
+    "help-hint": ("help-circle-outline", "fg"),
+    "star": ("star", "accent"),
+    "star-grey": ("star-outline", "dim"),
+    "love": ("heart-outline", "fg"),
+    "zoom-in": ("magnify-plus-outline", "fg"),
+    "zoom-out": ("magnify-minus-outline", "fg"),
+    "keyboard": ("keyboard-outline", "fg"),
+    "headset": ("headphones", "fg"),
+    "speaker": ("speaker", "fg"),
+    "soundcard": ("expansion-card-variant", "fg"),
+    "dialog-information": ("information-outline", "fg"),
+    "dialog-warning": ("alert-outline", "fg"),
+    "dialog-error": ("alert-circle-outline", "fg"),
+    "dialog-password": ("lock-outline", "fg"),
+}
+
+
+def main():
+    with open(COLORS, "rb") as f:
+        colors = tomllib.load(f)
+    with open(PATHS, encoding="utf-8") as f:
+        paths = json.load(f)
+    roles = {
+        "fg": colors.get("foreground", "#d0d0d0"),
+        "dim": colors.get("dark_foreground", colors.get("foreground", "#a0a0a0")),
+        "accent": colors.get("accent", colors.get("foreground", "#d0d0d0")),
+    }
+
+    target = os.path.join(OUT, "scalable")
+    os.makedirs(target, exist_ok=True)
+    written = 0
+    for name, (icon, role) in ICONS.items():
+        if icon is None:
+            # A valid, empty icon: Strawberry falls back to its own when a
+            # file is missing or unreadable.
+            body = '<rect width="24" height="24" fill="none"/>'
+        else:
+            body = f'<path fill="{roles[role]}" d="{paths[icon]}"/>'
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">{body}</svg>\n'
+        tmp = os.path.join(target, f".{name}.svg.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(svg)
+        os.replace(tmp, os.path.join(target, name + ".svg"))
+        written += 1
+    print(f"theme-set-strawberry: {written} icons in {target}")
+
+
+
+if __name__ == "__main__":
+    main()

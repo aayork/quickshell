@@ -156,6 +156,7 @@ run_parallel \
   theme-set-obsidian \
   theme-set-termusic \
   theme-set-rmpc \
+  theme-set-strawberry \
   theme-set-neovim
 
 # Keep the login screen in step (no-op until bin/greeter-install has run).

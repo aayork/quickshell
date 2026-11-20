@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Run Strawberry (music player) with the desktop theme, through qt6ct:
+# ~/.config/qt6ct/qt6ct.conf sets Fusion, the palette rendered from
+# themed/qt6ct-colors.conf.tpl and the stylesheet from
+# themed/strawberry.qss.tpl (both in current/theme, redone on every theme
+# switch). Only this wrapper turns qt6ct on, so no other Qt app is touched.
+# A theme change shows the next time Strawberry starts.
+#
+# Strawberry reads its own command line and refuses Qt's -style and
+# -stylesheet flags, which is why all of it comes in through qt6ct.
+#
+# ~/.local/share/applications/org.strawberrymusicplayer.strawberry.desktop
+# points here, so the launcher and opening audio files get the themed copy.
+
+export QT_QPA_PLATFORMTHEME=qt6ct
+export QT_STYLE_OVERRIDE=Fusion
+
+# Its output, for working out problems: the last run only.
+log="$HOME/.local/state/aayork-quickshell/strawberry.log"
+exec /usr/bin/strawberry "$@" >"$log" 2>&1
