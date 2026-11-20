@@ -6,7 +6,7 @@ import qs.theme
 import qs.ui
 
 // CPU temperature on the bar (yellow when warm, red when hot). Click opens
-// bottom (btm) with a temperature layout (bin/temps-monitor); right click
+// btop (bin/temps-monitor), and clicking again closes that window; right click
 // shows the quick popup with every sensor and a graph of the last few minutes.
 BarButton {
   id: root

@@ -67,9 +67,35 @@ Scope {
     // The same for headphones: output, Bluetooth, jacks, Bose and AirPods.
     { id: "headphones", title: "Headphones", subtitle: "Output, battery, noise control, Bose and AirPods", keyword: "headphones",
       aliases: ["headphone", "bose", "airpods", "earbuds", "anc", "noise", "eq", "equalizer", "audio", "output", "sound"],
-      glyph: Icons.glyph(0xF02CB), minChars: 0, debounceMs: 0, maxRows: 1, panel: "headphones" }
+      glyph: Icons.glyph(0xF02CB), minChars: 0, debounceMs: 0, maxRows: 1, panel: "headphones" },
+    // Things 3 to-dos, like Raycast's Things extension (ThingsSource.qml).
+    { id: "things", title: "Things", subtitle: "Today, Inbox and the rest of your to-dos", keyword: "things",
+      aliases: ["todo", "todos", "to-do", "tasks", "task", "t"], glyph: Icons.glyph(0xF05E1), minChars: 0, debounceMs: 0, maxRows: 500, provider: thingsSource },
+    // Every keyword above and in the extension files, to switch on and off.
+    { id: "extensions", title: "Extensions", subtitle: "Switch launcher extensions on and off", keyword: "extensions",
+      aliases: ["extension", "ext", "plugins"], glyph: Icons.glyph(0xF0431), minChars: 0, debounceMs: 0, maxRows: 200, provider: extensionList }
   ]
-  readonly property var scopes: builtins.filter(b => b.id !== "mouse" || Config.features.mouse).concat(extensions)
+  // Every keyword, switched on or not; `scopes` is the ones that answer.
+  readonly property var allScopes: builtins.concat(extensions.filter(e => !builtins.some(b => b.keyword === e.keyword)))
+  readonly property var scopes: allScopes.filter(s => scopeEnabled(s))
+
+  // Things and Mouse are features (their services stop too); the rest are
+  // listed in Config.launcher.disabled. `extensions:` itself always stays.
+  function scopeEnabled(scope) {
+    if (scope.id === "extensions") return true
+    if (scope.id === "things") return Config.features.things
+    if (scope.id === "mouse") return Config.features.mouse
+    return (Config.launcher.disabled || []).indexOf(scope.id) === -1
+  }
+
+  function setScopeEnabled(scope, on) {
+    if (scope.id === "extensions") return
+    if (scope.id === "things") { Config.features.things = on; return }
+    if (scope.id === "mouse") { Config.features.mouse = on; return }
+    var list = (Config.launcher.disabled || []).filter(id => id !== scope.id)
+    if (!on) list.push(scope.id)
+    Config.launcher.disabled = list
+  }
 
   // "keyword: rest" where keyword belongs to a scope.
   readonly property var scoped: {
@@ -84,6 +110,42 @@ Scope {
   ClipboardSource { id: clipboard }
   ShotsSource { id: shots }
   EmojiSource { id: emoji }
+  ThingsSource { id: thingsSource }
+
+  // The `extensions:` keyword: every keyword with a switch. Enter flips it.
+  QtObject {
+    id: extensionList
+    function refresh() {}
+    function rows(query) {
+      var needle = query.trim().toLowerCase()
+      var list = []
+      var all = root.allScopes.filter(s => s.id !== "extensions")
+      for (var i = 0; i < all.length; i++) {
+        var scope = all[i]
+        if (needle !== "" && Fuzzy.best(needle, scope.keyword, [scope.title].concat(scope.aliases)) <= 0) continue
+        var on = root.scopeEnabled(scope)
+        var actions = [{ title: on ? "Turn Off" : "Turn On", keepOpen: true,
+          run: (function(s, next) { return () => root.setScopeEnabled(s, next) })(scope, !on) }]
+        if (on) actions.push({ title: "Use Keyword", fill: scope.keyword + ": " })
+        list.push({
+          key: "extoggle:" + scope.id,
+          title: scope.title,
+          detail: scope.subtitle !== scope.title ? scope.subtitle : "",
+          subtitle: "",
+          icon: "",
+          glyph: scope.glyph || Icons.glyph(0xF0349),
+          glyphColor: on ? "" : Theme.muted,
+          // Drawn as a switch at the right end of the row.
+          toggle: on,
+          chip: scope.keyword + ":",
+          group: root.builtins.indexOf(scope) !== -1 ? "Built In" : "Script Extensions",
+          actions: actions
+        })
+      }
+      if (list.length === 0) list.push(root.hintRow("No extension matches", root.builtins.find(b => b.id === "extensions")))
+      return list
+    }
+  }
 
   // Things the shell does itself. A command with the same id as an extension
   // keyword steps aside for the extension.
@@ -248,6 +310,7 @@ Scope {
       chip: scope.keyword + ":",
       score: score,
       actions: [{ title: "Use Keyword", fill: scope.keyword + ": " }].concat(favoriteActions("kw:" + scope.id))
+        .concat(scope.id === "extensions" ? [] : [{ title: "Turn Off Extension", keepOpen: true, run: () => setScopeEnabled(scope, false) }])
     }
   }
 
@@ -516,7 +579,8 @@ Scope {
 
   function remember(key) {
     // Emoji keep their own recents (EmojiSource).
-    if (key === "calc" || key.indexOf("fallback:") === 0 || key.indexOf("emoji:") === 0) return
+    if (key === "calc" || key.indexOf("fallback:") === 0 || key.indexOf("emoji:") === 0
+        || key.indexOf("things") === 0 || key.indexOf("extoggle:") === 0) return
     var next = Object.assign({}, frecency)
     var entry = next[key] || { count: 0, last: 0 }
     next[key] = { count: entry.count + 1, last: Date.now() }
@@ -553,6 +617,10 @@ Scope {
     actionsOpen = false
   }
   onActionsOpenChanged: actionCursor = 0
+
+  // Things syncs more often while its list is up.
+  readonly property bool showingThings: open && scoped !== null && scoped.extension.id === "things"
+  onShowingThingsChanged: Things.watch("launcher", showingThings)
 
   // Driven by `scoped` rather than the query: the query's own change handler
   // can run before `scoped` has caught up with it.
@@ -667,7 +735,10 @@ Scope {
   // Other parts of the shell can ask for one of the built-in views.
   Connections {
     target: PopupState
-    function onRequested(name) { if (name === "shots") root.show("shots: ") }
+    function onRequested(name) {
+      if (name === "shots") root.show("shots: ")
+      else if (name === "things") root.show("things: ")
+    }
   }
 
   IpcHandler {
@@ -1103,7 +1174,8 @@ Scope {
                   visible: row.modelData.icon === "" && !row.modelData.mark
                   text: row.modelData.glyph
                   font.pixelSize: Theme.iconSize
-                  color: row.armed ? Theme.red : row.modelData.hint ? Theme.dim : row.current ? Theme.brightForeground : Theme.foreground
+                  color: row.armed ? Theme.red : row.modelData.hint ? Theme.dim : row.modelData.glyphColor ? row.modelData.glyphColor
+                    : row.current ? Theme.brightForeground : Theme.foreground
                   elide: Text.ElideNone
                 }
               }
@@ -1120,7 +1192,7 @@ Scope {
                 Label {
                   width: parent.width
                   text: row.armed ? "Enter again to " + row.modelData.title.toLowerCase() : row.modelData.title
-                  color: row.armed ? Theme.red : row.modelData.hint ? Theme.dim : row.current ? Theme.brightForeground : Theme.foreground
+                  color: row.armed ? Theme.red : row.modelData.hint || row.modelData.toggle === false ? Theme.dim : row.current ? Theme.brightForeground : Theme.foreground
                   font.pixelSize: Theme.fontSize
                 }
                 Label {
@@ -1192,6 +1264,18 @@ Scope {
                   font.pixelSize: Theme.fontSmall
                   horizontalAlignment: Text.AlignRight
                   width: Math.min(implicitWidth, list.width * 0.38)
+                }
+
+                // An on/off switch (the `extensions:` rows), the same one
+                // Settings uses; a click flips it.
+                Toggle {
+                  visible: row.modelData.toggle !== undefined
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: row.modelData.toggle === true
+                  onToggled: {
+                    root.cursor = row.index
+                    root.runAction(row.modelData, row.modelData.actions[0])
+                  }
                 }
               }
             }

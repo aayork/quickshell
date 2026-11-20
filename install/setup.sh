@@ -223,9 +223,13 @@ setup_services() {
 setup_things() {
   $WITH_THINGS || return 0
   step "Things 3 (things-cli)"
-  if have things-cli || [[ -x $HOME/go/bin/things-cli ]]; then ok "already installed"; return; fi
-  if go install github.com/arthursoares/things-cloud-sdk/cmd/things-cli@v0.6.0; then ok "installed to ~/go/bin"; else warn "go install things-cli failed"; fi
-  info "Sign in from the Things button on the bar."
+  if have things-cli || [[ -x $HOME/go/bin/things-cli ]]; then ok "already installed"
+  elif go install github.com/arthursoares/things-cloud-sdk/cmd/things-cli@v0.6.0; then ok "installed to ~/go/bin"
+  else warn "go install things-cli failed"; fi
+  # Ticks checklist items, which things-cli cannot.
+  if (cd "$SHELL_DIR/install/things-check" && go build -o "$HOME/go/bin/things-check" .); then ok "things-check built"
+  else warn "building things-check failed (checklist items will not tick)"; fi
+  info "Sign in from things: in the launcher."
 }
 
 setup_greeter() {

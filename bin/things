@@ -8,6 +8,8 @@
 #   things login <email>      store the login; the password is read from stdin
 #   things logout             forget it
 #   things status             "ready", "no-cli" or "no-login"
+#   things check <item> on|off tick or untick a checklist item (things-check,
+#                             built from install/things-check)
 #
 # Exit 3 means it is not set up yet (see `things status`).
 
@@ -52,6 +54,16 @@ esac
 
 [[ -n $cli ]] || { echo "things-cli is not installed" >&2; exit 3; }
 lookup || { echo "No Things Cloud login stored" >&2; exit 3; }
+
+# things-cli has no way to tick a checklist item; our small helper does.
+if [[ $1 == check ]]; then
+  check=$(command -v things-check || true)
+  [[ -z $check && -x $HOME/go/bin/things-check ]] && check=$HOME/go/bin/things-check
+  [[ -z $check && -x $HOME/.local/bin/things-check ]] && check=$HOME/.local/bin/things-check
+  [[ -n $check ]] || { echo "things-check is not installed (go build in install/things-check)" >&2; exit 1; }
+  shift
+  THINGS_USERNAME=$email THINGS_PASSWORD=$password exec "$check" "$@"
+fi
 
 mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/aayork-quickshell"
 THINGS_USERNAME=$email THINGS_PASSWORD=$password \

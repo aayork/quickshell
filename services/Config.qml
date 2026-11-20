@@ -70,6 +70,8 @@ Singleton {
         // Right-hand icons, left to right, as dragged on the bar. Names as in
         // bar/Bar.qml's defaultOrder; empty or missing ones fall back to it.
         property var order: []
+        // Workspace numbers as kanji numerals (一 二 三 …) instead of digits.
+        property bool kanji: false
       }
 
       // Widgets for particular hardware or accounts, off unless turned on:

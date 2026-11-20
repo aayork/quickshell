@@ -137,6 +137,7 @@ BarButton {
       root.addingZone = false
       root.addingEvent = false
       root.deleting = ""
+      Things.watch("clock", open)
       if (!open) return
       root.monthOffset = 0
       root.selectedDay = new Date()
@@ -486,6 +487,116 @@ BarButton {
             options: Calendar.writable.map(c => ({ label: c.name, value: c.url }))
             current: root.eventCalendar
             onPicked: function(value) { root.eventCalendar = value }
+          }
+        }
+      }
+
+      // Things to-dos for the selected day: the Today list on today, what is
+      // scheduled for a later day on that day. Shown while the Things
+      // extension is on (launcher `extensions:`).
+      ColumnLayout {
+        id: todos
+        readonly property string dayKey: Qt.formatDate(root.selectedDay, "yyyy-MM-dd")
+        readonly property bool isToday: dayKey === Things.dateKey(0)
+        readonly property var items: !Things.ready || !Things.loaded ? []
+          : isToday ? Things.lists.today
+          : Things.lists.upcoming.filter(t => t.date === dayKey)
+        readonly property int shown: 8
+
+        visible: Things.ready && dayKey >= Things.dateKey(0)
+        Layout.fillWidth: true
+        spacing: 2
+
+        function openThings() {
+          popup.close()
+          PopupState.request("things")
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          SectionHeader {
+            text: "THINGS" + (todos.isToday ? "" : " · " + Qt.formatDate(root.selectedDay, "MMM d").toUpperCase())
+            Layout.fillWidth: true
+          }
+          Label {
+            text: "Open"
+            color: openThingsMouse.containsMouse ? Theme.foreground : Theme.dim
+            font.pixelSize: Theme.fontSmall
+            MouseArea {
+              id: openThingsMouse
+              anchors.fill: parent
+              anchors.margins: -6
+              hoverEnabled: true
+              onClicked: todos.openThings()
+            }
+          }
+        }
+
+        Label {
+          visible: todos.items.length === 0
+          text: !Things.loaded ? "Loading…" : todos.isToday ? "Nothing left for today" : "Nothing scheduled"
+          color: Theme.dim
+        }
+
+        Repeater {
+          model: todos.items.slice(0, todos.shown)
+
+          RowLayout {
+            id: todoRow
+            required property var modelData
+            Layout.fillWidth: true
+            spacing: 8
+            opacity: modelData.pending ? 0.5 : 1
+
+            // The checkbox, as in Things: a click ticks it off.
+            Rectangle {
+              implicitWidth: 12
+              implicitHeight: 12
+              Layout.leftMargin: 1
+              radius: 3
+              color: tick.containsMouse ? Theme.alpha(Theme.accent, 0.15) : "transparent"
+              border.width: 1.5
+              border.color: tick.containsMouse ? Theme.accent : Theme.dim
+
+              Label {
+                anchors.centerIn: parent
+                visible: tick.containsMouse
+                text: Icons.glyph(0xF012C)
+                color: Theme.accent
+                font.pixelSize: 10
+                elide: Text.ElideNone
+              }
+
+              MouseArea {
+                id: tick
+                anchors.fill: parent
+                anchors.margins: -5
+                hoverEnabled: true
+                onClicked: Things.complete(todoRow.modelData)
+              }
+            }
+            Label { text: todoRow.modelData.title; Layout.fillWidth: true }
+            Label {
+              visible: text !== ""
+              text: todoRow.modelData.context
+              color: Theme.dim
+              font.pixelSize: Theme.fontSmall
+              Layout.maximumWidth: 110
+            }
+          }
+        }
+
+        Label {
+          visible: todos.items.length > todos.shown
+          text: (todos.items.length - todos.shown) + " more in Things"
+          color: moreMouse.containsMouse ? Theme.foreground : Theme.muted
+          font.pixelSize: Theme.fontSmall
+          MouseArea {
+            id: moreMouse
+            anchors.fill: parent
+            anchors.margins: -4
+            hoverEnabled: true
+            onClicked: todos.openThings()
           }
         }
       }

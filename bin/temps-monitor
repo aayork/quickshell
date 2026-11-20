@@ -1,6 +1,48 @@
 #!/bin/bash
 
-# Open bottom (btm) with the temperature layout in a terminal.
+# Toggle btop from the bar's temperature button: the first click opens it in
+# a terminal, the next click closes that same window.
+#
+# Only the btop this script started is ever touched: its window address, the
+# terminal's pid and the btop pid are kept in a state file. Closing ends that
+# btop process, and the terminal closes its window when the command exits.
+# Ghostty may run several windows in one process, so the terminal itself is
+# never killed. Any other btop or terminal is left alone.
 
 SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
-exec "$SHELL_ROOT/bin/launch-tui" --app-id=org.aayork.temps btm -C "$SHELL_ROOT/assets/btm/temps.toml" "$@"
+CLASS=org.aayork.temps
+STATE="$HOME/.local/state/aayork-quickshell/temps-window"
+
+windows() {
+  hyprctl clients -j 2>/dev/null | jq -r --arg c "$CLASS" '.[] | select(.class == $c) | "\(.address) \(.pid)"'
+}
+
+# Close the one we opened last time, if it is still the same btop.
+if read -r address pid btop <"$STATE" 2>/dev/null && [[ -n $btop ]]; then
+  rm -f "$STATE"
+  if windows | grep -qx "$address $pid" &&
+    [[ $(ps -o comm= -p "$btop" 2>/dev/null) == btop ]] &&
+    [[ $(ps -o ppid= -p "$btop" 2>/dev/null | tr -d ' ') == "$pid" ]]; then
+    kill -TERM "$btop"
+    exit 0
+  fi
+fi
+
+# Open a new one and remember which window and btop it is.
+before_windows=$(windows | cut -d' ' -f1)
+before_btops=$(pgrep -x btop)
+"$SHELL_ROOT/bin/launch-tui" --app-id=$CLASS btop "$@" &
+
+for _ in $(seq 50); do
+  sleep 0.1
+  while read -r address pid; do
+    [[ -n $address ]] && ! grep -qx "$address" <<<"$before_windows" || continue
+    # The new btop: a child of this terminal that was not running before.
+    for btop in $(pgrep -x -P "$pid" btop); do
+      grep -qx "$btop" <<<"$before_btops" && continue
+      mkdir -p "${STATE%/*}"
+      echo "$address $pid $btop" >"$STATE"
+      exit 0
+    done
+  done < <(windows)
+done

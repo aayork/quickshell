@@ -984,6 +984,16 @@ Scope {
               }
 
               Setting {
+                glyph: 0xF1331
+                label: "Kanji numerals"
+                note: Config.bar.kanji ? "Workspaces read 一 二 三 …" : "Workspaces read 1 2 3 …"
+                Toggle {
+                  checked: Config.bar.kanji
+                  onToggled: Config.bar.kanji = !Config.bar.kanji
+                }
+              }
+
+              Setting {
                 glyph: 0xF0954
                 label: "Clock format"
                 note: Qt.formatDateTime(new Date(), Config.clock.format)

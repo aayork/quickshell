@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Point btop at the desktop theme's btop.theme (generated from
+# themed/btop.theme.tpl, or shipped by the theme). The path never changes, so
+# a running btop only needs the SIGUSR2 that restart-btop sends.
+
+CONFIG="$HOME/.config/btop/btop.conf"
+THEME="$HOME/.local/state/aayork-quickshell/current/theme/btop.theme"
+
+command -v btop >/dev/null || exit 0
+
+mkdir -p "${CONFIG%/*}"
+# btop writes its full config on first exit; start from its defaults.
+[[ -f $CONFIG ]] || btop --default-config >"$CONFIG" 2>/dev/null
+
+line="color_theme = \"$THEME\""
+if grep -q '^color_theme' "$CONFIG"; then
+  sed -i "s|^color_theme.*|$line|" "$CONFIG"
+else
+  echo "$line" >>"$CONFIG"
+fi
+# Let the terminal's own background (and its opacity) show through.
+sed -i 's|^theme_background.*|theme_background = false|' "$CONFIG"

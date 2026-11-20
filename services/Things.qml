@@ -14,8 +14,16 @@ Singleton {
   readonly property string bin: Quickshell.shellDir + "/bin/things"
   readonly property string cache: Quickshell.env("HOME") + "/.cache/aayork-quickshell/things-state.json"
 
-  // Refreshes faster while the popup is showing.
-  property bool watching: false
+  // Refreshes faster while something shows the lists: name -> true.
+  property var watchers: ({})
+  readonly property bool watching: Object.keys(watchers).length > 0
+  function watch(name, on) {
+    if (!!watchers[name] === on) return
+    var next = Object.assign({}, watchers)
+    if (on) next[name] = true
+    else delete next[name]
+    watchers = next
+  }
 
   // "ready", "no-cli", "no-login", or "" before the first check.
   property string setup: ""
@@ -103,12 +111,13 @@ Singleton {
     return String(note || "").replace(/<[^>]+>/g, "").trim()
   }
 
-  // [{ title, done }] in the order Things shows them.
+  // [{ uuid, title, done }] in the order Things shows them.
   function checklist(uuid) {
     var list = []
     for (var id in checklistItems) {
-      var item = checklistItems[id]
-      if (item && (item.TaskIDs || []).indexOf(uuid) !== -1) list.push({ title: item.Title || "", done: item.Status === 3, order: item.Index || 0 })
+      var raw = checklistItems[id]
+      var item = raw && overrides[id] ? Object.assign({}, raw, overrides[id]) : raw
+      if (item && (item.TaskIDs || []).indexOf(uuid) !== -1) list.push({ uuid: id, title: item.Title || "", done: item.Status === 3, order: item.Index || 0 })
     }
     return list.sort((a, b) => a.order - b.order)
   }
@@ -158,6 +167,13 @@ Singleton {
     if (task.pending) return
     override(task.uuid, { Status: 3 })
     run(["complete", task.uuid])
+  }
+
+  // Tick or untick one checklist item.
+  function toggleItem(item) {
+    var done = !item.done
+    override(item.uuid, { Status: done ? 3 : 0 })
+    run(["check", item.uuid, done ? "on" : "off"])
   }
 
   function trash(task) {

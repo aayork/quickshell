@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
-// Qualified: the Tailscale and Things widgets here share names with services.
+// Qualified: the Tailscale widget here shares its name with a service.
 import qs.services as Services
 import qs.bar.elsewhen
 import qs.theme
@@ -77,7 +77,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "jot": jot.popup, "tray": tray.popup, "things": things.popup, "clock": clock.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "jot": jot.popup, "tray": tray.popup, "clock": clock.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -193,7 +193,7 @@ Scope {
           height: parent.height
           width: layout.width
 
-          readonly property var defaultOrder: ["jot", "tray", "things", "tailscale", "temps", "network", "control-center", "elsewhen", "weather", "clock"]
+          readonly property var defaultOrder: ["jot", "tray", "tailscale", "temps", "network", "control-center", "elsewhen", "weather", "clock"]
           // The saved order, cleaned up: unknown names dropped, new ones put
           // back where the default has them.
           function savedOrder() {
@@ -215,7 +215,7 @@ Scope {
           property var order: savedOrder()
 
           function widget(name) {
-            return { "jot": jot, "tray": tray, "things": things, "tailscale": tailscale, "temps": temps,
+            return { "jot": jot, "tray": tray, "tailscale": tailscale, "temps": temps,
                      "network": network, "control-center": controlCenter, "elsewhen": elsewhen, "weather": weather, "clock": clock }[name]
           }
 
@@ -286,12 +286,6 @@ Scope {
             id: tray; x: row.slotX("tray"); z: moving ? 1 : 0
             foreground: bar.foregroundOver(row.x + tray.x, tray.width)
             movable: true; onMoveStarted: row.beginMove("tray"); onMoved: dx => row.move("tray", dx); onMoveEnded: row.endMove("tray")
-            BarSlide on x {}
-          }
-          Things {
-            id: things; x: row.slotX("things"); z: moving ? 1 : 0
-            foreground: bar.foregroundOver(row.x + things.x, things.width)
-            movable: true; onMoveStarted: row.beginMove("things"); onMoved: dx => row.move("things", dx); onMoveEnded: row.endMove("things")
             BarSlide on x {}
           }
           Tailscale {

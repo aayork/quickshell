@@ -1,10 +1,11 @@
 import QtQuick
 import Quickshell.Hyprland
+import qs.services
 import qs.theme
 
 // Every workspace is its number on a small square tile (no border, a
 // barely-there rounding). Empty ones are a faint tile with a dim number, ones holding
-// windows a stronger tile with a solid strip along the bottom, and the
+// windows a stronger tile with a dot per window under it (up to three), and the
 // focused one the strongest. While a special workspace is open, the
 // workspace underneath fades back.
 // Clicking any number closes it.
@@ -14,12 +15,14 @@ Row {
   property color foreground: Theme.foreground
 
   readonly property int box: 16
+  // Settings › Shell › Bar › Kanji numerals.
+  readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
   readonly property int gap: 4
 
-  // 1-4 always show. Anything past that shows only while Hyprland has it, and
+  // 1-3 always show. Anything past that shows only while Hyprland has it, and
   // Hyprland drops an empty workspace the moment it is left.
   readonly property var ids: {
-    var list = [1, 2, 3, 4]
+    var list = [1, 2, 3]
     var values = Hyprland.workspaces.values
     for (var i = 0; i < values.length; i++) {
       var id = values[i].id
@@ -97,25 +100,22 @@ Row {
         Behavior on color { ColorAnimation { duration: 160 } }
         Behavior on baseOpacity { NumberAnimation { duration: 160 } }
 
-        // A solid strip along the bottom marks a workspace with windows.
-        Rectangle {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          // Inset so the strip stays inside the rounded corners.
-          anchors.leftMargin: parent.radius
-          anchors.rightMargin: parent.radius
-          height: 1.25
-          color: root.foreground
-          opacity: slot.windows > 0 ? 0.9 : 0
-          Behavior on opacity { NumberAnimation { duration: 160 } }
-        }
-
         Text {
+          id: label
           anchors.centerIn: parent
-          text: slot.modelData
-          font.family: Theme.fontFamily
-          font.pixelSize: Theme.fontSmall
+          // CJK faces carry a tall ascent/descent, so centring the text box
+          // leaves the strokes off. Ideographs are drawn in a square em box
+          // whose middle is 0.38em above the baseline in Noto CJK: centre that.
+          // (TextMetrics' tight box is wrong for 一, it runs down to the baseline.)
+          // 13px glyphs in the 16px tile land on x = 1.5, which Qt rounds
+          // down, leaving them half a pixel left of centre.
+          anchors.horizontalCenterOffset: Config.bar.kanji ? 0.5 : 0
+          anchors.verticalCenterOffset: Config.bar.kanji ? height / 2 - (baselineOffset - 0.38 * font.pixelSize) : 0
+          // 一 二 三 are bare strokes, so the kanji are drawn larger than the
+          // digits, and in one CJK face so every numeral has the same weight.
+          text: Config.bar.kanji ? root.kanji[slot.modelData - 1] : slot.modelData
+          font.family: Config.bar.kanji ? "Noto Sans CJK JP" : Theme.fontFamily
+          font.pixelSize: Config.bar.kanji ? Theme.fontSmall + 2 : Theme.fontSmall
           font.weight: slot.focused ? Font.Medium : Font.Normal
           color: root.foreground
           opacity: slot.focused || slot.windows > 0 ? 1 : 0.35
@@ -128,6 +128,26 @@ Row {
           NumberAnimation { target: frame; property: "pulse"; to: 0.3; duration: 500; easing.type: Easing.InOutSine }
           NumberAnimation { target: frame; property: "pulse"; to: 1; duration: 500; easing.type: Easing.InOutSine }
           onRunningChanged: if (!running) frame.pulse = 1
+        }
+      }
+
+      // One dot per window under the tile, up to three.
+      Row {
+        anchors.top: frame.bottom
+        anchors.topMargin: 1.5
+        anchors.horizontalCenter: frame.horizontalCenter
+        spacing: 2
+        opacity: frame.opacity
+
+        Repeater {
+          model: Math.min(slot.windows, 3)
+          Rectangle {
+            width: 2
+            height: 2
+            radius: 1
+            color: root.foreground
+            opacity: 0.9
+          }
         }
       }
 
