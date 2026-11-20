@@ -1010,7 +1010,13 @@ Scope {
           }
         }
 
-        Separator { Layout.fillWidth: true; visible: list.count > 0 || mousePanel.visible || headphonesPanel.visible || root.gridMode }
+        // A plain solid rule under the search box: not a section divider.
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 1
+          color: Theme.separator
+          visible: list.count > 0 || mousePanel.visible || headphonesPanel.visible || root.gridMode
+        }
 
         EmojiGrid {
           id: emojiGrid
