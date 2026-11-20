@@ -19,9 +19,36 @@ Rectangle {
   implicitHeight: Theme.rowHeight
   radius: Theme.controlRadius
   opacity: enabled ? 1 : 0.4
-  color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.hover : Theme.alpha(Theme.foreground, 0.04)
+  color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.hover : Theme.alpha(Theme.foreground, 0.05)
   border.width: selected ? 0 : 1
-  border.color: Theme.alpha(Theme.foreground, 0.2)
+  border.color: Theme.alpha(Theme.foreground, 0.1)
+
+  // delta.dev buttons: a darker, thicker bottom edge at rest that slides
+  // away on hover while a ring fades in just outside the button.
+  readonly property bool lit: mouse.containsMouse && enabled
+
+  Rectangle {
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: root.lit ? 0 : 2
+    radius: root.radius
+    color: Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.14 : 0.4)
+    Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+  }
+
+  Rectangle {
+    anchors.fill: parent
+    anchors.margins: -3
+    radius: root.radius + 2
+    color: "transparent"
+    border.width: 1
+    border.color: Theme.alpha(Theme.foreground, 0.28)
+    opacity: root.lit ? 1 : 0
+    scale: root.lit ? 1 : 0.97
+    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+  }
 
   Row {
     id: content
