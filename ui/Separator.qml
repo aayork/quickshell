@@ -1,7 +1,7 @@
 import QtQuick
 import qs.theme
 
-Rectangle {
-  implicitHeight: 1
+// Dashed hairline between menu sections.
+Dashed {
   color: Theme.separator
 }
