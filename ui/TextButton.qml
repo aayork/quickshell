@@ -19,6 +19,8 @@ Rectangle {
   implicitHeight: Theme.rowHeight
   radius: Theme.controlRadius
   opacity: enabled ? 1 : 0.4
+  transform: Translate { y: mouse.pressed ? 1 : 0 }
+  scale: mouse.pressed ? 0.99 : 1
   color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.hover : Theme.alpha(Theme.foreground, 0.05)
   border.width: selected ? 0 : 1
   border.color: Theme.alpha(Theme.foreground, 0.1)
@@ -27,23 +29,47 @@ Rectangle {
   // away on hover while a ring fades in just outside the button.
   readonly property bool lit: mouse.containsMouse && enabled
 
-  // The bottom strip of a button-shaped fill: flat on top, rounded below
-  // exactly like the button's own corners.
-  Item {
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    height: root.lit ? 0 : 2
-    clip: true
-    Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+  // delta.dev's inset shadow (0 -2px, inside the border): the button's inner
+  // shape minus the same shape raised by the lip height. The ends bend up
+  // along the rounded corners. Hover shrinks it away.
+  property real lip: lit ? 0 : 2
+  Behavior on lip { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+  onLipChanged: lipCanvas.requestPaint()
 
-    Rectangle {
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      height: root.height
-      radius: root.radius
-      color: Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.14 : 0.4)
+  Canvas {
+    id: lipCanvas
+    anchors.fill: parent
+    anchors.margins: root.border.width
+    readonly property color ink: root.selected ? Theme.alpha("#000000", 0.18)
+      : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.55)
+    onInkChanged: requestPaint()
+    onWidthChanged: requestPaint()
+    onHeightChanged: requestPaint()
+
+    onPaint: {
+      var ctx = getContext("2d")
+      ctx.reset()
+      if (root.lip <= 0) return
+      var w = width, h = height, r = Math.max(1, root.radius)
+      function shape(y) {
+        ctx.beginPath()
+        ctx.moveTo(r, y)
+        ctx.lineTo(w - r, y)
+        ctx.arcTo(w, y, w, y + r, r)
+        ctx.lineTo(w, y + h - r)
+        ctx.arcTo(w, y + h, w - r, y + h, r)
+        ctx.lineTo(r, y + h)
+        ctx.arcTo(0, y + h, 0, y + h - r, r)
+        ctx.lineTo(0, y + r)
+        ctx.arcTo(0, y, r, y, r)
+        ctx.closePath()
+      }
+      ctx.fillStyle = ink
+      shape(0)
+      ctx.fill()
+      ctx.globalCompositeOperation = "destination-out"
+      shape(-root.lip)
+      ctx.fill()
     }
   }
 
