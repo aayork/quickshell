@@ -1,0 +1,107 @@
+# VLC (Qt5) resource path -> Fluent System Icon (regular style, like the
+# bar's icon set; assets/fluent-icons/map.json uses the same names where the
+# two overlap). The SVGs are in vlc/fluent/; vlc/make-icons recolours them
+# with the theme. A colour key after the name picks the theme colour
+# (default foreground).
+
+# Transport
+/toolbar/play_b.svg                    play
+/menu/play.svg                         play
+/toolbar/pause_b.svg                   pause
+/toolbar/stop_b.svg                    stop
+/toolbar/previous_b.svg                previous
+/toolbar/next_b.svg                    next
+/toolbar/faster.svg                    fast_forward
+/toolbar/slower.svg                    rewind
+/toolbar/faster2.svg                   fast_forward
+/toolbar/slower2.svg                   rewind
+/toolbar/skip_fw.svg                   skip_forward_10
+/toolbar/skip_back.svg                 skip_back_10
+/toolbar/frame.svg                     next_frame
+/toolbar/reverse.svg                   arrow_swap
+/toolbar/record.svg                    record          red
+/toolbar/snapshot.svg                  camera
+/toolbar/atob.svg                      arrow_bidirectional_left_right
+/toolbar/atob_noa.svg                  arrow_bidirectional_left_right
+/toolbar/atob_nob.svg                  arrow_bidirectional_left_right
+/toolbar/eject.svg                     arrow_eject
+
+# View
+/toolbar/fullscreen.svg                full_screen_maximize
+/toolbar/defullscreen.svg              full_screen_minimize
+/toolbar/extended.svg                  options
+/toolbar/playlist.svg                  text_bullet_list_ltr
+/toolbar/dvd_menu.svg                  navigation
+/toolbar/dvd_next.svg                  next
+/toolbar/dvd_prev.svg                  previous
+/toolbar/tv.svg                        tv
+/toolbar/tvtelx.svg                    closed_caption
+/toolbar/clear.svg                     dismiss
+/toobar/clear.svg                      dismiss
+/search_clear.svg                      dismiss_circle
+/valid.svg                             checkmark
+
+# Volume
+/toolbar/volume-high.svg               speaker_2
+/toolbar/volume-medium.svg             speaker_1
+/toolbar/volume-low.svg                speaker_0
+/toolbar/volume-muted.svg              speaker_mute
+
+# Playlist
+/buttons/playlist/repeat_all.svg       arrow_repeat_all
+/buttons/playlist/repeat_one.svg       arrow_repeat_1
+/buttons/playlist/repeat_off.svg       arrow_repeat_all_off
+/buttons/playlist/shuffle_on.svg       arrow_shuffle
+/buttons/playlist/playlist_add.svg     add
+/buttons/playlist/playlist_remove.svg  subtract
+
+# Menus
+/menu/exit.svg                         arrow_exit
+/menu/help.svg                         question_circle
+/menu/info.svg                         info
+/menu/messages.svg                     chat_multiple
+/menu/playlist_menu.svg                text_bullet_list_ltr
+/menu/preferences.svg                  settings
+/menu/settings.svg                     options
+/menu/setting.svg                      wrench
+/menu/stream.svg                       live
+/new.svg                               document_add
+/update.svg                            arrow_sync
+
+# Sidebar
+/sidebar/capture.svg                   video
+/sidebar/disc.svg                      storage
+/sidebar/lan.svg                       router
+/sidebar/library.svg                   library
+/sidebar/movie.svg                     movies_and_tv
+/sidebar/mtp.svg                       phone
+/sidebar/music.svg                     music_note_2
+/sidebar/network.svg                   globe
+/sidebar/pictures.svg                  image
+/sidebar/playlist.svg                  text_bullet_list_ltr
+/sidebar/podcast.svg                   mic
+/sidebar/screen.svg                    desktop
+
+# Item types
+/type/capture-card.svg                 video
+/type/directory.svg                    folder
+/type/node.svg                         folder
+/type/folder-grey.svg                  folder
+/type/disc.svg                         storage
+/type/file.svg                         document
+/type/file-asym.svg                    document
+/type/file-wide.svg                    document
+/type/network.svg                      globe
+/type/playlist.svg                     text_bullet_list_ltr
+/type/stream.svg                       live
+
+# Add-ons
+/addons/default.svg                    puzzle_piece
+/addons/broken.svg                     puzzle_piece    red
+/addons/score.svg                      star            accent
+
+# Playlist placeholders. A .png target is drawn as artwork: the icon, dimmed,
+# on a dark tile (VLC loads these as bitmaps).
+/dropzone.svg                          arrow_download  muted
+/noart.png                             music_note_2    art
+/noart64.png                           music_note_2    art

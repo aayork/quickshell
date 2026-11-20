@@ -1,0 +1,61 @@
+#!/usr/bin/python3 -I
+"""Make VLC draw its seek bar and volume as ordinary Qt sliders.
+
+VLC 3 marks toolbar items with "-<flags>"; flag 4 ("shiny") on the seek bar
+(id 33) and the volume (id 35) selects its own drawing: a near-white outline
+with a fixed blue fill, and a volume wedge rasterised from SVG at 1x (blurry
+at 2x). Without the flag they are plain QSliders, which the qt5ct stylesheet
+(themed/qt5ct-vlc.qss.tpl) draws like the shell's sliders. Only that flag on
+those two items is touched; the rest of a customised layout is kept. Run
+before VLC starts, since VLC rewrites the file when it quits. Values are
+written quoted: QSettings reads an unquoted ";" as the start of a comment.
+"""
+import os
+import re
+
+CONF = os.path.expanduser("~/.config/vlc/vlc-qt-interface.conf")
+# VLC 3.0's defaults (modules/gui/qt/components/controller.hpp).
+DEFAULTS = {
+    "MainToolbar2": "0-2;64;3;1;4;64;7;9;64;10;20;19;64-4;37;65;35-4",
+    "InputToolbar": "43;33-4;44",
+    "FSCtoolbar": "0-2;64;3;1;4;64;37;64;38;64;8;65;25;35-4;34",
+}
+
+
+def quoted(key, layout):
+    if ";" not in layout:
+        layout = DEFAULTS[key]
+    return f'{key}="{unshine(layout)}"'
+
+
+def unshine(layout):
+    def fix(m):
+        flags = int(m.group(2) or 0) & ~4
+        return m.group(1) + (f"-{flags}" if flags else "")
+    return ";".join(re.sub(r"^(3[35])(?:-(\d+))?$", fix, item) for item in layout.split(";"))
+
+
+lines = open(CONF).read().splitlines() if os.path.exists(CONF) else []
+section, seen, out = None, set(), []
+for line in lines:
+    m = re.match(r"^\[(.+)\]$", line)
+    if m:
+        if section == "MainWindow":
+            out += [quoted(k, v) for k, v in DEFAULTS.items() if k not in seen]
+        section = m.group(1)
+    elif section == "MainWindow":
+        key, _, value = line.partition("=")
+        if key in DEFAULTS:
+            seen.add(key)
+            line = quoted(key, value.strip().strip(chr(34)))
+    out.append(line)
+if section == "MainWindow":
+    out += [quoted(k, v) for k, v in DEFAULTS.items() if k not in seen]
+if "[MainWindow]" not in lines:
+    out += ["", "[MainWindow]"] + [quoted(k, v) for k, v in DEFAULTS.items()]
+
+os.makedirs(os.path.dirname(CONF), exist_ok=True)
+tmp = CONF + ".tmp"
+with open(tmp, "w") as f:
+    f.write("\n".join(out) + "\n")
+os.replace(tmp, CONF)

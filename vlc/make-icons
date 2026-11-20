@@ -1,0 +1,86 @@
+#!/usr/bin/python3 -I
+"""Draw VLC's interface icons from Fluent System Icons in theme colours.
+
+    make-icons <icons.map> <svg-dir> <out-dir> key=#rrggbb ...
+
+Each map line is "<resource path> <fluent name> [colour key]". The SVG is
+the Fluent drawing (vlc/fluent/, Microsoft, MIT) filled with the colour and
+given a stroke of the same colour 0.5 units wide (on a 24-unit grid), the
+weight assets/fluent-icons/build.py adds so the lines match the bar's icons.
+
+A .png target becomes cover art (rsvg-convert): the icon, dimmed, on a\ndark tile. Also writes the volume slider's two shapes and icons.qrc. VLC rasterises
+those at their own 80x22 size and stretches them to the screen's scale, so
+they are square, pixel-aligned rectangles that stay sharp when doubled.
+"""
+import os
+import re
+import subprocess
+import sys
+
+map_path, svg_dir, out = sys.argv[1:4]
+colors = dict(arg.split("=", 1) for arg in sys.argv[4:])
+fg = colors.get("foreground", "#cccccc")
+
+
+def write(rel, text):
+    path = os.path.join(out, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(text)
+
+
+files = []
+missing = 0
+for line in open(map_path):
+    parts = line.split("#", 1)[0].split()
+    if len(parts) < 2:
+        continue
+    resource, name = parts[0].lstrip("/"), parts[1]
+    color = colors.get(parts[2], fg) if len(parts) > 2 else fg
+    for size in (24, 20):
+        src = os.path.join(svg_dir, f"{name}_{size}_regular.svg")
+        if os.path.exists(src):
+            break
+    else:
+        print(f"missing {name} for {resource}", file=sys.stderr)
+        missing += 1
+        continue
+    body = open(src).read()
+    paths = "".join(re.findall(r"<path\b[^>]*/>", body))
+    stroke = 0.5 * size / 24
+    if resource.endswith(".png"):
+        # Cover-art placeholder: the icon at half size, dimmed, on a tile.
+        tile = colors.get("dark_background", "#202020")
+        ink = colors.get("muted", fg)
+        svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {size * 2} {size * 2}">'
+               f'<rect width="{size * 2}" height="{size * 2}" fill="{tile}"/>'
+               f'<g transform="translate({size / 2} {size / 2})" fill="{ink}" stroke="{ink}" '
+               f'stroke-width="{stroke:g}" stroke-linejoin="round">{paths}</g></svg>')
+        path = os.path.join(out, resource)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        subprocess.run(["rsvg-convert", "-o", path], input=svg.encode(), check=True)
+        files.append(resource)
+        continue
+    write(resource,
+          f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 {size} {size}">'
+          f'<g fill="{color}" stroke="{color}" stroke-width="{stroke:g}" stroke-linejoin="round">'
+          f"{paths}</g></svg>\n")
+    files.append(resource)
+
+# Volume: VLC fills "inside" with its slider colours up to the level and
+# draws "outside" on top, then its "NN%" label in the upper half. A 3px bar
+# along the bottom with a 1px outline, both on whole pixels.
+groove = colors.get("groove", "#555555")
+write("toolbar/volslide-inside.svg",
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="22" viewBox="0 0 80 22" shape-rendering="crispEdges">'
+      '<rect x="1" y="15" width="78" height="5" fill="#ffffff"/></svg>\n')
+write("toolbar/volslide-outside.svg",
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="22" viewBox="0 0 80 22" shape-rendering="crispEdges">'
+      f'<path d="M1 15h78v5H1zM2 16v3h76v-3z" fill="{groove}" fill-rule="evenodd"/></svg>\n')
+files += ["toolbar/volslide-inside.svg", "toolbar/volslide-outside.svg"]
+
+write("icons.qrc", '<RCC><qresource prefix="/">\n'
+      + "".join(f"  <file>{f}</file>\n" for f in files)
+      + "</qresource></RCC>\n")
+print(f"{len(files)} icons, {missing} missing", file=sys.stderr)
+sys.exit(1 if missing else 0)

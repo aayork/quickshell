@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# Run VLC with the desktop theme's colours.
+#
+# VLC 3's interface is Qt5 widgets and takes no stylesheet from outside, so
+# its palette comes from qt5ct: current/theme/qt5ct-colors.conf (written by
+# theme-set-templates from themed/qt5ct-colors.conf.tpl) with the Fusion
+# style, plus current/theme/qt5ct-vlc.qss (themed/qt5ct-vlc.qss.tpl) to
+# flatten and round the controls like the shell. qt5ct is switched on for VLC alone, through this wrapper and the
+# override ~/.local/share/applications/vlc.desktop; other Qt apps are left
+# as they are, since only a QT_QPA_PLATFORMTHEME=qt5ct app reads qt5ct.conf.
+
+CONF="$HOME/.config/qt5ct/qt5ct.conf"
+COLORS="$HOME/.local/state/aayork-quickshell/current/theme/qt5ct-colors.conf"
+QSS="$HOME/.local/state/aayork-quickshell/current/theme/qt5ct-vlc.qss"
+
+if [[ -f /usr/lib/qt/plugins/platformthemes/libqt5ct.so && -f $COLORS ]]; then
+  # Rewritten at every launch so the icons and fonts follow the desktop's
+  # interface settings (Settings › Appearance).
+  qfont() { # "Adwaita Sans 11" -> "Adwaita Sans,11,-1,5,50,0,0,0,0,0"
+    local spec
+    spec=$(gsettings get org.gnome.desktop.interface "$1" 2>/dev/null | tr -d "'")
+    [[ $spec =~ ^(.+)\ ([0-9.]+)$ ]] || spec="$2"
+    [[ $spec =~ ^(.+)\ ([0-9.]+)$ ]]
+    printf '"%s,%s,-1,5,50,0,0,0,0,0"' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  }
+  mkdir -p "${CONF%/*}"
+  cat >"$CONF" <<CONFEOF
+[Appearance]
+color_scheme_path=$COLORS
+custom_palette=true
+style=Fusion
+icon_theme=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'")
+standard_dialogs=default
+
+[Fonts]
+general=$(qfont font-name "Sans 11")
+fixed=$(qfont monospace-font-name "Monospace 11")
+
+[Interface]
+stylesheets=$QSS
+CONFEOF
+  export QT_QPA_PLATFORMTHEME=qt5ct
+fi
+
+# Icons: VLC's built-in toolbar/menu icons are replaced with Fluent System
+# Icons (the bar's set, vlc/fluent/) in theme colours, through an LD_PRELOAD
+# shim (vlc/preload.cpp) compiled once into the cache. The icons are redrawn
+# whenever the theme or the map changes.
+SHELL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PATH="$SHELL_ROOT/bin:$PATH"
+CACHE="$HOME/.cache/aayork-quickshell/vlc"
+COLORS_TOML="$HOME/.local/state/aayork-quickshell/current/theme/colors.toml"
+EXTRA=()
+
+themed_icons() {
+  command -v rcc >/dev/null && [[ -f $COLORS_TOML ]] || return 1
+  mkdir -p "$CACHE"
+  if [[ ! -f $CACHE/preload.so || $SHELL_ROOT/vlc/preload.cpp -nt $CACHE/preload.so ]]; then
+    command -v g++ >/dev/null || return 1
+    local qt
+    qt=$(pkg-config --cflags --libs Qt5Widgets) || return 1
+    # shellcheck disable=SC2086
+    g++ -std=c++17 -O2 -shared "$SHELL_ROOT/vlc/preload.cpp" -o "$CACHE/preload.so" $qt -fPIC || return 1
+  fi
+
+  local fg accent red groove tile stamp
+  fg=$(theme-color --file "$COLORS_TOML" foreground)
+  accent=$(theme-color --file "$COLORS_TOML" accent)
+  red=$(theme-color --file "$COLORS_TOML" red)
+  groove=$(theme-color --file "$COLORS_TOML" muted)
+  tile=$(theme-color --file "$COLORS_TOML" dark_background)
+  stamp="$fg $accent $red $groove $tile $(cat "$SHELL_ROOT/vlc/icons.map" "$SHELL_ROOT/vlc/make-icons" | md5sum)"
+  if [[ ! -f $CACHE/icons.rcc || $(cat "$CACHE/stamp" 2>/dev/null) != "$stamp" ]]; then
+    rm -rf "$CACHE/icons"
+    "$SHELL_ROOT/vlc/make-icons" "$SHELL_ROOT/vlc/icons.map" "$SHELL_ROOT/vlc/fluent" "$CACHE/icons" \
+      foreground="$fg" accent="$accent" red="$red" groove="$groove" \
+      muted="$groove" dark_background="$tile" 2>/dev/null || return 1
+    (cd "$CACHE/icons" && rcc -binary icons.qrc -o "$CACHE/icons.rcc") || return 1
+    echo "$stamp" >"$CACHE/stamp"
+  fi
+
+  export VLC_THEMED_RCC="$CACHE/icons.rcc"
+  export LD_PRELOAD="$CACHE/preload.so${LD_PRELOAD:+:$LD_PRELOAD}"
+  # The volume bar's fill (VLC's four slider colours) in the accent.
+  local rgb
+  rgb=$(printf '%d;%d;%d' "0x${accent:1:2}" "0x${accent:3:2}" "0x${accent:5:2}")
+  EXTRA=(--qt-slider-colours="$rgb;$rgb;$rgb;$rgb")
+}
+themed_icons || EXTRA=()
+
+# Plain Qt seek bar and volume, so the stylesheet draws them (vlc/plain-sliders).
+[[ $QT_QPA_PLATFORMTHEME == qt5ct ]] && "$SHELL_ROOT/vlc/plain-sliders" 2>/dev/null
+
+# Native Wayland. Qt 5 falls back to xcb (Xwayland) unless told otherwise,
+# and under Xwayland the cursor and scaling come out at X11's size. VLC 3's
+# Qt interface embeds its video on Wayland too (vout window type "wayland").
+# VLC_X11=1 forces the old Xwayland path if something misbehaves.
+if [[ -n $WAYLAND_DISPLAY && -z $VLC_X11 && -z $QT_QPA_PLATFORM ]] &&
+  compgen -G "/usr/lib/qt/plugins/platforms/libqwayland*.so" >/dev/null; then
+  export QT_QPA_PLATFORM=wayland
+fi
+
+exec /usr/bin/vlc "${EXTRA[@]}" "$@"
