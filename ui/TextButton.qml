@@ -22,7 +22,7 @@ Rectangle {
   transform: Translate { y: mouse.pressed ? 1 : 0 }
   scale: mouse.pressed ? 0.99 : 1
   color: selected ? Theme.accent : mouse.pressed ? Theme.pressed : mouse.containsMouse ? Theme.alpha(Theme.foreground, 0.07) : Theme.alpha(Theme.foreground, 0.05)
-  Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+  Behavior on color { ColorAnimation { duration: 90; easing.type: Easing.OutCubic } }
   border.width: selected ? 0 : 1
   border.color: Theme.alpha(Theme.foreground, 0.1)
 
@@ -36,12 +36,19 @@ Rectangle {
   // Drawn once; hover only fades it back, so nothing is repainted mid-fade.
   readonly property real lip: 2
 
-  Canvas {
-    id: lipCanvas
+  // Hover slides the drawn edge down and out of this clipped window, so it
+  // moves without being repainted.
+  Item {
     anchors.fill: parent
     anchors.margins: root.border.width
-    opacity: root.lit ? 0.3 : 1
-    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    clip: true
+
+  Canvas {
+    id: lipCanvas
+    width: parent.width
+    height: parent.height
+    y: root.lit ? root.lip : 0
+    Behavior on y { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
     readonly property color ink: root.selected ? Theme.alpha("#000000", 0.18)
       : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.55)
     onInkChanged: requestPaint()
@@ -74,16 +81,17 @@ Rectangle {
       ctx.fill()
     }
   }
+  }
 
   Rectangle {
     anchors.fill: parent
     anchors.margins: -3
-    radius: root.radius + 2
+    radius: root.radius + 3
     color: "transparent"
     border.width: 1
-    border.color: Theme.alpha(Theme.foreground, 0.18)
+    border.color: Theme.alpha(Theme.foreground, 0.22)
     opacity: root.lit ? 1 : 0
-    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
   }
 
   Row {
