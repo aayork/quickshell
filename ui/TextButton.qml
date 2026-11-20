@@ -30,60 +30,58 @@ Rectangle {
   // away on hover while a ring fades in just outside the button.
   readonly property bool lit: mouse.containsMouse && enabled
 
-  // delta.dev's inset shadow (0 -2px, inside the border): the button's inner
-  // shape minus the same shape raised by the lip height. The ends bend up
-  // along the rounded corners. Hover shrinks it away.
-  // Drawn once; hover only fades it back, so nothing is repainted mid-fade.
+  // delta.dev's inset shadow (0 -2px, inside the border): a flat-topped band
+  // whose bottom corners follow the button's, with its ends turned up a
+  // touch at the sides. Plain rectangles, so it stays crisp at 1.6x.
+  // Hover slides it down and out of the clipped inside.
   readonly property real lip: 2
+  readonly property color lipInk: selected ? Theme.alpha("#000000", 0.18)
+    : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.4)
 
-  // Clipped to the button's inside.
   Item {
     anchors.fill: parent
     anchors.margins: root.border.width
     clip: true
 
-  Canvas {
-    id: lipCanvas
-    width: parent.width
-    height: parent.height
-    // Gone the moment the ring arrives, as on the site; nothing moves.
-    opacity: root.lit ? 0 : 1
-    Behavior on opacity { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
-    readonly property color ink: root.selected ? Theme.alpha("#000000", 0.18)
-      : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.55)
-    onInkChanged: requestPaint()
-    onWidthChanged: requestPaint()
-    onHeightChanged: requestPaint()
+    Item {
+      id: lipShape
+      width: parent.width
+      height: parent.height
+      // Far enough to take the raised ends out too.
+      y: root.lit ? root.lip + Math.max(1, root.radius) + 1 : 0
+      Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
-    onPaint: {
-      var ctx = getContext("2d")
-      ctx.reset()
-      if (root.lip <= 0) return
-      var w = width, h = height, r = Math.max(1, root.radius)
-      function shape(y) {
-        ctx.beginPath()
-        ctx.moveTo(r, y)
-        ctx.lineTo(w - r, y)
-        ctx.arcTo(w, y, w, y + r, r)
-        ctx.lineTo(w, y + h - r)
-        ctx.arcTo(w, y + h, w - r, y + h, r)
-        ctx.lineTo(r, y + h)
-        ctx.arcTo(0, y + h, 0, y + h - r, r)
-        ctx.lineTo(0, y + r)
-        ctx.arcTo(0, y, r, y, r)
-        ctx.closePath()
+      readonly property real r: Math.max(1, root.radius - root.border.width)
+
+      // The band: the bottom of a button-shaped fill.
+      Item {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: root.lip
+        clip: true
+        Rectangle {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          height: lipShape.height
+          radius: lipShape.r
+          color: root.lipInk
+        }
       }
-      ctx.fillStyle = ink
-      shape(0)
-      ctx.fill()
-      ctx.globalCompositeOperation = "destination-out"
-      shape(-root.lip)
-      ctx.fill()
-      // Clear everything above the crescent's raised ends, so no anti-aliased
-      // trace of the shapes' top corners is left behind.
-      ctx.fillRect(0, 0, w, h - root.lip - r - 0.5)
+      // The turned-up ends.
+      Repeater {
+        model: 2
+        Rectangle {
+          required property int index
+          x: index === 0 ? 0 : lipShape.width - width
+          y: lipShape.height - root.lip - lipShape.r
+          width: 1
+          height: lipShape.r
+          color: root.lipInk
+        }
+      }
     }
-  }
   }
 
   Rectangle {
@@ -94,7 +92,7 @@ Rectangle {
     border.width: 1
     border.color: Theme.alpha(Theme.foreground, 0.22)
     opacity: root.lit ? 1 : 0
-    Behavior on opacity { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
   }
 
   Row {
