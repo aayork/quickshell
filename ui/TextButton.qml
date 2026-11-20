@@ -27,14 +27,24 @@ Rectangle {
   // away on hover while a ring fades in just outside the button.
   readonly property bool lit: mouse.containsMouse && enabled
 
-  Rectangle {
+  // The bottom strip of a button-shaped fill: flat on top, rounded below
+  // exactly like the button's own corners.
+  Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: root.lit ? 0 : 2
-    radius: root.radius
-    color: Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.14 : 0.4)
+    clip: true
     Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+    Rectangle {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      height: root.height
+      radius: root.radius
+      color: Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.14 : 0.4)
+    }
   }
 
   Rectangle {
