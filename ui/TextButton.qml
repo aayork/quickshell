@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Hyprland
 import qs.theme
 
 // A labelled button inside a popup, optionally led by a glyph. `selected`
@@ -36,7 +37,7 @@ Rectangle {
   // Hover slides it down and out of the clipped inside.
   readonly property real lip: 2
   readonly property color lipInk: selected ? Theme.alpha("#000000", 0.18)
-    : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.4)
+    : Theme.alpha("#000000", Theme.luminance(Theme.background) > 0.4 ? 0.12 : 0.5)
 
   Item {
     anchors.fill: parent
@@ -69,16 +70,36 @@ Rectangle {
           color: root.lipInk
         }
       }
-      // The turned-up ends.
+      // The turned-up ends, matched to delta.dev pixel for pixel: the column
+      // against the border rises one screen pixel, the next only a hint.
+      // One screen pixel. Qt reports 2 here though the screen draws at
+      // Hyprland's 1.6, so the scale comes from Hyprland.
+      readonly property real px: 1 / (Hyprland.focusedMonitor?.scale ?? 1)
+      // Soft top edge: a half-tone row along the whole band.
+      Rectangle {
+        width: lipShape.width
+        height: lipShape.px
+        y: lipShape.height - root.lip - height
+        color: root.lipInk
+        opacity: 0.25
+      }
+      // [column from the border, rows up, opacity] at each end.
       Repeater {
-        model: 2
-        Rectangle {
-          required property int index
-          x: index === 0 ? 0 : lipShape.width - width
-          y: lipShape.height - root.lip - lipShape.r
-          width: 1
-          height: lipShape.r
-          color: root.lipInk
+        model: [[0, 1, 0.75], [0, 2, 0.2], [1, 1, 0.2]]
+        Item {
+          required property var modelData
+          Repeater {
+            model: 2
+            Rectangle {
+              required property int index
+              width: lipShape.px
+              height: lipShape.px
+              x: index === 0 ? modelData[0] * lipShape.px : lipShape.width - (modelData[0] + 1) * lipShape.px
+              y: lipShape.height - root.lip - modelData[1] * lipShape.px
+              color: root.lipInk
+              opacity: modelData[2]
+            }
+          }
         }
       }
     }
