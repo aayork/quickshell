@@ -180,7 +180,7 @@ setup_shell_config() {
        + (if $bose then {bose: true} else {} end)
        + (if $mouse then {mouse: true} else {} end)
        + (if $things then {things: true} else {} end))' "$cfg" >"$tmp" && mv "$tmp" "$cfg"
-  ok "extras: $(jq -r '.features | to_entries | map("\(.key)=\(.value)") | join(" ")' "$cfg") (switch in Settings › Shell › Extras)"
+  ok "extras: $(jq -r '.features | to_entries | map("\(.key)=\(.value)") | join(" ")' "$cfg") (switch with the launcher keyword extensions:)"
 }
 
 setup_theme() {

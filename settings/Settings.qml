@@ -1023,41 +1023,6 @@ Scope {
               }
 
               Card {
-              title: "EXTRAS"
-
-              Setting {
-                glyph: 0xF00AF
-                label: "Bose headphones"
-                note: "Battery, noise control and EQ on the bar while connected"
-                Toggle {
-                  checked: Config.features.bose
-                  onToggled: Config.features.bose = !Config.features.bose
-                }
-              }
-
-              Setting {
-                glyph: 0xF037D
-                label: "Razer mouse"
-                note: "DPI and polling rate in the launcher (needs OpenRazer)"
-                Toggle {
-                  checked: Config.features.mouse
-                  onToggled: Config.features.mouse = !Config.features.mouse
-                }
-              }
-
-              Setting {
-                glyph: 0xF04CE
-                label: "Things 3"
-                note: "Your to-dos on the bar (needs things-cli)"
-                Toggle {
-                  checked: Config.features.things
-                  onToggled: Config.features.things = !Config.features.things
-                }
-              }
-
-              }
-
-              Card {
               title: "SCREENSAVER"
 
               Setting {

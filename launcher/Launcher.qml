@@ -142,6 +142,25 @@ Scope {
           actions: actions
         })
       }
+      // Bose has no keyword of its own (it is a section of `headphones:`),
+      // but its service is switched here like Things and Mouse.
+      if (needle === "" || Fuzzy.best(needle, "bose", ["Bose headphones", "headphones", "qc45"]) > 0) {
+        var bose = Config.features.bose
+        list.push({
+          key: "extoggle:bose",
+          title: "Bose",
+          detail: "Battery, noise control and EQ in the headphones panel",
+          subtitle: "",
+          icon: "",
+          glyph: Icons.glyph(0xF00AF),
+          glyphColor: bose ? "" : Theme.muted,
+          toggle: bose,
+          chip: "headphones:",
+          group: "Built In",
+          actions: [{ title: bose ? "Turn Off" : "Turn On", keepOpen: true,
+                      run: (function(next) { return () => { Config.features.bose = next } })(!bose) }]
+        })
+      }
       if (list.length === 0) list.push(root.hintRow("No extension matches", root.builtins.find(b => b.id === "extensions")))
       return list
     }
