@@ -1,0 +1,35 @@
+#!/bin/bash
+# One sample of the machine's load and temperatures, for services/Performance.qml.
+# Builtins only (no cat per file), since it runs every couple of seconds.
+#
+#   @cpu  TAB <busy jiffies> TAB <total jiffies>     (since boot; the service diffs)
+#   @mem  TAB <total kB> TAB <available kB> TAB <swap total kB> TAB <swap free kB>
+#   @gpu  TAB <busy %> TAB <VRAM used bytes> TAB <VRAM total bytes>   (amdgpu)
+#   <hwmon chip name> TAB <label, may be empty> TAB <millidegrees C>
+
+read -r _ user nice system idle iowait irq softirq steal _ </proc/stat
+busy=$((user + nice + system + irq + softirq + steal))
+printf '@cpu\t%s\t%s\n' "$busy" "$((busy + idle + iowait))"
+
+while read -r key value _; do
+  case $key in
+    MemTotal:) mt=$value ;; MemAvailable:) ma=$value ;;
+    SwapTotal:) st=$value ;; SwapFree:) sf=$value ;;
+  esac
+done </proc/meminfo
+printf '@mem\t%s\t%s\t%s\t%s\n' "$mt" "$ma" "$st" "$sf"
+
+# The first card that reports how busy it is (the discrete one on this box).
+for busy in /sys/class/drm/card*/device/gpu_busy_percent; do
+  [[ -r $busy ]] || continue
+  dev=${busy%/*}
+  printf '@gpu\t%s\t%s\t%s\n' "$(<"$busy")" "$(<"$dev/mem_info_vram_used")" "$(<"$dev/mem_info_vram_total")"
+  break
+done 2>/dev/null
+
+for input in /sys/class/hwmon/hwmon*/temp*_input; do
+  value=$(<"$input") 2>/dev/null || continue
+  label=
+  [[ -r ${input%_input}_label ]] && label=$(<"${input%_input}_label")
+  printf '%s\t%s\t%s\n' "$(<"${input%/*}/name")" "$label" "$value"
+done

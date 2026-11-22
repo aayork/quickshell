@@ -77,7 +77,7 @@ Scope {
           if (Hyprland.focusedMonitor !== bar.monitor) return
           // A tucked bar comes out to show what was asked for.
           if (bar.fullscreen) bar.peeking = true
-          var popups = { "jot": jot.popup, "tray": tray.popup, "clock": clock.popup, "tailscale": tailscale.popup, "temps": temps.popup, "network": network.popup, "control-center": controlCenter.popup }
+          var popups = { "jot": jot.popup, "tray": tray.popup, "clock": clock.popup, "tailscale": tailscale.popup, "temps": performance.popup, "performance": performance.popup, "network": network.popup, "control-center": controlCenter.popup }
           if (popups[name]) popups[name].toggle()
       }
 
@@ -184,6 +184,15 @@ Scope {
           foreground: bar.foregroundOver(workspaces.x, workspaces.width)
         }
 
+        // CPU / memory / GPU use and CPU temperature, just right of the
+        // workspaces (`bar toggle performance` opens its popup).
+        Performance {
+          id: performance
+          anchors.left: workspaces.right
+          anchors.leftMargin: 4
+          foreground: bar.foregroundOver(performance.x, performance.width)
+        }
+
         // The right-hand icons. Drag one sideways to move it; the others
         // slide aside, and the order is saved to config.json (bar.order).
         Item {
@@ -193,7 +202,7 @@ Scope {
           height: parent.height
           width: layout.width
 
-          readonly property var defaultOrder: ["jot", "tray", "tailscale", "temps", "network", "control-center", "elsewhen", "weather", "clock"]
+          readonly property var defaultOrder: ["jot", "tray", "tailscale", "network", "control-center", "elsewhen", "weather", "clock"]
           // The saved order, cleaned up: unknown names dropped, new ones put
           // back where the default has them.
           function savedOrder() {
@@ -215,7 +224,7 @@ Scope {
           property var order: savedOrder()
 
           function widget(name) {
-            return { "jot": jot, "tray": tray, "tailscale": tailscale, "temps": temps,
+            return { "jot": jot, "tray": tray, "tailscale": tailscale,
                      "network": network, "control-center": controlCenter, "elsewhen": elsewhen, "weather": weather, "clock": clock }[name]
           }
 
@@ -292,12 +301,6 @@ Scope {
             id: tailscale; x: row.slotX("tailscale"); z: moving ? 1 : 0
             foreground: bar.foregroundOver(row.x + tailscale.x, tailscale.width)
             movable: true; onMoveStarted: row.beginMove("tailscale"); onMoved: dx => row.move("tailscale", dx); onMoveEnded: row.endMove("tailscale")
-            BarSlide on x {}
-          }
-          Temps {
-            id: temps; x: row.slotX("temps"); z: moving ? 1 : 0
-            foreground: bar.foregroundOver(row.x + temps.x, temps.width)
-            movable: true; onMoveStarted: row.beginMove("temps"); onMoved: dx => row.move("temps", dx); onMoveEnded: row.endMove("temps")
             BarSlide on x {}
           }
           Network {

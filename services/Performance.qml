@@ -3,10 +3,23 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Hardware temperatures from hwmon (bin/temps), every few seconds: the CPU
-// for the bar, and CPU, GPU, drives and Wi-Fi card for the popup.
+// The machine's load and temperatures (bin/system-stats), every two seconds:
+// CPU, memory and GPU use plus the CPU temperature for the bar; every sensor
+// and a few minutes of history for the popup.
 Singleton {
   id: root
+
+  // Use, in percent; NaN until known (CPU needs two samples).
+  property real cpuUsage: NaN
+  property real memUsage: NaN
+  property real gpuUsage: NaN
+  // Bytes.
+  property real memUsed: NaN
+  property real memTotal: NaN
+  property real swapUsed: NaN
+  property real swapTotal: NaN
+  property real vramUsed: NaN
+  property real vramTotal: NaN
 
   // °C, NaN when the machine has no such sensor.
   property real cpu: NaN
@@ -15,10 +28,15 @@ Singleton {
   property var sensors: []
   property var cpuHistory: []
   property var gpuHistory: []
-  readonly property int interval: 3000
+  property var cpuUsageHistory: []
+  property var gpuUsageHistory: []
+  readonly property int interval: 2000
   // Three minutes.
-  readonly property int historyLength: 60
-  readonly property bool available: !isNaN(cpu)
+  readonly property int historyLength: 90
+  readonly property bool available: !isNaN(memUsage)
+
+  property real lastBusy: NaN
+  property real lastTotal: NaN
 
   // Normal, getting warm, or hot.
   function level(value, warn, hot) {
@@ -26,13 +44,37 @@ Singleton {
     return value >= hot ? 2 : value >= warn ? 1 : 0
   }
   function format(value) { return isNaN(value) ? "–" : Math.round(value) + "°" }
+  function percent(value) { return isNaN(value) ? "–" : Math.round(value) + "%" }
+  function gib(bytes) { return isNaN(bytes) ? "–" : (bytes / 1073741824).toFixed(1) }
 
   function parse(text) {
     // chip -> [{ label, value }], in the order the kernel lists them.
     var chips = {}
     var lines = text.split("\n")
+    var gpuBusy = NaN
     for (var i = 0; i < lines.length; i++) {
       var f = lines[i].split("\t")
+      if (f[0] === "@cpu") {
+        var busy = Number(f[1]), total = Number(f[2])
+        if (total > lastTotal) cpuUsage = Math.max(0, Math.min(100, 100 * (busy - lastBusy) / (total - lastTotal)))
+        lastBusy = busy
+        lastTotal = total
+        continue
+      }
+      if (f[0] === "@mem") {
+        memTotal = Number(f[1]) * 1024
+        memUsed = (Number(f[1]) - Number(f[2])) * 1024
+        memUsage = memTotal > 0 ? 100 * memUsed / memTotal : NaN
+        swapTotal = Number(f[3]) * 1024
+        swapUsed = (Number(f[3]) - Number(f[4])) * 1024
+        continue
+      }
+      if (f[0] === "@gpu") {
+        gpuBusy = Number(f[1])
+        vramUsed = Number(f[2])
+        vramTotal = Number(f[3])
+        continue
+      }
       var value = parseInt(f[2]) / 1000
       // Unwired inputs read as -55 or so on some boards.
       if (f.length < 3 || isNaN(value) || value <= -40 || value > 150) continue
@@ -86,7 +128,10 @@ Singleton {
 
     root.cpu = cpu
     root.gpu = gpu
+    root.gpuUsage = gpuBusy
     root.sensors = out
+    if (!isNaN(cpuUsage)) cpuUsageHistory = cpuUsageHistory.concat([cpuUsage]).slice(-historyLength)
+    if (!isNaN(gpuBusy)) gpuUsageHistory = gpuUsageHistory.concat([gpuBusy]).slice(-historyLength)
     if (!isNaN(cpu)) cpuHistory = cpuHistory.concat([cpu]).slice(-historyLength)
     if (!isNaN(gpu)) gpuHistory = gpuHistory.concat([gpu]).slice(-historyLength)
   }
@@ -101,7 +146,7 @@ Singleton {
 
   Process {
     id: reader
-    command: [Quickshell.shellDir + "/bin/temps"]
+    command: [Quickshell.shellDir + "/bin/system-stats"]
     stdout: StdioCollector {
       onStreamFinished: root.parse(text)
     }
