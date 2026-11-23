@@ -130,12 +130,15 @@ Scope {
   function aioRecord(format) {
     if (!surface.kept) return
     var geo = recorderGeo(surface.kept)
+    recordRect = surface.kept
     dismissForLive()
     Captures.startRecording(geo, format, recSystem, recMic, recCursor)
   }
 
   // Where the timer's countdown shows, in this screen's points.
   property var countdownRect: null
+  // The area being recorded, in this screen's points.
+  property var recordRect: null
 
   function cancel() {
     if (!open && frozen === "") return
@@ -657,6 +660,40 @@ Scope {
         visible: root.aio && root.mode !== "windows" && !!surface.kept && !surface.dragging && surface.editOp === ""
       }
     }
+  }
+
+  // While recording, the rest of the screen is dimmed as macOS does, so it
+  // is clear which part is being recorded. The shade stops a point short of
+  // the area so none of it can round into the video.
+  PanelWindow {
+    id: recordShade
+    screen: window.screen
+    visible: Captures.recording && !!root.recordRect && !fullScreen
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    mask: Region {}
+    WlrLayershell.namespace: "aayork-capture-recording"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+    readonly property var r: root.recordRect
+    readonly property real gap: 1
+    readonly property real left: r ? Math.max(0, r.x - gap) : 0
+    readonly property real top: r ? Math.max(0, r.y - gap) : 0
+    readonly property real right: r ? Math.min(width, r.x + r.w + gap) : width
+    readonly property real bottom: r ? Math.min(height, r.y + r.h + gap) : height
+    readonly property color shade: Qt.rgba(0, 0, 0, 0.45)
+    // No shade at all when the whole screen (give or take a few points) is
+    // being recorded: there is nothing to set apart.
+    readonly property real slack: 8
+    readonly property bool fullScreen: !!r && r.x <= slack && r.y <= slack
+      && r.x + r.w >= screen.width - slack && r.y + r.h >= screen.height - slack
+
+    Rectangle { x: 0; y: 0; width: parent.width; height: recordShade.top; color: recordShade.shade }
+    Rectangle { x: 0; y: recordShade.bottom; width: parent.width; height: parent.height - recordShade.bottom; color: recordShade.shade }
+    Rectangle { x: 0; y: recordShade.top; width: recordShade.left; height: recordShade.bottom - recordShade.top; color: recordShade.shade }
+    Rectangle { x: recordShade.right; y: recordShade.top; width: parent.width - recordShade.right; height: recordShade.bottom - recordShade.top; color: recordShade.shade }
   }
 
   // The self-timer's countdown: a big number over the area it will take,

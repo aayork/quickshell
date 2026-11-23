@@ -17,8 +17,21 @@ BarButton {
   text: Captures.converting ? "Converting…"
     : Icons.glyph(0xF0765) + " " + Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0")
   fontSize: Theme.fontSize
-  foreground: Captures.converting ? Theme.brightForeground : Theme.red
+  // A fixed deep red rather than the theme's red, which is pale in most
+  // themes: white on a solid pill so it reads over any wallpaper.
+  readonly property color recordRed: "#d4111e"
+  foreground: Captures.converting ? Theme.brightForeground : "#ffffff"
   onClicked: if (Captures.recording) Captures.stopRecording()
+
+  Rectangle {
+    z: -1
+    visible: Captures.recording
+    anchors.fill: parent
+    anchors.topMargin: 4
+    anchors.bottomMargin: 4
+    radius: Theme.controlRadius
+    color: root.hovered ? Qt.darker(root.recordRed, 1.15) : root.recordRed
+  }
 
   Timer {
     interval: 500
