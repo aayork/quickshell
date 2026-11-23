@@ -176,7 +176,7 @@ Scope {
     { id: "shutdown", title: "Shut down", glyph: 0xF0425, words: "power off poweroff", confirm: true, run: () => Session.run("shutdown") },
     { id: "control-center", title: "Control Center", glyph: 0xF057E, words: "audio sound output input now playing", run: () => PopupState.request("control-center") },
     { id: "tailscale", title: "Tailscale", glyph: 0xF0582, mark: "tailscale", words: "vpn tailnet", run: () => PopupState.request("tailscale") },
-    { id: "calendar", title: "Calendar and Weather", glyph: 0xF0599, words: "clock date notifications", run: () => PopupState.request("clock") },
+    { id: "calendar", title: "Calendar and Notifications", glyph: 0xF0599, words: "clock date events notifications history", run: () => PopupState.request("clock") },
     { id: "settings", title: "Settings", glyph: 0xF0493, words: "preferences theme background font cursor night light windows", run: () => PopupState.request("settings") },
     { id: "notes", title: "Notes", glyph: 0xF039B, words: "jot notepad scratchpad note memo alt+a", run: () => JotStore.openRequested() },
     { id: "new-note", title: "New Note", glyph: 0xF090C, words: "jot notes notepad scratchpad create write", run: () => { JotStore.newNote(""); JotStore.openRequested() } },
