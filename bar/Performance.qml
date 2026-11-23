@@ -18,14 +18,20 @@ BarButton {
     return level === 2 ? Theme.red : level === 1 ? Theme.yellow : normal
   }
   function fixed(value, suffix) { return isNaN(value) ? "–" + suffix : Math.round(value) + suffix }
+  // Bytes as "850M" under a gigabyte, "12.3G" above.
+  function size(bytes) {
+    if (isNaN(bytes)) return "–G"
+    return bytes < 1073741824 ? Math.round(bytes / 1048576) + "M" : (bytes / 1073741824).toFixed(1) + "G"
+  }
 
-  // Every value gets the width of "88%", so the bar does not shift whenever
-  // one gains or loses a digit.
+  // Every value gets the width of "88%" (memory: "88.8G"), so the bar does
+  // not shift whenever one gains or loses a digit.
   TextMetrics { id: digits; text: "88%"; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+  TextMetrics { id: sizeDigits; text: "88.8G"; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
 
   readonly property var metrics: [
     { glyph: 0xF061A, text: fixed(Performance.cpuUsage, "%"), level: Performance.level(Performance.cpuUsage, 80, 95), show: true },
-    { glyph: 0xF035B, text: fixed(Performance.memUsage, "%"), level: Performance.level(Performance.memUsage, 80, 92), show: true },
+    { glyph: 0xF035B, text: size(Performance.memUsed), wide: true, level: Performance.level(Performance.memUsage, 80, 92), show: true },
     { glyph: 0xF08AE, text: fixed(Performance.gpuUsage, "%"), level: Performance.level(Performance.gpuUsage, 80, 95), show: !isNaN(Performance.gpuUsage) },
     { glyph: 0xF050F, text: fixed(Performance.cpu, "°"), level: Performance.level(Performance.cpu, 80, 90), show: !isNaN(Performance.cpu) }
   ]
@@ -61,7 +67,7 @@ BarButton {
         }
         Label {
           anchors.verticalCenter: parent.verticalCenter
-          width: Math.max(implicitWidth, digits.advanceWidth)
+          width: Math.max(implicitWidth, (parent.modelData.wide ? sizeDigits : digits).advanceWidth)
           text: parent.modelData.text
           color: root.levelColor(parent.modelData.level, root.foreground)
           font.pixelSize: Theme.fontSize
