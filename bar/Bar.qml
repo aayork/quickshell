@@ -36,6 +36,7 @@ Scope {
       readonly property var monitor: Hyprland.monitorFor(screen)
       readonly property bool fullscreen: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.hasFullscreen === true : false
       property bool peeking: false
+      property bool liveWallpaper: false
       // Steam games (and other Wine/Proton windows) keep the bar tucked: some
       // show a free cursor that would keep hitting the edge. The bar keybinds
       // still bring it out.
@@ -163,6 +164,40 @@ Scope {
           Rectangle {
             anchors.fill: parent
             color: Theme.background.hslLightness < 0.5 ? Qt.rgba(0, 0, 0, 0.12) : Qt.rgba(1, 1, 1, 0.3)
+          }
+        }
+
+        // Background effects off: the wallpaper's own pixels behind the bar,
+        // so it still looks fully clear but the surface is opaque. The desktop
+        // runs in HDR, and Hyprland garbles the edges of text it has to blend
+        // over the wallpaper itself (screenshots do not show it). An animated
+        // wallpaper keeps the see-through bar, since a still copy would not move.
+        FileView {
+          path: Services.Background.path ? Services.Background.path.replace(/\.[^.\/]+$/, "") + ".live.json" : ""
+          printErrors: false
+          onPathChanged: bar.liveWallpaper = false
+          onLoaded: bar.liveWallpaper = true
+          onLoadFailed: bar.liveWallpaper = false
+        }
+
+        Loader {
+          anchors.fill: parent
+          active: !Services.Config.bar.glass && !bar.fullscreen && !bar.liveWallpaper
+          sourceComponent: Item {
+            clip: true
+
+            Image {
+              // Screen-sized and cropped the same way as background/Wallpaper.qml.
+              width: bar.screen.width
+              height: bar.screen.height
+              source: Services.Background.source
+              sourceSize: Qt.size(Math.ceil(width * (bar.monitor ? bar.monitor.scale : 2)),
+                                  Math.ceil(height * (bar.monitor ? bar.monitor.scale : 2)))
+              fillMode: Image.PreserveAspectCrop
+              asynchronous: true
+              cache: false
+              smooth: true
+            }
           }
         }
 
