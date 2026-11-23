@@ -664,11 +664,11 @@ BarButton {
               group: modelData
               ago: t => root.ago(t)
               expanded: !!root.openGroups[modelData.key]
-              onExpandedChanged: {
-                var open = Object.assign({}, root.openGroups)
-                if (expanded) open[modelData.key] = true
-                else delete open[modelData.key]
-                root.openGroups = open
+              onExpandRequested: open => {
+                var groups = Object.assign({}, root.openGroups)
+                if (open) groups[modelData.key] = true
+                else delete groups[modelData.key]
+                root.openGroups = groups
               }
             }
           }

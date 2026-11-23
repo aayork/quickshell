@@ -13,7 +13,10 @@ Item {
   required property var group
   // Turns a timestamp into "5m", "2h"…; the clock popup owns the clock.
   property var ago: t => ""
+  // Owned by the parent (the clock popup remembers which groups are open);
+  // the group only asks, so the binding is never broken or looped.
   property bool expanded: false
+  signal expandRequested(bool open)
 
   readonly property int count: group.entries.length
   // How many cards peek out under the top one while folded.
@@ -47,7 +50,7 @@ Item {
       width: parent.width
       entry: root.group.entries[0]
       more: root.count - 1
-      onOpen: if (root.count > 1) root.expanded = true
+      onOpen: if (root.count > 1) root.expandRequested(true)
     }
   }
 
@@ -71,7 +74,7 @@ Item {
       }
       Pill {
         text: Icons.chevronDown + "  Show less"
-        onClicked: root.expanded = false
+        onClicked: root.expandRequested(false)
       }
       Pill {
         text: Icons.close
