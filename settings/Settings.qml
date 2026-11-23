@@ -813,7 +813,6 @@ Scope {
                 NotchSlider {
                   Layout.preferredWidth: 260
                   stops: root.cursorSizes
-                  notchEvery: 5
                   value: root.nearestCursorSize(root.cursorSize)
                   onMoved: function(value) { root.applyCursor(root.cursor, value) }
                 }
