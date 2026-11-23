@@ -41,15 +41,48 @@ def fail(message):
     sys.exit(1)
 
 
-def mouse():
+def daemon_mice():
+    # None when the daemon is not running.
     try:
         from openrazer.client import DeviceManager
-        devices = [d for d in DeviceManager().devices if d.type == "mouse"]
+        return [d for d in DeviceManager().devices if d.type == "mouse"]
     except Exception:
+        return None
+
+
+def reachable():
+    # {product id: sysfs dpi file} for each mouse the driver can read now.
+    # The wireless mouse shows up twice while it is on its cable: the dongle
+    # (which then reads all zeros) and the wired device, which answers.
+    found = {}
+    for path in sorted(driver_dpi_files()):
+        if read_dpi(path) is None:
+            continue
+        try:
+            name = os.path.basename(os.path.dirname(path))
+            found.setdefault(int(name.split(":")[2].split(".")[0], 16), path)
+        except (IndexError, ValueError):
+            pass
+    return found
+
+
+def pick(devices, live=None):
+    # The daemon device that answers, with its sysfs dpi file; else the
+    # first one and no file.
+    live = reachable() if live is None else live
+    for d in devices:
+        if getattr(d, "_pid", None) in live:
+            return d, live[d._pid]
+    return devices[0], None
+
+
+def mouse():
+    devices = daemon_mice()
+    if devices is None:
         fail("The OpenRazer daemon is not running")
     if not devices:
         fail("No Razer mouse found")
-    return devices[0]
+    return pick(devices)[0]
 
 
 def load_saved():
@@ -219,6 +252,7 @@ def watch():
     fds = []
     online = None
     misses = 0
+    nudged = set()
 
     def set_online(now):
         nonlocal online
@@ -230,16 +264,28 @@ def watch():
         if device is None:
             close_all(fds)
             fds = []
-            try:
-                from openrazer.client import DeviceManager
-                found = [d for d in DeviceManager().devices if d.type == "mouse"]
-            except Exception:
-                found = []
+            found = daemon_mice() or []
+            live = reachable()
+            missing = [p for pid, p in live.items()
+                       if pid not in [getattr(d, "_pid", None) for d in found]]
+            if found and missing and missing[0] not in nudged:
+                # Plugging the cable in sometimes slips past the daemon
+                # (it drops the old wired device and never adds the new
+                # one), so it is left talking to a dongle that reads zero.
+                nudged.add(missing[0])
+                try:
+                    subprocess.run(["systemctl", "--user", "restart", "openrazer-daemon"],
+                                   capture_output=True, timeout=30)
+                except Exception:
+                    pass
+                time.sleep(2)
+                continue
             if found:
-                device, owner = found[0], bus_owner()
-                files = [f for f in driver_dpi_files() if read_dpi(f) is not None]
-                path = files[0] if files else None
+                owner = bus_owner()
+                device, path = pick(found, live)
                 fds = open_button_events()
+                # Said again for the new device so the shell re-reads it.
+                online = None
                 restore(device)
                 last = read_dpi(path) if path else None
                 if last:
@@ -256,7 +302,7 @@ def watch():
             value = read_after_press(path, last)
         else:
             value = read_dpi(path)
-        if bus_owner() != owner or path is None or not os.path.exists(path):
+        if bus_owner() != owner or (path is not None and not os.path.exists(path)):
             device = None
             continue
         if value is None:
@@ -264,6 +310,12 @@ def watch():
             # shows up as reads failing rather than the device going away.
             last = None
             misses += 1
+            # Cable just plugged in (or pulled): another device answers now.
+            # (One the daemon still has not picked up after a restart is
+            # left alone rather than re-checked every half second.)
+            if any(p != path and p not in nudged for p in reachable().values()):
+                device = None
+                continue
             if misses >= OFFLINE_AFTER:
                 set_online(False)
             continue
@@ -317,7 +369,7 @@ def status():
     d = mouse()
     accel, sensitivity = saved()
     info = {
-        "name": d.name.replace(" (Wireless)", ""),
+        "name": d.name.replace(" (Wireless)", "").replace(" (Wired)", ""),
         "accel": accel,
         "sensitivity": sensitivity,
         "pollRates": POLL_RATES,
