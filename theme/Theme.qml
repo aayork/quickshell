@@ -93,7 +93,9 @@ Singleton {
   readonly property int barPadding: 6
   readonly property int barIconSlot: 27
 
-  readonly property int radius: 0
+  // Set from Settings › Windows › Corner radius by shell.qml. The greeter
+  // shares no Config, so it keeps this default.
+  property int radius: 0
   readonly property int controlRadius: 2
   readonly property int borderWidth: 2
   readonly property int popupPadding: 14

@@ -1,5 +1,7 @@
 //@ pragma IconTheme Numix-Square
+import QtQuick
 import Quickshell
+import qs.theme
 import qs.background
 import qs.bar
 import qs.capture
@@ -19,6 +21,14 @@ ShellRoot {
   readonly property bool nightLight: NightLight.active
   // Likewise the clipboard history, which has to be recording from the start.
   readonly property int clipboardEntries: Clipboard.entries.length
+
+  // Popups, toasts and overlays share the window corner radius. Bound here
+  // because services already import the theme, so Theme cannot import Config.
+  Binding {
+    target: Theme
+    property: "radius"
+    value: Math.max(0, Number(Config.windows.rounding) || 0)
+  }
 
   Wallpaper {}
   Bar {}
